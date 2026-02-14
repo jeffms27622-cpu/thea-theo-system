@@ -4,3 +4,5 @@ fpdf
 openpyxl
 thefuzz
 python-Levenshtein
+gspread
+google-auth
