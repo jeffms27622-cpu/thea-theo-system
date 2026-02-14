@@ -1,13 +1,13 @@
 import streamlit as st
 import pandas as pd
 import ast
-from datetime import datetime
+from datetime import datetime, timedelta
 from fpdf import FPDF
 import os
 import gspread
 from google.oauth2.service_account import Credentials
 
-# --- 1. KONFIGURASI IDENTITAS ---
+# --- 1. KONFIGURASI IDENTITAS & KEAMANAN ---
 COMPANY_NAME = "PT. THEA THEO STATIONARY"
 SLOGAN = "Supplier Alat Tulis Kantor & Sekolah"
 ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
@@ -28,17 +28,20 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
-# --- 3. FUNGSI DATABASE LOKAL ---
+# --- 3. FUNGSI DATABASE LOKAL (Daftar Barang) ---
 def load_db():
     if os.path.exists("database_barang.xlsx"):
-        df = pd.read_excel("database_barang.xlsx")
-        df.columns = df.columns.str.strip()
-        return df
+        try:
+            df = pd.read_excel("database_barang.xlsx")
+            df.columns = df.columns.str.strip()
+            return df
+        except:
+            return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
     return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
 
 df_barang = load_db()
 
-# --- 4. MESIN PDF (DENGAN CATATAN TANPA TTD) ---
+# --- 4. MESIN PDF (Footer Tanpa TTD Basah) ---
 class PenawaranPDF(FPDF):
     def header(self):
         if os.path.exists("logo.png"):
@@ -62,7 +65,10 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf = PenawaranPDF()
     pdf.add_page()
     pdf.set_font('Arial', '', 10)
-    tgl_skrg = datetime.now().strftime('%d %B %Y')
+    
+    # Waktu Indonesia Barat (WIB)
+    waktu_jkt = datetime.utcnow() + timedelta(hours=7)
+    tgl_skrg = waktu_jkt.strftime('%d %B %Y')
     
     pdf.cell(95, 6, f"No: {no_surat}", ln=0)
     pdf.cell(95, 6, f"Tangerang, {tgl_skrg}", ln=1, align='R')
@@ -102,15 +108,12 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(160, 8, "GRAND TOTAL", 0, 0, 'R')
     pdf.cell(30, 8, f"{grand_total:,.0f}", 1, 1, 'R')
     
-    # --- FOOTER CATATAN SAH TANPA TTD (PENTING) ---
+    # Footer Catatan Sah Tanpa TTD Basah
     pdf.ln(10); pdf.set_font('Arial', '', 9)
     pdf.cell(0, 5, "Atas perhatian dan kerja samanya kami ucapkan terima kasih.", ln=1)
-    pdf.ln(5)
-    pdf.set_font('Arial', 'I', 8)
-    pdf.set_text_color(100, 100, 100)
+    pdf.ln(5); pdf.set_font('Arial', 'I', 8); pdf.set_text_color(100, 100, 100)
     pdf.multi_cell(0, 4, "Dokumen ini diterbitkan secara otomatis oleh sistem aplikasi PT. THEA THEO STATIONARY.\nSah dan valid tanpa tanda tangan basah karena telah diverifikasi secara elektronik.")
     
-    # Penutup
     pdf.set_text_color(0, 0, 0); pdf.ln(5); pdf.set_font('Arial', 'B', 10)
     pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15); pdf.cell(0, 6, "Asin", ln=1)
     pdf.set_font('Arial', '', 9); pdf.cell(0, 5, "Sales Consultant", ln=1)
@@ -125,15 +128,15 @@ if 'cart' not in st.session_state:
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
     if os.path.exists("logo.png"): st.image("logo.png", width=200)
-    st.write("Sistem Penawaran Otomatis (GSheets & Tanpa TTD Basah).")
+    st.write("Sistem Penawaran Otomatis (GSheets + WIB Timezone).")
 
 elif menu == "📝 Portal Customer":
     st.title("🛒 Form Pengajuan Penawaran")
     with st.container(border=True):
         col1, col2 = st.columns(2)
-        nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko")
-        up_nama = col2.text_input("👤 Nama Penerima (UP)")
-        wa_nomor = col1.text_input("📞 Nomor WhatsApp")
+        nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko", placeholder="Contoh: PT. Dharma Guna Wibawa")
+        up_nama = col2.text_input("👤 Nama Penerima (UP)", placeholder="Contoh: Ibu Rizka")
+        wa_nomor = col1.text_input("📞 Nomor WhatsApp", placeholder="0815xxxx")
         picks = st.multiselect("📦 Pilih Barang:", options=df_barang['Nama Barang'].tolist())
         if st.button("Tambahkan Barang"):
             for p in picks:
@@ -153,19 +156,31 @@ elif menu == "📝 Portal Customer":
                 qty = c4.number_input("Qty", min_value=1, value=1, key=f"q_{item}")
                 if c5.button("❌", key=f"del_{item}"):
                     st.session_state.cart.remove(item); st.rerun()
-                list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(row['Harga']), "Satuan": str(row['Satuan']), "Total_Row": float(qty * row['Harga'])})
+                
+                # Memastikan data dikonversi ke Python Dasar agar GSheets tidak Error
+                list_pesanan.append({
+                    "Nama Barang": str(item), 
+                    "Qty": int(qty), 
+                    "Harga": float(row['Harga']), 
+                    "Satuan": str(row['Satuan']), 
+                    "Total_Row": float(qty * row['Harga'])
+                })
 
         if st.button("🚀 Kirim Pengajuan Sekarang", use_container_width=True):
             sheet = connect_gsheet()
             if sheet and nama_toko:
+                # Ambil waktu WIB (UTC+7)
+                waktu_jkt = datetime.utcnow() + timedelta(hours=7)
+                tanggal_wib = waktu_jkt.strftime("%Y-%m-%d %H:%M")
+                
                 sheet.append_row([
-                    datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending"
+                    tanggal_wib,
+                    str(nama_toko), str(up_nama), str(wa_nomor), str(list_pesanan), "Pending"
                 ])
-                st.success("Terkirim! Terima kasih, data sudah masuk di sistem GSheets kami.")
+                st.success("✅ Terkirim! Data sudah masuk di sistem GSheets kami (WIB).")
                 st.session_state.cart = []
             else:
-                st.error("Gagal simpan. Pastikan Nama Toko terisi.")
+                st.error("Gagal simpan. Periksa Nama Toko atau Koneksi Internet.")
 
 elif menu == "👨‍💻 Admin Dashboard":
     st.title("Admin Dashboard (Real-time)")
@@ -178,23 +193,28 @@ elif menu == "👨‍💻 Admin Dashboard":
                 st.info("Belum ada antrean.")
             else:
                 df_gs = pd.DataFrame(data)
+                # Filter hanya status Pending
                 pending = df_gs[df_gs['Status'] == 'Pending']
                 if pending.empty:
                     st.info("Tidak ada antrean baru.")
                 else:
                     for idx, row in pending.iterrows():
-                        with st.expander(f"DARI: {row['Customer']}"):
-                            items = ast.literal_eval(row['Pesanan'])
-                            df_f = pd.DataFrame(items)
-                            dpp = df_f['Total_Row'].sum()
-                            tax = dpp * 0.11
-                            total = dpp + tax
-                            st.table(df_f[['Nama Barang', 'Qty', 'Satuan', 'Harga', 'Total_Row']])
-                            
-                            no_surat = st.text_input("Nomor Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_{idx}")
-                            pdf_bytes = generate_pdf(no_surat, row['Customer'], row['UP'], df_f, dpp, tax, total)
-                            
-                            st.download_button("Download PDF", data=pdf_bytes, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_{idx}")
-                            if st.button("Tandai Selesai", key=f"fin_{idx}"):
-                                sheet.update_cell(idx + 2, 6, "Processed")
-                                st.rerun()
+                        with st.expander(f"DARI: {row['Customer']} ({row['Tanggal']})"):
+                            try:
+                                items = ast.literal_eval(str(row['Pesanan']))
+                                df_f = pd.DataFrame(items)
+                                dpp = df_f['Total_Row'].sum()
+                                tax = dpp * 0.11
+                                total = dpp + tax
+                                st.table(df_f[['Nama Barang', 'Qty', 'Satuan', 'Harga', 'Total_Row']])
+                                
+                                no_surat = st.text_input("Nomor Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_{idx}")
+                                pdf_bytes = generate_pdf(no_surat, row['Customer'], row['UP'], df_f, dpp, tax, total)
+                                
+                                st.download_button("Download PDF", data=pdf_bytes, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_{idx}")
+                                if st.button("Tandai Selesai", key=f"fin_{idx}"):
+                                    # Update cell di kolom 'Status' (Kolom 6)
+                                    sheet.update_cell(idx + 2, 6, "Processed")
+                                    st.rerun()
+                            except Exception as e:
+                                st.error(f"Error memproses data: {e}")
