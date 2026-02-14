@@ -5,12 +5,12 @@ from datetime import datetime
 from fpdf import FPDF
 import os
 
-# --- 1. KONFIGURASI IDENTITAS & KEAMANAN ---
+# --- 1. KONFIGURASI IDENTITAS ---
 COMPANY_NAME = "PT. THEA THEO STATIONARY"
 SLOGAN = "Supplier Alat Tulis Kantor & Sekolah"
 ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 CONTACT = "Ph: 021-55780659, WA: 08158199775 | email: alattulis.tts@gmail.com"
-ADMIN_PASSWORD = "theo123" 
+ADMIN_PASSWORD = "tts123" 
 
 st.set_page_config(page_title=COMPANY_NAME, layout="wide")
 
@@ -27,19 +27,17 @@ def load_db():
 
 df_barang = load_db()
 
-# --- 3. MESIN PDF (Layout Perbaikan Header & Footer) ---
+# --- 3. MESIN PDF ---
 class PenawaranPDF(FPDF):
     def header(self):
         if os.path.exists("logo.png"):
             self.image("logo.png", 10, 8, 25)
             self.set_x(38)
         
-        # Nama Perusahaan (Kiri)
         self.set_font('Arial', 'B', 15)
         self.set_text_color(0, 51, 102)
         self.cell(80, 7, COMPANY_NAME, ln=0)
         
-        # Alamat & Kontak (Kanan - Diberi lebar lebih luas agar tidak terpotong)
         self.set_font('Arial', '', 8)
         self.set_text_color(0, 0, 0)
         self.cell(0, 5, ADDR, ln=1, align='R')
@@ -61,20 +59,17 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.set_font('Arial', '', 10)
     tgl_skrg = datetime.now().strftime('%d %B %Y')
     
-    # Header Surat
     pdf.cell(95, 6, f"No: {no_surat}", ln=0)
     pdf.cell(95, 6, f"Tangerang, {tgl_skrg}", ln=1, align='R')
     pdf.cell(0, 6, "Hal: Surat Penawaran Harga", ln=1)
     pdf.ln(5)
     
-    # Tujuan
     pdf.set_font('Arial', 'B', 10)
     pdf.cell(0, 6, "Kepada Yth,", ln=1)
     pdf.cell(0, 6, str(nama_cust), ln=1)
     pdf.cell(0, 6, f"Up. {pic}", ln=1)
     pdf.ln(5)
 
-    # Tabel Penawaran
     pdf.set_fill_color(240, 240, 240)
     pdf.set_font('Arial', 'B', 10)
     pdf.cell(10, 10, 'No', 1, 0, 'C', True)
@@ -102,14 +97,12 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(160, 8, "GRAND TOTAL", 0, 0, 'R')
     pdf.cell(30, 8, f"{grand_total:,.0f}", 1, 1, 'R')
 
-    # Footer Khusus: Deklarasi Tanpa TTD
     pdf.ln(10)
     pdf.set_font('Arial', '', 9)
     pdf.cell(0, 5, "Atas perhatian dan kerja samanya kami ucapkan terima kasih.", ln=1)
     pdf.ln(5)
     pdf.set_font('Arial', 'I', 8)
     pdf.set_text_color(100, 100, 100)
-    # Teks ini yang sebelumnya hilang/terpotong:
     pdf.multi_cell(0, 4, "Dokumen ini diterbitkan secara otomatis oleh sistem aplikasi PT. THEA THEO STATIONARY.\nSah dan valid tanpa tanda tangan basah karena telah diverifikasi secara elektronik.")
     
     pdf.set_text_color(0, 0, 0)
@@ -117,7 +110,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.set_font('Arial', 'B', 10)
     pdf.cell(0, 6, "Hormat Kami,", ln=1)
     pdf.ln(15)
-    pdf.cell(0, 6, "A.Sin", ln=1)
+    pdf.cell(0, 6, "Asin", ln=1)
     pdf.set_font('Arial', '', 9)
     pdf.cell(0, 5, "Sales Consultant", ln=1)
     
@@ -130,18 +123,17 @@ if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
     if os.path.exists("logo.png"):
         st.image("logo.png", width=200)
-    st.write("Sistem Pembuatan Penawaran Harga Otomatis.")
+    st.write("Gunakan menu di samping untuk membuat pengajuan penawaran harga.")
 
 elif menu == "📝 Portal Customer":
     st.title("🛒 Form Pengajuan Penawaran")
-    st.info("Pilih barang yang dibutuhkan dan atur jumlahnya di bawah.")
+    st.info("Pilih barang dan tentukan jumlahnya di bawah.")
     
     with st.form("main_form"):
         col1, col2 = st.columns(2)
-        nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko", placeholder="Contoh: PT. Dharma Guna Wibawa")
+        nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko", placeholder="Contoh: PT. Maju Jaya")
         up_nama = col2.text_input("👤 Nama Penerima (UP)", placeholder="Contoh: Ibu Rizka")
         wa_nomor = col1.text_input("📞 Nomor WhatsApp", placeholder="0815xxxx")
-        
         pilihan = st.multiselect("📦 Pilih Barang:", options=df_barang['Nama Barang'].tolist())
         submit_data = st.form_submit_button("Lanjut ke Pengaturan Jumlah")
 
@@ -150,8 +142,10 @@ elif menu == "📝 Portal Customer":
         st.subheader("🔢 Masukkan Jumlah (Qty)")
         list_pesanan = []
         for b in pilihan:
-            c_nama, c_qty = st.columns([3, 1])
+            row_data = df_barang[df_barang['Nama Barang'] == b].iloc[0]
+            c_nama, c_satuan, c_qty = st.columns([3, 1, 1])
             c_nama.write(f"**{b}**")
+            c_satuan.write(f"Satuan: `{row_data['Satuan']}`") # MENAMPILKAN SATUAN BAKU
             qty = c_qty.number_input(f"Qty", min_value=1, value=1, key=f"q_{b}", label_visibility="collapsed")
             list_pesanan.append({"Barang": str(b), "Qty": int(qty)})
         
@@ -206,9 +200,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                             
                             st.table(df_f[['Nama Barang', 'Qty', 'Satuan', 'Harga', 'Total_Row']])
                             
-                            # Input Nomor Surat Manual
                             no_surat_input = st.text_input("📝 Nomor Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_txt_{i}")
-                            
                             pdf_bytes = generate_pdf(no_surat_input, row['Customer'], row['UP'], df_f, dpp, tax, total_akhir)
                             
                             st.download_button(
@@ -223,7 +215,6 @@ elif menu == "👨‍💻 Admin Dashboard":
                                 df_q.at[i, 'Status'] = 'Processed'
                                 df_q.to_excel("antrean_penawaran.xlsx", index=False)
                                 st.rerun()
-                                
                         except Exception as e:
                             st.error(f"Gagal memproses baris ini: {e}")
         else:
