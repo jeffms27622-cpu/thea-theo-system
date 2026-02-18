@@ -75,6 +75,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(0, 6, f"Up. {pic}", ln=1)
     pdf.ln(5)
     
+    # Tabel Header
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(10, 10, 'No', 1, 0, 'C', True)
     pdf.cell(85, 10, 'Nama Barang', 1, 0, 'C', True)
@@ -100,10 +101,18 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(160, 8, "GRAND TOTAL", 0, 0, 'R')
     pdf.cell(30, 8, f"{grand_total:,.0f}", 1, 1, 'R')
     
+    # Footer Catatan Sah
     pdf.ln(10); pdf.set_font('Arial', 'I', 8); pdf.set_text_color(100, 100, 100)
     pdf.multi_cell(0, 4, "Dokumen ini diterbitkan secara otomatis oleh sistem PT. THEA THEO STATIONARY.\nSah dan valid tanpa tanda tangan basah.")
+    
+    # --- BAGIAN JABATAN (SUDAH DIPERBAIKI) ---
     pdf.set_text_color(0, 0, 0); pdf.ln(5); pdf.set_font('Arial', 'B', 10)
-    pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15); pdf.cell(0, 6, "A.Sin", ln=1)
+    pdf.cell(0, 6, "Hormat Kami,", ln=1)
+    pdf.ln(15)
+    pdf.cell(0, 6, "A.Sin", ln=1)
+    pdf.set_font('Arial', '', 9)
+    pdf.cell(0, 5, "Sales Consultant", ln=1) # Baris ini sudah ditambahkan kembali
+    
     return pdf.output(dest='S').encode('latin-1')
 
 # --- 5. LOGIKA MENU ---
@@ -114,7 +123,7 @@ if 'cart' not in st.session_state:
 
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.write("Sistem Penawaran Otomatis v3.0 (Full Admin Control: Edit, Hapus & Tambah Item)")
+    st.write("Sistem Penawaran Otomatis v3.1 (Edit Admin + Jabatan PDF)")
 
 elif menu == "📝 Portal Customer":
     st.title("🛒 Form Pengajuan Penawaran")
@@ -146,11 +155,11 @@ elif menu == "📝 Portal Customer":
             if sheet and nama_toko:
                 waktu_jkt = datetime.utcnow() + timedelta(hours=7)
                 sheet.append_row([waktu_jkt.strftime("%Y-%m-%d %H:%M"), nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending"])
-                st.success("Terkirim! Terima kasih.")
+                st.success("Terkirim!")
                 st.session_state.cart = []
 
 elif menu == "👨‍💻 Admin Dashboard":
-    st.title("Admin Dashboard (Editor Mode v3.0)")
+    st.title("Admin Dashboard (Editor Mode v3.1)")
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         sheet = connect_gsheet()
@@ -165,68 +174,25 @@ elif menu == "👨‍💻 Admin Dashboard":
                 else:
                     for idx, row in pending.iterrows():
                         with st.expander(f"🛠️ EDIT PESANAN: {row['Customer']}"):
-                            # 1. Load Data Pesanan Saat Ini
                             items_list = ast.literal_eval(str(row['Pesanan']))
                             current_items_df = pd.DataFrame(items_list)
                             
-                            st.subheader("1. Edit Item Terdaftar")
+                            st.subheader("1. Koreksi Item")
                             edited_items = []
                             for i, r in current_items_df.iterrows():
                                 col_a, col_b, col_c = st.columns([3, 1, 1])
-                                col_a.write(f"**{r['Nama Barang']}** ({r['Satuan']})")
-                                new_qty = col_b.number_input(f"Qty", value=int(r['Qty']), key=f"ed_qty_{idx}_{i}")
-                                hapus = col_c.checkbox("Hapus Item", key=f"ed_del_{idx}_{i}")
-                                
+                                col_a.write(f"**{r['Nama Barang']}**")
+                                n_qty = col_b.number_input(f"Qty", value=int(r['Qty']), key=f"ed_{idx}_{i}")
+                                hapus = col_c.checkbox("Hapus", key=f"del_{idx}_{i}")
                                 if not hapus:
-                                    edited_items.append({
-                                        "Nama Barang": r['Nama Barang'],
-                                        "Qty": new_qty,
-                                        "Harga": r['Harga'],
-                                        "Satuan": r['Satuan'],
-                                        "Total_Row": new_qty * r['Harga']
-                                    })
+                                    edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": n_qty, "Harga": r['Harga'], "Satuan": r['Satuan'], "Total_Row": n_qty * r['Harga']})
                             
                             st.divider()
-                            st.subheader("2. Tambah Barang Baru ke Pesanan")
-                            new_picks = st.multiselect("Pilih Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_item_{idx}")
-                            
+                            st.subheader("2. Tambah Barang")
+                            new_picks = st.multiselect("Cari Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_{idx}")
                             for p in new_picks:
-                                row_b = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                with st.container():
-                                    ca, cb = st.columns([3, 1])
-                                    ca.write(f"Menambahkan: **{p}**")
-                                    a_qty = cb.number_input(f"Qty Tambahan", min_value=1, value=1, key=f"add_qty_{idx}_{p}")
-                                    edited_items.append({
-                                        "Nama Barang": str(p),
-                                        "Qty": int(a_qty),
-                                        "Harga": float(row_b['Harga']),
-                                        "Satuan": str(row_b['Satuan']),
-                                        "Total_Row": float(a_qty * row_b['Harga'])
-                                    })
+                                rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
+                                aqty = st.number_input(f"Qty {p}", min_value=1, value=1, key=f"aq_{idx}_{p}")
+                                edited_items.append({"Nama Barang": str(p), "Qty": int(aqty), "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(aqty * rb['Harga'])})
 
-                            # 2. Simpan Semua Perubahan (Edit + Hapus + Tambah)
-                            if st.button("💾 Simpan Perubahan ke Google Sheets", key=f"btn_save_{idx}"):
-                                sheet.update_cell(idx + 2, 5, str(edited_items))
-                                st.success("Database GSheets telah diperbarui!")
-                                st.rerun()
-
-                            # 3. Preview & Cetak PDF
-                            st.divider()
-                            final_df = pd.DataFrame(edited_items)
-                            if not final_df.empty:
-                                dpp = final_df['Total_Row'].sum()
-                                tax = dpp * 0.11
-                                total = dpp + tax
-                                
-                                st.write(f"**Preview Total Baru:** Rp {total:,.0f}")
-                                
-                                no_surat = st.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_{idx}")
-                                pdf_bytes = generate_pdf(no_surat, row['Customer'], row['UP'], final_df, dpp, tax, total)
-                                
-                                st.download_button("📩 Download PDF Final", data=pdf_bytes, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_{idx}")
-                                
-                                if st.button("✅ Selesai & Arsipkan", key=f"fin_{idx}"):
-                                    sheet.update_cell(idx + 2, 6, "Processed")
-                                    st.rerun()
-                            else:
-                                st.warning("Daftar pesanan kosong.")
+                            if st.
