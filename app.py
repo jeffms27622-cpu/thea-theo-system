@@ -12,7 +12,7 @@ COMPANY_NAME = "PT. THEA THEO STATIONARY"
 SLOGAN = "Supplier Alat Tulis Kantor & Sekolah"
 ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 CONTACT = "Ph: 021-55780659, WA: 08158199775 | email: alattulis.tts@gmail.com"
-ADMIN_PASSWORD = "theo123" 
+ADMIN_PASSWORD = "tts123" 
 
 st.set_page_config(page_title=COMPANY_NAME, layout="wide")
 
@@ -27,12 +27,22 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
-# --- 3. FUNGSI DATABASE LOKAL ---
+# --- 3. FUNGSI DATABASE LOKAL (DENGAN PROTEKSI HARGA) ---
 def load_db():
     if os.path.exists("database_barang.xlsx"):
-        df = pd.read_excel("database_barang.xlsx")
-        df.columns = df.columns.str.strip()
-        return df
+        try:
+            df = pd.read_excel("database_barang.xlsx")
+            df.columns = df.columns.str.strip() # Bersihkan spasi di nama kolom
+            
+            # Validasi Kolom Harga
+            if 'Harga' in df.columns:
+                df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce').fillna(0)
+            else:
+                st.error("⚠️ Kolom 'Harga' tidak ditemukan di database_barang.xlsx")
+                
+            return df
+        except Exception as e:
+            st.error(f"Gagal membaca Excel: {e}")
     return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
 
 df_barang = load_db()
@@ -119,7 +129,7 @@ if 'cart' not in st.session_state:
 
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.write("Sistem Penawaran Otomatis v3.2 (Stabel & Full Features)")
+    st.write("Sistem Penawaran Otomatis v3.4 (Fix Harga & Jabatan)")
 
 elif menu == "📝 Portal Customer":
     st.title("🛒 Form Pengajuan Penawaran")
@@ -137,73 +147,77 @@ elif menu == "📝 Portal Customer":
     if st.session_state.cart:
         list_pesanan = []
         for item in st.session_state.cart:
-            row = df_barang[df_barang['Nama Barang'] == item].iloc[0]
+            item_row = df_barang[df_barang['Nama Barang'] == item].iloc[0]
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([3, 1, 1, 0.5])
                 c1.write(f"**{item}**")
+                c2.write(f"Rp {item_row['Harga']:,.0f}") # Tampilkan harga di portal
                 qty = c3.number_input(f"Qty {item}", min_value=1, value=1, key=f"q_{item}")
                 if c4.button("❌", key=f"del_{item}"):
                     st.session_state.cart.remove(item); st.rerun()
-                list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(row['Harga']), "Satuan": str(row['Satuan']), "Total_Row": float(qty * row['Harga'])})
+                list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(item_row['Harga']), "Satuan": str(item_row['Satuan']), "Total_Row": float(qty * item_row['Harga'])})
 
         if st.button("🚀 Kirim Pengajuan", use_container_width=True):
             sheet = connect_gsheet()
             if sheet and nama_toko:
-                waktu_jkt = datetime.utcnow() + timedelta(hours=7)
-                sheet.append_row([waktu_jkt.strftime("%Y-%m-%d %H:%M"), nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending"])
-                st.success("Terkirim!")
+                wkt = datetime.utcnow() + timedelta(hours=7)
+                sheet.append_row([wkt.strftime("%Y-%m-%d %H:%M"), nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending"])
+                st.success("Terkirim! Mohon tunggu konfirmasi Marketing.")
                 st.session_state.cart = []
 
 elif menu == "👨‍💻 Admin Dashboard":
-    st.title("Admin Dashboard (Editor Mode v3.2)")
+    st.title("Admin Dashboard (Editor Mode v3.4)")
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         sheet = connect_gsheet()
         if sheet:
-            data = sheet.get_all_records()
-            if data:
-                df_gs = pd.DataFrame(data)
-                pending = df_gs[df_gs['Status'] == 'Pending']
-                if pending.empty:
-                    st.info("Tidak ada antrean baru.")
-                else:
-                    for idx, row in pending.iterrows():
-                        with st.expander(f"🛠️ EDIT PESANAN: {row['Customer']}"):
-                            items_list = ast.literal_eval(str(row['Pesanan']))
-                            current_df = pd.DataFrame(items_list)
-                            
-                            st.subheader("1. Koreksi Item")
-                            edited_items = []
-                            for i, r in current_df.iterrows():
-                                col_a, col_b, col_c = st.columns([3, 1, 1])
-                                col_a.write(f"**{r['Nama Barang']}**")
-                                n_qty = col_b.number_input(f"Qty", value=int(r['Qty']), key=f"ed_{idx}_{i}")
-                                hapus = col_c.checkbox("Hapus", key=f"del_{idx}_{i}")
-                                if not hapus:
-                                    edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": n_qty, "Harga": r['Harga'], "Satuan": r['Satuan'], "Total_Row": n_qty * r['Harga']})
-                            
-                            st.divider()
-                            st.subheader("2. Tambah Barang")
-                            new_picks = st.multiselect("Cari Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_{idx}")
-                            for p in new_picks:
-                                rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                aqty = st.number_input(f"Qty {p}", min_value=1, value=1, key=f"aq_{idx}_{p}")
-                                edited_items.append({"Nama Barang": str(p), "Qty": int(aqty), "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(aqty * rb['Harga'])})
+            try:
+                all_vals = sheet.get_all_values()
+                if len(all_vals) > 1:
+                    df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
+                    pending = df_gs[df_gs['Status'] == 'Pending']
+                    if pending.empty:
+                        st.info("Tidak ada antrean baru.")
+                    else:
+                        for idx, row in pending.iterrows():
+                            real_row_idx = idx + 2
+                            with st.expander(f"🛠️ EDIT PESANAN: {row['Customer']}"):
+                                items_list = ast.literal_eval(str(row['Pesanan']))
+                                cur_df = pd.DataFrame(items_list)
+                                edited_items = []
+                                for i, r in cur_df.iterrows():
+                                    ca, cb, cc = st.columns([3, 1, 1])
+                                    ca.write(f"**{r['Nama Barang']}**")
+                                    nq = cb.number_input(f"Qty", value=int(r['Qty']), key=f"ed_{idx}_{i}")
+                                    hps = cc.checkbox("Hapus", key=f"del_{idx}_{i}")
+                                    if not hps:
+                                        edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": r['Harga'], "Satuan": r['Satuan'], "Total_Row": nq * r['Harga']})
+                                
+                                st.divider()
+                                new_ps = st.multiselect("Tambah Barang:", options=df_barang['Nama Barang'].tolist(), key=f"add_{idx}")
+                                for p in new_ps:
+                                    rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
+                                    aq = st.number_input(f"Qty {p}", min_value=1, value=1, key=f"aq_{idx}_{p}")
+                                    edited_items.append({"Nama Barang": str(p), "Qty": int(aq), "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(aq * rb['Harga'])})
 
-                            if st.button("💾 Simpan Perubahan", key=f"save_{idx}"):
-                                sheet.update_cell(idx + 2, 5, str(edited_items))
-                                st.success("Database Diperbarui!")
-                                st.rerun()
-
-                            st.divider()
-                            final_df = pd.DataFrame(edited_items)
-                            if not final_df.empty:
-                                dpp = final_df['Total_Row'].sum()
-                                tax = dpp * 0.11
-                                total = dpp + tax
-                                no_surat = st.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_{idx}")
-                                pdf_bytes = generate_pdf(no_surat, row['Customer'], row['UP'], final_df, dpp, tax, total)
-                                st.download_button("📩 Download PDF", data=pdf_bytes, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_{idx}")
-                                if st.button("✅ Selesai & Arsipkan", key=f"fin_{idx}"):
-                                    sheet.update_cell(idx + 2, 6, "Processed")
+                                if st.button("💾 Simpan Perubahan", key=f"save_{idx}"):
+                                    sheet.update_cell(real_row_idx, 5, str(edited_items))
+                                    st.success("Berhasil diupdate!")
                                     st.rerun()
+
+                                st.divider()
+                                final_df = pd.DataFrame(edited_items)
+                                if not final_df.empty:
+                                    subt = final_df['Total_Row'].sum()
+                                    tax = subt * 0.11
+                                    gtot = subt + tax
+                                    no_s = st.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_{idx}")
+                                    pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
+                                    st.download_button("📩 Download PDF", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_{idx}")
+                                    if st.button("✅ Selesai & Arsipkan", key=f"fin_{idx}"):
+                                        sheet.update_cell(real_row_idx, 6, "Processed")
+                                        st.rerun()
+                else:
+                    st.info("Sheet kosong.")
+            except Exception as e:
+                st.error(f"Error: {e}")
