@@ -12,7 +12,7 @@ COMPANY_NAME = "PT. THEA THEO STATIONARY"
 SLOGAN = "Supplier Alat Tulis Kantor & Sekolah"
 ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 CONTACT = "Ph: 021-55780659, WA: 08158199775 | email: alattulis.tts@gmail.com"
-ADMIN_PASSWORD = "tts123" 
+ADMIN_PASSWORD = "theo123" 
 
 st.set_page_config(page_title=COMPANY_NAME, layout="wide")
 
@@ -75,7 +75,6 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(0, 6, f"Up. {pic}", ln=1)
     pdf.ln(5)
     
-    # Tabel Header
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(10, 10, 'No', 1, 0, 'C', True)
     pdf.cell(85, 10, 'Nama Barang', 1, 0, 'C', True)
@@ -101,18 +100,15 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(160, 8, "GRAND TOTAL", 0, 0, 'R')
     pdf.cell(30, 8, f"{grand_total:,.0f}", 1, 1, 'R')
     
-    # Footer Catatan Sah
     pdf.ln(10); pdf.set_font('Arial', 'I', 8); pdf.set_text_color(100, 100, 100)
     pdf.multi_cell(0, 4, "Dokumen ini diterbitkan secara otomatis oleh sistem PT. THEA THEO STATIONARY.\nSah dan valid tanpa tanda tangan basah.")
     
-    # --- BAGIAN JABATAN (SUDAH DIPERBAIKI) ---
     pdf.set_text_color(0, 0, 0); pdf.ln(5); pdf.set_font('Arial', 'B', 10)
     pdf.cell(0, 6, "Hormat Kami,", ln=1)
     pdf.ln(15)
     pdf.cell(0, 6, "A.Sin", ln=1)
     pdf.set_font('Arial', '', 9)
-    pdf.cell(0, 5, "Sales Consultant", ln=1) # Baris ini sudah ditambahkan kembali
-    
+    pdf.cell(0, 5, "Sales Consultant", ln=1)
     return pdf.output(dest='S').encode('latin-1')
 
 # --- 5. LOGIKA MENU ---
@@ -123,7 +119,7 @@ if 'cart' not in st.session_state:
 
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.write("Sistem Penawaran Otomatis v3.1 (Edit Admin + Jabatan PDF)")
+    st.write("Sistem Penawaran Otomatis v3.2 (Stabel & Full Features)")
 
 elif menu == "📝 Portal Customer":
     st.title("🛒 Form Pengajuan Penawaran")
@@ -159,7 +155,7 @@ elif menu == "📝 Portal Customer":
                 st.session_state.cart = []
 
 elif menu == "👨‍💻 Admin Dashboard":
-    st.title("Admin Dashboard (Editor Mode v3.1)")
+    st.title("Admin Dashboard (Editor Mode v3.2)")
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         sheet = connect_gsheet()
@@ -168,18 +164,17 @@ elif menu == "👨‍💻 Admin Dashboard":
             if data:
                 df_gs = pd.DataFrame(data)
                 pending = df_gs[df_gs['Status'] == 'Pending']
-                
                 if pending.empty:
                     st.info("Tidak ada antrean baru.")
                 else:
                     for idx, row in pending.iterrows():
                         with st.expander(f"🛠️ EDIT PESANAN: {row['Customer']}"):
                             items_list = ast.literal_eval(str(row['Pesanan']))
-                            current_items_df = pd.DataFrame(items_list)
+                            current_df = pd.DataFrame(items_list)
                             
                             st.subheader("1. Koreksi Item")
                             edited_items = []
-                            for i, r in current_items_df.iterrows():
+                            for i, r in current_df.iterrows():
                                 col_a, col_b, col_c = st.columns([3, 1, 1])
                                 col_a.write(f"**{r['Nama Barang']}**")
                                 n_qty = col_b.number_input(f"Qty", value=int(r['Qty']), key=f"ed_{idx}_{i}")
@@ -195,4 +190,20 @@ elif menu == "👨‍💻 Admin Dashboard":
                                 aqty = st.number_input(f"Qty {p}", min_value=1, value=1, key=f"aq_{idx}_{p}")
                                 edited_items.append({"Nama Barang": str(p), "Qty": int(aqty), "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(aqty * rb['Harga'])})
 
-                            if st.
+                            if st.button("💾 Simpan Perubahan", key=f"save_{idx}"):
+                                sheet.update_cell(idx + 2, 5, str(edited_items))
+                                st.success("Database Diperbarui!")
+                                st.rerun()
+
+                            st.divider()
+                            final_df = pd.DataFrame(edited_items)
+                            if not final_df.empty:
+                                dpp = final_df['Total_Row'].sum()
+                                tax = dpp * 0.11
+                                total = dpp + tax
+                                no_surat = st.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_{idx}")
+                                pdf_bytes = generate_pdf(no_surat, row['Customer'], row['UP'], final_df, dpp, tax, total)
+                                st.download_button("📩 Download PDF", data=pdf_bytes, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_{idx}")
+                                if st.button("✅ Selesai & Arsipkan", key=f"fin_{idx}"):
+                                    sheet.update_cell(idx + 2, 6, "Processed")
+                                    st.rerun()
