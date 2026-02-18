@@ -27,19 +27,14 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
-# --- 3. FUNGSI DATABASE LOKAL (DENGAN PROTEKSI HARGA) ---
+# --- 3. FUNGSI DATABASE LOKAL ---
 def load_db():
     if os.path.exists("database_barang.xlsx"):
         try:
             df = pd.read_excel("database_barang.xlsx")
-            df.columns = df.columns.str.strip() # Bersihkan spasi di nama kolom
-            
-            # Validasi Kolom Harga
+            df.columns = df.columns.str.strip()
             if 'Harga' in df.columns:
                 df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce').fillna(0)
-            else:
-                st.error("⚠️ Kolom 'Harga' tidak ditemukan di database_barang.xlsx")
-                
             return df
         except Exception as e:
             st.error(f"Gagal membaca Excel: {e}")
@@ -114,11 +109,8 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.multi_cell(0, 4, "Dokumen ini diterbitkan secara otomatis oleh sistem PT. THEA THEO STATIONARY.\nSah dan valid tanpa tanda tangan basah.")
     
     pdf.set_text_color(0, 0, 0); pdf.ln(5); pdf.set_font('Arial', 'B', 10)
-    pdf.cell(0, 6, "Hormat Kami,", ln=1)
-    pdf.ln(15)
-    pdf.cell(0, 6, "A.Sin", ln=1)
-    pdf.set_font('Arial', '', 9)
-    pdf.cell(0, 5, "Sales Consultant", ln=1)
+    pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15); pdf.cell(0, 6, "Asin", ln=1)
+    pdf.set_font('Arial', '', 9); pdf.cell(0, 5, "Sales Consultant", ln=1)
     return pdf.output(dest='S').encode('latin-1')
 
 # --- 5. LOGIKA MENU ---
@@ -129,7 +121,7 @@ if 'cart' not in st.session_state:
 
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.write("Sistem Penawaran Otomatis v3.4 (Fix Harga & Jabatan)")
+    st.write("Sistem Penawaran Otomatis")
 
 elif menu == "📝 Portal Customer":
     st.title("🛒 Form Pengajuan Penawaran")
@@ -146,27 +138,29 @@ elif menu == "📝 Portal Customer":
 
     if st.session_state.cart:
         list_pesanan = []
+        st.subheader("Detail Pesanan Anda:")
         for item in st.session_state.cart:
-            item_row = df_barang[df_barang['Nama Barang'] == item].iloc[0]
+            row_b = df_barang[df_barang['Nama Barang'] == item].iloc[0]
             with st.container(border=True):
-                c1, c2, c3, c4 = st.columns([3, 1, 1, 0.5])
+                c1, c2, c3, c4 = st.columns([3, 1.5, 1, 0.5])
+                # Menampilkan Nama Barang + Satuan
                 c1.write(f"**{item}**")
-                c2.write(f"Rp {item_row['Harga']:,.0f}") # Tampilkan harga di portal
-                qty = c3.number_input(f"Qty {item}", min_value=1, value=1, key=f"q_{item}")
+                c2.write(f"Harga: Rp {row_b['Harga']:,.0f} / **{row_b['Satuan']}**")
+                qty = c3.number_input(f"Jumlah ({row_b['Satuan']})", min_value=1, value=1, key=f"q_{item}")
                 if c4.button("❌", key=f"del_{item}"):
                     st.session_state.cart.remove(item); st.rerun()
-                list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(item_row['Harga']), "Satuan": str(item_row['Satuan']), "Total_Row": float(qty * item_row['Harga'])})
+                list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(row_b['Harga']), "Satuan": str(row_b['Satuan']), "Total_Row": float(qty * row_b['Harga'])})
 
         if st.button("🚀 Kirim Pengajuan", use_container_width=True):
             sheet = connect_gsheet()
             if sheet and nama_toko:
                 wkt = datetime.utcnow() + timedelta(hours=7)
                 sheet.append_row([wkt.strftime("%Y-%m-%d %H:%M"), nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending"])
-                st.success("Terkirim! Mohon tunggu konfirmasi Marketing.")
+                st.success("Berhasil Terkirim! Penawaran resmi akan segera kami kirim via WhatsApp.")
                 st.session_state.cart = []
 
 elif menu == "👨‍💻 Admin Dashboard":
-    st.title("Admin Dashboard (Editor Mode v3.4)")
+    st.title("Admin Dashboard (Editor Mode v3.5)")
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         sheet = connect_gsheet()
@@ -187,7 +181,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                 edited_items = []
                                 for i, r in cur_df.iterrows():
                                     ca, cb, cc = st.columns([3, 1, 1])
-                                    ca.write(f"**{r['Nama Barang']}**")
+                                    ca.write(f"**{r['Nama Barang']}** ({r['Satuan']})")
                                     nq = cb.number_input(f"Qty", value=int(r['Qty']), key=f"ed_{idx}_{i}")
                                     hps = cc.checkbox("Hapus", key=f"del_{idx}_{i}")
                                     if not hps:
@@ -197,12 +191,11 @@ elif menu == "👨‍💻 Admin Dashboard":
                                 new_ps = st.multiselect("Tambah Barang:", options=df_barang['Nama Barang'].tolist(), key=f"add_{idx}")
                                 for p in new_ps:
                                     rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                    aq = st.number_input(f"Qty {p}", min_value=1, value=1, key=f"aq_{idx}_{p}")
+                                    aq = st.number_input(f"Qty {p} ({rb['Satuan']})", min_value=1, value=1, key=f"aq_{idx}_{p}")
                                     edited_items.append({"Nama Barang": str(p), "Qty": int(aq), "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(aq * rb['Harga'])})
 
                                 if st.button("💾 Simpan Perubahan", key=f"save_{idx}"):
                                     sheet.update_cell(real_row_idx, 5, str(edited_items))
-                                    st.success("Berhasil diupdate!")
                                     st.rerun()
 
                                 st.divider()
