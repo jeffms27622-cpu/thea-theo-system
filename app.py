@@ -6,6 +6,7 @@ from fpdf import FPDF
 import os
 import gspread
 from google.oauth2.service_account import Credentials
+import re
 
 # --- 1. KONFIGURASI IDENTITAS ---
 COMPANY_NAME = "PT. THEA THEO STATIONARY"
@@ -30,7 +31,7 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
-# --- 3. FUNGSI DATABASE BARANG ---
+# --- 3. DATABASE BARANG ---
 def load_db():
     if os.path.exists("database_barang.xlsx"):
         try:
@@ -45,7 +46,12 @@ def load_db():
 
 df_barang = load_db()
 
-# --- 4. MESIN GENERATOR PENAWARAN (PDF) ---
+# --- 4. LOGIKA PEMBERSIH TEKS (NORMALISASI) ---
+def clean_text(text):
+    # Mengubah ke huruf besar dan membuang semua karakter non-alfanumerik
+    return re.sub(r'[^A-Z0-9]', '', str(text).upper())
+
+# --- 5. MESIN PDF ---
 class PenawaranPDF(FPDF):
     def header(self):
         if os.path.exists("logo.png"):
@@ -117,7 +123,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.set_font('Arial', '', 9); pdf.cell(0, 5, "Sales Consultant", ln=1)
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 5. LOGIKA MENU UTAMA ---
+# --- 6. MENU UTAMA ---
 menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Portal Customer", "👨‍💻 Admin Dashboard"])
 
 if 'cart' not in st.session_state:
@@ -125,8 +131,7 @@ if 'cart' not in st.session_state:
 
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.write("Sistem Penawaran Otomatis & Portal Faktur Mandiri v4.2")
-    st.info("Pencarian faktur kini lebih fleksibel terhadap format penulisan.")
+    st.write("Sistem Penawaran Otomatis & Portal Faktur Mandiri v4.4")
 
 elif menu == "📝 Portal Customer":
     tab_order, tab_pajak = st.tabs(["🛒 Buat Penawaran Baru", "📄 Ambil Faktur Pajak"])
@@ -135,9 +140,9 @@ elif menu == "📝 Portal Customer":
         st.subheader("Form Pengajuan Penawaran")
         with st.container(border=True):
             col1, col2 = st.columns(2)
-            nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko")
-            up_nama = col2.text_input("👤 Nama Penerima (UP)")
-            wa_nomor = col1.text_input("📞 Nomor WhatsApp")
+            nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko", key="cust_toko")
+            up_nama = col2.text_input("👤 Nama Penerima (UP)", key="cust_up")
+            wa_nomor = col1.text_input("📞 Nomor WhatsApp", key="cust_wa")
             picks = st.multiselect("📦 Pilih Barang:", options=df_barang['Nama Barang'].tolist())
             if st.button("Tambahkan Barang"):
                 for p in picks:
@@ -167,36 +172,37 @@ elif menu == "📝 Portal Customer":
 
     with tab_pajak:
         st.subheader("Unduh Faktur Pajak")
-        st.write("Masukkan data sesuai tagihan Anda.")
+        st.write("Masukkan Nomor Invoice dan Nama PT Anda untuk memverifikasi data.")
         
         with st.container(border=True):
-            raw_inv = st.text_input("Nomor Invoice:", placeholder="Contoh: INV260200977")
-            raw_nama = st.text_input("Nama Perusahaan:", placeholder="Contoh: KEMASAN INDAH SEJAHTERA")
+            raw_inv = st.text_input("Nomor Invoice (Contoh: INV260200977 atau INV-26/02/00977):")
+            raw_nama = st.text_input("Nama Perusahaan (Sesuai Faktur):")
             
             if st.button("🔍 Cari Faktur"):
                 if raw_inv and raw_nama:
-                    # LOGIKA SMART SEARCH: Membersihkan karakter aneh
-                    clean_inv = "".join(filter(str.isalnum, raw_inv.upper()))
-                    clean_nama = raw_nama.upper().strip()
+                    # PROSES PEMBERSIHAN (NORMALISASI)
+                    cleaned_input_inv = clean_text(raw_inv)
+                    cleaned_input_nama = clean_text(raw_nama)
                     
-                    st.info("Sedang mencari di folder...")
+                    st.info("Sedang mencari di sistem...")
                     
-                    # DATA SIMULASI (Diganti koneksi Drive di tahap deploy)
-                    # File asli: INV260200977 - KEMASAN INDAH SEJAHTERA - 04002600036132306.pdf
-                    sim_file_name = "INV260200977 - KEMASAN INDAH SEJAHTERA - 04002600036132306.pdf"
-                    clean_sim_file = sim_file_name.replace("-", "").replace("/", "").replace(" ", "").upper()
+                    # DATA SIMULASI (Sesuai file asli Bapak)
+                    actual_file_name = "INV260200977 - KEMASAN INDAH SEJAHTERA - 04002600036132306.pdf"
+                    cleaned_actual_file = clean_text(actual_file_name)
                     
-                    if clean_inv in clean_sim_file and clean_nama in sim_file_name.upper():
+                    # Logika Pencocokan: Input harus ada di dalam Nama File
+                    if cleaned_input_inv in cleaned_actual_file and cleaned_input_nama in cleaned_actual_file:
                         st.success(f"✅ Faktur Ditemukan!")
-                        st.write(f"**Nama File:** {sim_file_name}")
-                        st.download_button("📥 Unduh Faktur (PDF)", data="...", file_name=sim_file_name)
+                        st.write(f"**Invoice:** {raw_inv}")
+                        st.write(f"**Customer:** {raw_nama}")
+                        st.download_button("📥 Unduh Faktur Pajak (PDF)", data=b"Dummy Data", file_name=actual_file_name)
                     else:
-                        st.error("❌ Data tidak cocok atau faktur belum tersedia.")
+                        st.error("❌ Data tidak ditemukan. Pastikan Nomor Invoice dan Nama PT sudah sesuai.")
                 else:
-                    st.warning("Mohon isi semua kolom.")
+                    st.warning("Mohon lengkapi semua data.")
 
 elif menu == "👨‍💻 Admin Dashboard":
-    st.title("Admin Dashboard (v4.2)")
+    st.title("Admin Dashboard (v4.4)")
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         sheet = connect_gsheet()
@@ -212,7 +218,6 @@ elif menu == "👨‍💻 Admin Dashboard":
                             with st.expander(f"🛠️ MANAGE ORDER: {row['Customer']}"):
                                 items_list = ast.literal_eval(str(row['Pesanan']))
                                 edited_items = []
-                                
                                 for i, r in enumerate(items_list):
                                     with st.container(border=True):
                                         ca, cb, cc, cd = st.columns([3, 1, 1.5, 0.5])
@@ -222,11 +227,9 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         if not cd.checkbox("Hapus", key=f"d_a_{idx}_{i}"):
                                             edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": r['Satuan'], "Total_Row": nq * nh})
                                 
-                                st.divider()
                                 if st.button("💾 Simpan Perubahan", key=f"save_a_{idx}"):
                                     sheet.update_cell(real_row_idx, 5, str(edited_items))
-                                    st.success("Update Berhasil!")
-                                    st.rerun()
+                                    st.success("Update Berhasil!"); st.rerun()
 
                                 final_df = pd.DataFrame(edited_items)
                                 if not final_df.empty:
@@ -234,11 +237,8 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     tax = subt * 0.11
                                     gtot = subt + tax
                                     pdf_b = generate_pdf(f"..../S-TTS/II/{datetime.now().year}", row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                    st.download_button("📩 Download PDF", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
+                                    st.download_button("📩 Download PDF Penawaran", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
                                     if st.button("✅ Selesai & Arsipkan", key=f"fin_a_{idx}"):
-                                        sheet.update_cell(real_row_idx, 6, "Processed")
-                                        st.rerun()
-                else:
-                    st.info("Tidak ada antrean pending.")
-            except Exception as e:
-                st.error(f"Error Database: {e}")
+                                        sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
+                else: st.info("Antrean kosong.")
+            except Exception as e: st.error(f"Error: {e}")
