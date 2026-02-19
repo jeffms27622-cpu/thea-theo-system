@@ -14,7 +14,7 @@ ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 CONTACT = "Ph: 021-55780659, WA: 08158199775 | email: alattulis.tts@gmail.com"
 ADMIN_PASSWORD = "tts123" 
 
-# ID FOLDER GOOGLE DRIVE TEMPAT 3.907 FAKTUR PAJAK (Ganti dengan ID Folder Bapak)
+# Masukkan ID Folder Google Drive Bapak di sini
 PAJAK_FOLDER_ID = '19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z' 
 
 st.set_page_config(page_title=COMPANY_NAME, layout="wide")
@@ -22,8 +22,7 @@ st.set_page_config(page_title=COMPANY_NAME, layout="wide")
 # --- 2. KONEKSI GOOGLE SERVICES ---
 def connect_gsheet():
     try:
-        scope = ["https://spreadsheets.google.com/feeds", 
-                 "https://www.googleapis.com/auth/drive"]
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
         client = gspread.authorize(creds)
         return client.open("Antrean Penawaran TTS").sheet1
@@ -114,7 +113,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.multi_cell(0, 4, "Dokumen ini diterbitkan secara otomatis oleh sistem PT. THEA THEO STATIONARY.\nSah dan valid tanpa tanda tangan basah.")
     
     pdf.set_text_color(0, 0, 0); pdf.ln(5); pdf.set_font('Arial', 'B', 10)
-    pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15); pdf.cell(0, 6, "Asin", ln=1)
+    pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15); pdf.cell(0, 6, "A.Sin", ln=1)
     pdf.set_font('Arial', '', 9); pdf.cell(0, 5, "Sales Consultant", ln=1)
     return pdf.output(dest='S').encode('latin-1')
 
@@ -126,11 +125,10 @@ if 'cart' not in st.session_state:
 
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.write("Sistem Penawaran Otomatis & Portal Faktur Mandiri v4.0")
-    st.info("Sekarang customer dapat mengunduh Faktur Pajak secara mandiri di menu Portal Customer.")
+    st.write("Sistem Penawaran Otomatis & Portal Faktur Mandiri v4.1")
+    st.info("Customer dapat mengunduh Faktur Pajak dengan memasukkan Nomor Invoice dan Nama Perusahaan.")
 
 elif menu == "📝 Portal Customer":
-    # FITUR TAB UNTUK MEMISAHKAN FORM DAN AMBIL PAJAK
     tab_order, tab_pajak = st.tabs(["🛒 Buat Penawaran Baru", "📄 Ambil Faktur Pajak"])
 
     with tab_order:
@@ -168,31 +166,35 @@ elif menu == "📝 Portal Customer":
                     st.session_state.cart = []
 
     with tab_pajak:
-        st.subheader("Pusat Unduh Faktur Pajak Mandiri")
-        st.write("Silakan masukkan identitas untuk memverifikasi data Anda.")
+        st.subheader("Unduh Faktur Pajak")
+        st.write("Cari faktur berdasarkan data Invoice Anda.")
         
         with st.container(border=True):
-            cust_npwp = st.text_input("Masukkan NPWP Anda (16 Digit):", placeholder="Contoh: 0029883808402000")
-            cust_inv = st.text_input("Masukkan Nomor Referensi (Invoice):", placeholder="Contoh: INV260200977")
+            # INPUT NOMOR INVOICE DAN NAMA PT (SESUAI NAMA FILE BAPAK)
+            cust_inv = st.text_input("Masukkan Nomor Invoice (Contoh: INV260200977):")
+            cust_nama_pt = st.text_input("Masukkan Nama Perusahaan (Sesuai Faktur):")
             
             if st.button("🔍 Cari Faktur"):
-                if len(cust_npwp) == 16 and cust_inv:
-                    st.info("Sedang memindai folder Januari 2026...")
+                if cust_inv and cust_nama_pt:
+                    st.info("Mencari di database faktur...")
                     
-                    # LOGIKA KEAMANAN: Mencari file yang mengandung NPWP dan Invoice
-                    # Simulasi pencocokan file asli yang diunggah Pak Asin 
-                    if cust_npwp == "0029883808402000" and "INV260200977" in cust_inv.upper():
-                        st.success("✅ Data Terverifikasi! Faktur ditemukan.")
-                        st.write("**Nama:** KEMASAN INDAH SEJAHTERA")
-                        st.write("**Nomor Seri:** 04002600036132306")
+                    # LOGIKA: Mencari file yang mengandung Nomor Invoice DAN Nama PT
+                    # Berdasarkan contoh: INV260200977 - KEMASAN INDAH SEJAHTERA - 04002600036132306.pdf
+                    
+                    target_inv = "INV260200977"
+                    target_nama = "KEMASAN INDAH SEJAHTERA"
+                    
+                    # Verifikasi apakah input cocok dengan data simulasi (Nanti diganti API Drive)
+                    if target_inv in cust_inv.upper() and target_nama in cust_nama_pt.upper():
+                        st.success(f"✅ Faktur Ditemukan untuk {target_nama}")
                         st.download_button("📥 Unduh Faktur Pajak (PDF)", data="...", file_name=f"FP_{cust_inv}.pdf")
                     else:
-                        st.error("❌ Data tidak ditemukan. Pastikan NPWP dan Nomor Referensi sudah benar.")
+                        st.error("❌ Data tidak cocok atau faktur belum tersedia.")
                 else:
-                    st.warning("Mohon lengkapi NPWP (16 Digit) dan Nomor Referensi.")
+                    st.warning("Mohon isi Nomor Invoice dan Nama Perusahaan.")
 
 elif menu == "👨‍💻 Admin Dashboard":
-    st.title("Admin Dashboard (Full Control v4.0)")
+    st.title("Admin Dashboard (v4.1)")
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         sheet = connect_gsheet()
