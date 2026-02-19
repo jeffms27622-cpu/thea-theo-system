@@ -144,7 +144,7 @@ elif menu == "📝 Portal Customer":
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([3, 1.5, 1, 0.5])
                 c1.write(f"**{item}**")
-                c2.write(f"Harga Standar: Rp {row_b['Harga']:,.0f} / {row_b['Satuan']}")
+                c2.write(f"Harga : Rp {row_b['Harga']:,.0f} / {row_b['Satuan']}")
                 qty = c3.number_input(f"Jumlah", min_value=1, value=1, key=f"q_{item}")
                 if c4.button("❌", key=f"del_{item}"):
                     st.session_state.cart.remove(item); st.rerun()
@@ -233,4 +233,5 @@ elif menu == "👨‍💻 Admin Dashboard":
                     st.info("Antrean kosong.")
             except Exception as e:
                 st.error(f"Error: {e}")
+
 
