@@ -1,8 +1,7 @@
 streamlit
 pandas
-fpdf
 openpyxl
-thefuzz
-python-Levenshtein
+fpdf
 gspread
 google-auth
+google-api-python-client
