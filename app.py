@@ -18,14 +18,13 @@ ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 CONTACT = "Ph: 021-55780659, WA: 08158199775 | email: alattulis.tts@gmail.com"
 ADMIN_PASSWORD = "tts123" 
 
-# ID FOLDER GOOGLE DRIVE BAPAK (Sesuai link yang Bapak berikan)
+# ID FOLDER GOOGLE DRIVE BAPAK
 PAJAK_FOLDER_ID = '19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z' 
 
 st.set_page_config(page_title=COMPANY_NAME, layout="wide")
 
 # --- 2. KONEKSI GOOGLE SERVICES ---
 def get_creds():
-    # Mengambil kredensial dari secrets Streamlit
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     return Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
 
@@ -37,28 +36,24 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
-# --- 3. FUNGSI PENCARIAN GOOGLE DRIVE NYATA ---
+# --- 3. FUNGSI PENCARIAN DRIVE NYATA ---
 def search_pajak_file(inv_keyword, name_keyword):
     try:
         service = build('drive', 'v3', credentials=get_creds())
-        
-        # Membersihkan input customer (buang spasi & tanda baca)
         clean_inv = re.sub(r'[^A-Z0-9]', '', inv_keyword.upper())
         clean_name = re.sub(r'[^A-Z0-9]', '', name_keyword.upper())
         
-        # Mengambil daftar file dari folder Drive Bapak
         query = f"'{PAJAK_FOLDER_ID}' in parents and mimeType = 'application/pdf' and trashed = false"
         results = service.files().list(q=query, fields="files(id, name)", pageSize=1000).execute()
         files = results.get('files', [])
         
-        # Mencocokkan input dengan Nama File di Drive
         for f in files:
             file_name_clean = re.sub(r'[^A-Z0-9]', '', f['name'].upper())
             if clean_inv in file_name_clean and clean_name in file_name_clean:
                 return f 
         return None
     except Exception as e:
-        st.error(f"Kesalahan Akses Drive: {e}")
+        st.error(f"Drive Error: {e}")
         return None
 
 def download_drive_file(file_id):
@@ -71,7 +66,7 @@ def download_drive_file(file_id):
         status, done = downloader.next_chunk()
     return fh.getvalue()
 
-# --- 4. DATABASE LOKAL & MESIN PDF ---
+# --- 4. DATABASE & PDF ENGINE ---
 def load_db():
     if os.path.exists("database_barang.xlsx"):
         try:
@@ -152,7 +147,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.multi_cell(0, 4, "Dokumen ini diterbitkan secara otomatis oleh sistem PT. THEA THEO STATIONARY.\nSah dan valid tanpa tanda tangan basah.")
     
     pdf.set_text_color(0, 0, 0); pdf.ln(5); pdf.set_font('Arial', 'B', 10)
-    pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15); pdf.cell(0, 6, "Asin", ln=1)
+    pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15); pdf.cell(0, 6, "A.Sin", ln=1)
     pdf.set_font('Arial', '', 9); pdf.cell(0, 5, "Sales Consultant", ln=1)
     return pdf.output(dest='S').encode('latin-1')
 
@@ -164,7 +159,7 @@ if 'cart' not in st.session_state:
 
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.write("Sistem Penawaran Otomatis & Portal Faktur Mandiri v4.5")
+    st.write("Sistem Penawaran Otomatis & Portal Faktur Mandiri v4.6")
 
 elif menu == "📝 Portal Customer":
     tab_order, tab_pajak = st.tabs(["🛒 Buat Penawaran Baru", "📄 Ambil Faktur Pajak"])
@@ -195,7 +190,7 @@ elif menu == "📝 Portal Customer":
                         st.session_state.cart.remove(item); st.rerun()
                     list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(row_b['Harga']), "Satuan": str(row_b['Satuan']), "Total_Row": float(qty * row_b['Harga'])})
 
-            if st.button("🚀 Kirim Pengajuan Penawaran", use_container_width=True):
+            if st.button("🚀 Kirim Pengajuan", use_container_width=True):
                 sheet = connect_gsheet()
                 if sheet and nama_toko:
                     wkt = datetime.utcnow() + timedelta(hours=7)
@@ -213,23 +208,17 @@ elif menu == "📝 Portal Customer":
                 if in_inv and in_nama:
                     with st.spinner("Mencari di database Google Drive..."):
                         file_match = search_pajak_file(in_inv, in_nama)
-                        
                         if file_match:
                             st.success(f"✅ Faktur Ditemukan: {file_match['name']}")
                             pdf_data = download_drive_file(file_match['id'])
-                            st.download_button(
-                                label="📥 Klik untuk Download Faktur (PDF)",
-                                data=pdf_data,
-                                file_name=file_match['name'],
-                                mime="application/pdf"
-                            )
+                            st.download_button(label="📥 Download PDF", data=pdf_data, file_name=file_match['name'], mime="application/pdf")
                         else:
-                            st.error("❌ Data tidak ditemukan. Pastikan Nomor Invoice dan Nama PT sudah sesuai.")
+                            st.error("❌ Data tidak ditemukan.")
                 else:
                     st.warning("Mohon isi semua kolom.")
 
 elif menu == "👨‍💻 Admin Dashboard":
-    st.title("Admin Dashboard (v4.5)")
+    st.title("Admin Dashboard (v4.6)")
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         sheet = connect_gsheet()
@@ -242,7 +231,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                     if not pending.empty:
                         for idx, row in pending.iterrows():
                             real_row_idx = idx + 2
-                            with st.expander(f"🛠️ MANAGE ORDER: {row['Customer']}"):
+                            with st.expander(f"🛠️ MANAGE: {row['Customer']}"):
                                 items_list = ast.literal_eval(str(row['Pesanan']))
                                 edited_items = []
                                 for i, r in enumerate(items_list):
@@ -255,7 +244,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                             edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": r['Satuan'], "Total_Row": nq * nh})
                                 if st.button("💾 Simpan", key=f"s_a_{idx}"):
                                     sheet.update_cell(real_row_idx, 5, str(edited_items))
-                                    st.success("Update Berhasil!"); st.rerun()
+                                    st.success("Tersimpan!"); st.rerun()
                                 final_df = pd.DataFrame(edited_items)
                                 if not final_df.empty:
                                     subt = final_df['Total_Row'].sum()
@@ -264,4 +253,9 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     pdf_b = generate_pdf(f"..../S-TTS/II/{datetime.now().year}", row['Customer'], row['UP'], final_df, subt, tax, gtot)
                                     st.download_button("📩 Download PDF", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
                                     if st.button("✅ Selesai", key=f"fin_a_{idx}"):
-                                        sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
+                                        sheet.update_cell(real_row_idx, 6, "Processed")
+                                        st.rerun()
+                else:
+                    st.info("Antrean kosong.")
+            except Exception as e:
+                st.error(f"Error: {e}")
