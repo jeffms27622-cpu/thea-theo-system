@@ -147,7 +147,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.multi_cell(0, 4, "Dokumen ini diterbitkan secara otomatis oleh sistem PT. THEA THEO STATIONARY.\nSah dan valid tanpa tanda tangan basah.")
     
     pdf.set_text_color(0, 0, 0); pdf.ln(5); pdf.set_font('Arial', 'B', 10)
-    pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15); pdf.cell(0, 6, "A.Sin", ln=1)
+    pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15); pdf.cell(0, 6, "Asin", ln=1)
     pdf.set_font('Arial', '', 9); pdf.cell(0, 5, "Sales Consultant", ln=1)
     return pdf.output(dest='S').encode('latin-1')
 
@@ -159,7 +159,7 @@ if 'cart' not in st.session_state:
 
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.write("Sistem Penawaran Otomatis & Portal Faktur Mandiri v4.6")
+    st.write("Sistem Penawaran Otomatis & Portal Faktur Mandiri v4.7")
 
 elif menu == "📝 Portal Customer":
     tab_order, tab_pajak = st.tabs(["🛒 Buat Penawaran Baru", "📄 Ambil Faktur Pajak"])
@@ -172,7 +172,7 @@ elif menu == "📝 Portal Customer":
             up_nama = col2.text_input("👤 Nama Penerima (UP)")
             wa_nomor = col1.text_input("📞 Nomor WhatsApp")
             picks = st.multiselect("📦 Pilih Barang:", options=df_barang['Nama Barang'].tolist())
-            if st.button("Tambahkan Barang"):
+            if st.button("Tambahkan ke Keranjang"):
                 for p in picks:
                     if p not in st.session_state.cart: st.session_state.cart.append(p)
                 st.rerun()
@@ -195,30 +195,26 @@ elif menu == "📝 Portal Customer":
                 if sheet and nama_toko:
                     wkt = datetime.utcnow() + timedelta(hours=7)
                     sheet.append_row([wkt.strftime("%Y-%m-%d %H:%M"), nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending"])
-                    st.success("Terkirim! Terima kasih.")
-                    st.session_state.cart = []
+                    st.success("Terkirim! Terima kasih."); st.session_state.cart = []
 
     with tab_pajak:
         st.subheader("Unduh Faktur Pajak Mandiri")
         with st.container(border=True):
             in_inv = st.text_input("Nomor Invoice (Contoh: INV260200977):")
             in_nama = st.text_input("Nama Perusahaan (Sesuai Faktur):")
-            
             if st.button("🔍 Cari Faktur"):
                 if in_inv and in_nama:
-                    with st.spinner("Mencari di database Google Drive..."):
+                    with st.spinner("Mencari di Drive..."):
                         file_match = search_pajak_file(in_inv, in_nama)
                         if file_match:
                             st.success(f"✅ Faktur Ditemukan: {file_match['name']}")
                             pdf_data = download_drive_file(file_match['id'])
                             st.download_button(label="📥 Download PDF", data=pdf_data, file_name=file_match['name'], mime="application/pdf")
-                        else:
-                            st.error("❌ Data tidak ditemukan.")
-                else:
-                    st.warning("Mohon isi semua kolom.")
+                        else: st.error("❌ Data tidak ditemukan.")
+                else: st.warning("Mohon isi semua kolom.")
 
 elif menu == "👨‍💻 Admin Dashboard":
-    st.title("Admin Dashboard (v4.6)")
+    st.title("Admin Dashboard (v4.7)")
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         sheet = connect_gsheet()
@@ -234,6 +230,8 @@ elif menu == "👨‍💻 Admin Dashboard":
                             with st.expander(f"🛠️ MANAGE: {row['Customer']}"):
                                 items_list = ast.literal_eval(str(row['Pesanan']))
                                 edited_items = []
+                                
+                                st.write("### 1. Edit Barang & Harga Nego")
                                 for i, r in enumerate(items_list):
                                     with st.container(border=True):
                                         ca, cb, cc, cd = st.columns([3, 1, 1.5, 0.5])
@@ -242,20 +240,32 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         nh = cc.number_input(f"Harga Nego", value=float(r['Harga']), key=f"h_a_{idx}_{i}")
                                         if not cd.checkbox("Hapus", key=f"d_a_{idx}_{i}"):
                                             edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": r['Satuan'], "Total_Row": nq * nh})
-                                if st.button("💾 Simpan", key=f"s_a_{idx}"):
+                                
+                                st.divider()
+                                st.write("### 2. Tambah Barang Baru")
+                                new_items = st.multiselect("Cari Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_a_{idx}")
+                                for p in new_items:
+                                    rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
+                                    aq = st.number_input(f"Qty: {p}", min_value=1, value=1, key=f"aq_a_{idx}_{p}")
+                                    edited_items.append({"Nama Barang": str(p), "Qty": int(aq), "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(aq * rb['Harga'])})
+
+                                if st.button("💾 Simpan Perubahan", key=f"s_a_{idx}"):
                                     sheet.update_cell(real_row_idx, 5, str(edited_items))
                                     st.success("Tersimpan!"); st.rerun()
+
+                                st.divider()
                                 final_df = pd.DataFrame(edited_items)
                                 if not final_df.empty:
                                     subt = final_df['Total_Row'].sum()
                                     tax = subt * 0.11
                                     gtot = subt + tax
-                                    pdf_b = generate_pdf(f"..../S-TTS/II/{datetime.now().year}", row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                    st.download_button("📩 Download PDF", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
-                                    if st.button("✅ Selesai", key=f"fin_a_{idx}"):
-                                        sheet.update_cell(real_row_idx, 6, "Processed")
-                                        st.rerun()
-                else:
-                    st.info("Antrean kosong.")
-            except Exception as e:
-                st.error(f"Error: {e}")
+                                    c1, c2 = st.columns(2)
+                                    no_s = c1.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_a_{idx}")
+                                    c2.metric("Total Baru", f"Rp {gtot:,.0f}")
+                                    
+                                    pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
+                                    st.download_button("📩 Download PDF Penawaran", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
+                                    if st.button("✅ Selesai & Arsipkan", key=f"fin_a_{idx}"):
+                                        sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
+                else: st.info("Antrean kosong.")
+            except Exception as e: st.error(f"Error: {e}")
