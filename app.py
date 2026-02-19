@@ -17,7 +17,7 @@ SLOGAN = "Supplier Alat Tulis Kantor & Sekolah"
 ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 CONTACT = "Ph: 021-55780659, WA: 08158199775 | email: alattulis.tts@gmail.com"
 
-# SEKARANG AMBIL DARI SECRETS 
+# SEKARANG 
 ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
 
 # ID FOLDER GOOGLE DRIVE BAPAK
@@ -271,5 +271,6 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                 else: st.info("Antrean kosong.")
             except Exception as e: st.error(f"Error: {e}")
+
 
 
