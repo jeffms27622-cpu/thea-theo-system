@@ -103,7 +103,8 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(160, 8, "PPN 11%", 0, 0, 'R')
     pdf.cell(30, 8, f"{ppn:,.0f}", 1, 1, 'R')
     pdf.cell(160, 8, "GRAND TOTAL", 0, 0, 'R')
-    pdf.cell(30, 8, f"{grand_total:,.0f}", 1, 1, 'R')
+    pdf.set_fill_color(255, 255, 0)
+    pdf.cell(30, 8, f"{grand_total:,.0f}", 1, 1, 'R', True)
     
     pdf.ln(10); pdf.set_font('Arial', 'I', 8); pdf.set_text_color(100, 100, 100)
     pdf.multi_cell(0, 4, "Dokumen ini diterbitkan secara otomatis oleh sistem PT. THEA THEO STATIONARY.\nSah dan valid tanpa tanda tangan basah.")
@@ -121,7 +122,7 @@ if 'cart' not in st.session_state:
 
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.write("Sistem Penawaran Otomatis")
+    st.write("Sistem Penawaran Otomatis v3.7")
 
 elif menu == "📝 Portal Customer":
     st.title("🛒 Form Pengajuan Penawaran")
@@ -138,15 +139,13 @@ elif menu == "📝 Portal Customer":
 
     if st.session_state.cart:
         list_pesanan = []
-        st.subheader("Detail Pesanan Anda:")
         for item in st.session_state.cart:
             row_b = df_barang[df_barang['Nama Barang'] == item].iloc[0]
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([3, 1.5, 1, 0.5])
-                # Menampilkan Nama Barang + Satuan
                 c1.write(f"**{item}**")
-                c2.write(f"Harga: Rp {row_b['Harga']:,.0f} / **{row_b['Satuan']}**")
-                qty = c3.number_input(f"Jumlah ({row_b['Satuan']})", min_value=1, value=1, key=f"q_{item}")
+                c2.write(f"Harga Standar: Rp {row_b['Harga']:,.0f} / {row_b['Satuan']}")
+                qty = c3.number_input(f"Jumlah", min_value=1, value=1, key=f"q_{item}")
                 if c4.button("❌", key=f"del_{item}"):
                     st.session_state.cart.remove(item); st.rerun()
                 list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(row_b['Harga']), "Satuan": str(row_b['Satuan']), "Total_Row": float(qty * row_b['Harga'])})
@@ -156,11 +155,11 @@ elif menu == "📝 Portal Customer":
             if sheet and nama_toko:
                 wkt = datetime.utcnow() + timedelta(hours=7)
                 sheet.append_row([wkt.strftime("%Y-%m-%d %H:%M"), nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending"])
-                st.success("Berhasil Terkirim! Penawaran resmi akan segera kami kirim via WhatsApp.")
+                st.success("Terkirim!")
                 st.session_state.cart = []
 
 elif menu == "👨‍💻 Admin Dashboard":
-    st.title("Admin Dashboard (Editor Mode v3.5)")
+    st.title("Admin Dashboard (Nego Mode v3.7)")
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         sheet = connect_gsheet()
@@ -170,32 +169,33 @@ elif menu == "👨‍💻 Admin Dashboard":
                 if len(all_vals) > 1:
                     df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
                     pending = df_gs[df_gs['Status'] == 'Pending']
-                    if pending.empty:
-                        st.info("Tidak ada antrean baru.")
-                    else:
+                    if not pending.empty:
                         for idx, row in pending.iterrows():
                             real_row_idx = idx + 2
-                            with st.expander(f"🛠️ EDIT PESANAN: {row['Customer']}"):
+                            with st.expander(f"🛠️ NEGO PESANAN: {row['Customer']}"):
                                 items_list = ast.literal_eval(str(row['Pesanan']))
-                                cur_df = pd.DataFrame(items_list)
                                 edited_items = []
-                                for i, r in cur_df.iterrows():
-                                    ca, cb, cc = st.columns([3, 1, 1])
-                                    ca.write(f"**{r['Nama Barang']}** ({r['Satuan']})")
-                                    nq = cb.number_input(f"Qty", value=int(r['Qty']), key=f"ed_{idx}_{i}")
-                                    hps = cc.checkbox("Hapus", key=f"del_{idx}_{i}")
-                                    if not hps:
-                                        edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": r['Harga'], "Satuan": r['Satuan'], "Total_Row": nq * r['Harga']})
                                 
-                                st.divider()
-                                new_ps = st.multiselect("Tambah Barang:", options=df_barang['Nama Barang'].tolist(), key=f"add_{idx}")
-                                for p in new_ps:
-                                    rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                    aq = st.number_input(f"Qty {p} ({rb['Satuan']})", min_value=1, value=1, key=f"aq_{idx}_{p}")
-                                    edited_items.append({"Nama Barang": str(p), "Qty": int(aq), "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(aq * rb['Harga'])})
-
-                                if st.button("💾 Simpan Perubahan", key=f"save_{idx}"):
+                                for i, r in enumerate(items_list):
+                                    with st.container(border=True):
+                                        ca, cb, cc, cd = st.columns([3, 1, 1.5, 0.5])
+                                        ca.write(f"**{r['Nama Barang']}**")
+                                        nq = cb.number_input(f"Qty", value=int(r['Qty']), key=f"q_{idx}_{i}")
+                                        # FITUR NEGO HARGA SATUAN DI SINI
+                                        nh = cc.number_input(f"Harga Satuan Nego", value=float(r['Harga']), key=f"h_{idx}_{i}", step=100.0)
+                                        
+                                        if not cd.checkbox("Hapus", key=f"d_{idx}_{i}"):
+                                            edited_items.append({
+                                                "Nama Barang": r['Nama Barang'], 
+                                                "Qty": nq, 
+                                                "Harga": nh, 
+                                                "Satuan": r['Satuan'], 
+                                                "Total_Row": nq * nh
+                                            })
+                                
+                                if st.button("💾 Simpan Perubahan Harga", key=f"s_{idx}"):
                                     sheet.update_cell(real_row_idx, 5, str(edited_items))
+                                    st.success("Harga Nego Disimpan!")
                                     st.rerun()
 
                                 st.divider()
@@ -204,13 +204,18 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     subt = final_df['Total_Row'].sum()
                                     tax = subt * 0.11
                                     gtot = subt + tax
-                                    no_s = st.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_{idx}")
+                                    
+                                    col_res1, col_res2 = st.columns(2)
+                                    no_s = col_res1.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_{idx}")
+                                    col_res2.metric("Total Penawaran", f"Rp {gtot:,.0f}")
+                                    
                                     pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                    st.download_button("📩 Download PDF", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_{idx}")
+                                    st.download_button("📩 Download PDF Nego", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_{idx}")
+                                    
                                     if st.button("✅ Selesai & Arsipkan", key=f"fin_{idx}"):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
                                         st.rerun()
                 else:
-                    st.info("Sheet kosong.")
+                    st.info("Belum ada antrean.")
             except Exception as e:
                 st.error(f"Error: {e}")
