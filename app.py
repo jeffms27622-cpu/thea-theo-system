@@ -12,7 +12,7 @@ COMPANY_NAME = "PT. THEA THEO STATIONARY"
 SLOGAN = "Supplier Alat Tulis Kantor & Sekolah"
 ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 CONTACT = "Ph: 021-55780659, WA: 08158199775 | email: alattulis.tts@gmail.com"
-ADMIN_PASSWORD = "tts123" 
+ADMIN_PASSWORD = "theo123" 
 
 st.set_page_config(page_title=COMPANY_NAME, layout="wide")
 
@@ -110,7 +110,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.multi_cell(0, 4, "Dokumen ini diterbitkan secara otomatis oleh sistem PT. THEA THEO STATIONARY.\nSah dan valid tanpa tanda tangan basah.")
     
     pdf.set_text_color(0, 0, 0); pdf.ln(5); pdf.set_font('Arial', 'B', 10)
-    pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15); pdf.cell(0, 6, "Asin", ln=1)
+    pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15); pdf.cell(0, 6, "A.Sin", ln=1)
     pdf.set_font('Arial', '', 9); pdf.cell(0, 5, "Sales Consultant", ln=1)
     return pdf.output(dest='S').encode('latin-1')
 
@@ -122,7 +122,7 @@ if 'cart' not in st.session_state:
 
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.write("Sistem Penawaran Otomatis v3.7")
+    st.write("Sistem Penawaran Otomatis v3.8 (Stabel - All Admin Features)")
 
 elif menu == "📝 Portal Customer":
     st.title("🛒 Form Pengajuan Penawaran")
@@ -159,7 +159,7 @@ elif menu == "📝 Portal Customer":
                 st.session_state.cart = []
 
 elif menu == "👨‍💻 Admin Dashboard":
-    st.title("Admin Dashboard (Nego Mode v3.7)")
+    st.title("Admin Dashboard (Full Control v3.8)")
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         sheet = connect_gsheet()
@@ -172,17 +172,17 @@ elif menu == "👨‍💻 Admin Dashboard":
                     if not pending.empty:
                         for idx, row in pending.iterrows():
                             real_row_idx = idx + 2
-                            with st.expander(f"🛠️ NEGO PESANAN: {row['Customer']}"):
+                            with st.expander(f"🛠️ MANAGE: {row['Customer']}"):
                                 items_list = ast.literal_eval(str(row['Pesanan']))
                                 edited_items = []
                                 
+                                st.subheader("1. Edit Item & Harga Nego")
                                 for i, r in enumerate(items_list):
                                     with st.container(border=True):
                                         ca, cb, cc, cd = st.columns([3, 1, 1.5, 0.5])
-                                        ca.write(f"**{r['Nama Barang']}**")
+                                        ca.write(f"**{r['Nama Barang']}** ({r['Satuan']})")
                                         nq = cb.number_input(f"Qty", value=int(r['Qty']), key=f"q_{idx}_{i}")
-                                        # FITUR NEGO HARGA SATUAN DI SINI
-                                        nh = cc.number_input(f"Harga Satuan Nego", value=float(r['Harga']), key=f"h_{idx}_{i}", step=100.0)
+                                        nh = cc.number_input(f"Harga Nego", value=float(r['Harga']), key=f"h_{idx}_{i}")
                                         
                                         if not cd.checkbox("Hapus", key=f"d_{idx}_{i}"):
                                             edited_items.append({
@@ -193,9 +193,23 @@ elif menu == "👨‍💻 Admin Dashboard":
                                                 "Total_Row": nq * nh
                                             })
                                 
-                                if st.button("💾 Simpan Perubahan Harga", key=f"s_{idx}"):
+                                st.divider()
+                                st.subheader("2. Tambah Barang Baru")
+                                new_ps = st.multiselect("Pilih Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_{idx}")
+                                for p in new_ps:
+                                    rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
+                                    aq = st.number_input(f"Qty Tambahan: {p}", min_value=1, value=1, key=f"aq_{idx}_{p}")
+                                    edited_items.append({
+                                        "Nama Barang": str(p), 
+                                        "Qty": int(aq), 
+                                        "Harga": float(rb['Harga']), 
+                                        "Satuan": str(rb['Satuan']), 
+                                        "Total_Row": float(aq * rb['Harga'])
+                                    })
+
+                                if st.button("💾 Simpan Perubahan (GSheets)", key=f"s_{idx}"):
                                     sheet.update_cell(real_row_idx, 5, str(edited_items))
-                                    st.success("Harga Nego Disimpan!")
+                                    st.success("Update Berhasil!")
                                     st.rerun()
 
                                 st.divider()
@@ -207,15 +221,15 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     
                                     col_res1, col_res2 = st.columns(2)
                                     no_s = col_res1.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_{idx}")
-                                    col_res2.metric("Total Penawaran", f"Rp {gtot:,.0f}")
+                                    col_res2.metric("Total Baru", f"Rp {gtot:,.0f}")
                                     
                                     pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                    st.download_button("📩 Download PDF Nego", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_{idx}")
+                                    st.download_button("📩 Download PDF Penawaran", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_{idx}")
                                     
                                     if st.button("✅ Selesai & Arsipkan", key=f"fin_{idx}"):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
                                         st.rerun()
                 else:
-                    st.info("Belum ada antrean.")
+                    st.info("Antrean kosong.")
             except Exception as e:
                 st.error(f"Error: {e}")
