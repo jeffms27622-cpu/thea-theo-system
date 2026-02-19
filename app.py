@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import ast
-from datetime import datetime, timedelta
+from datetime import datetime
 from fpdf import FPDF
 import os
 import gspread
@@ -11,43 +11,29 @@ from googleapiclient.http import MediaIoBaseDownload
 import io
 import re
 
-# --- 1. KONFIGURASI IDENTITAS ---
+# --- 1. KONFIGURASI ---
 COMPANY_NAME = "PT. THEA THEO STATIONARY"
-SLOGAN = "Supplier Alat Tulis Kantor & Sekolah"
+SLOGAN = "Solusi Kebutuhan Kantor & Sekolah Terlengkap"
 ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 CONTACT = "Ph: 021-55780659, WA: 08158199775 | email: alattulis.tts@gmail.com"
 
-# SEKARANG 
 ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
+ 
 
-# ID FOLDER GOOGLE DRIVE BAPAK
 PAJAK_FOLDER_ID = '19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z' 
 
 st.set_page_config(page_title=COMPANY_NAME, layout="wide", page_icon="📝")
 
-# --- 2. CUSTOM CSS (Tampilan 10/10) ---
+# --- 2. CSS CUSTOM ---
 st.markdown("""
     <style>
-    .main { background-color: #fcfcfc; }
-    .stButton>button {
-        width: 100%;
-        border-radius: 10px;
-        background-color: #004a99;
-        color: white;
-        font-weight: bold;
-        border: none;
-        padding: 10px;
-    }
-    .stButton>button:hover {
-        background-color: #003366;
-        color: #ffca28;
-    }
-    div[data-testid="stMetricValue"] { font-size: 24px; color: #004a99; }
-    .footer { text-align: center; color: #888; font-size: 0.8em; margin-top: 50px; }
+    .stButton>button { width: 100%; border-radius: 8px; background-color: #004a99; color: white; font-weight: bold; }
+    .stButton>button:hover { background-color: #003366; color: #ffca28; }
+    .item-card { background-color: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.02); }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. FUNGSI KONEKSI ---
+# --- 3. FUNGSI CORE ---
 def get_creds():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     return Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
@@ -97,144 +83,117 @@ class PenawaranPDF(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 15); self.set_text_color(0, 74, 153)
         self.cell(0, 7, COMPANY_NAME, ln=1)
-        self.set_font('Arial', 'I', 9); self.cell(0, 5, SLOGAN, ln=1)
         self.set_font('Arial', '', 8); self.set_text_color(0, 0, 0)
-        self.cell(0, 5, f"{ADDR} | {CONTACT}", ln=1); self.line(10, 28, 200, 28); self.ln(10)
+        self.cell(0, 5, f"{ADDR} | {CONTACT}", ln=1); self.line(10, 25, 200, 25); self.ln(10)
 
 def generate_pdf(no_s, cust, pic, df_o, subt, tax, gtot):
     pdf = PenawaranPDF()
     pdf.add_page()
-    pdf.set_font('Arial', '', 10)
-    pdf.cell(95, 6, f"No: {no_s}", ln=0); pdf.cell(95, 6, f"Tgl: {datetime.now().strftime('%d/%m/%Y')}", ln=1, align='R')
-    pdf.ln(5); pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, f"Kepada Yth: {cust} (UP: {pic})", ln=1); pdf.ln(5)
-    
-    pdf.set_fill_color(230, 230, 230); pdf.set_font('Arial', 'B', 9)
-    pdf.cell(10, 8, 'No', 1, 0, 'C', 1); pdf.cell(90, 8, 'Nama Barang', 1, 0, 'C', 1)
-    pdf.cell(20, 8, 'Qty', 1, 0, 'C', 1); pdf.cell(30, 8, 'Harga', 1, 0, 'C', 1); pdf.cell(40, 8, 'Total', 1, 1, 'C', 1)
-    
-    pdf.set_font('Arial', '', 9)
+    pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, f"Penawaran Harga No: {no_s}", ln=1)
+    pdf.set_font('Arial', '', 10); pdf.cell(0, 6, f"Kepada Yth: {cust} (UP: {pic})", ln=1); pdf.ln(5)
+    pdf.set_fill_color(230, 230, 230); pdf.cell(10, 8, 'No', 1, 0, 'C', 1); pdf.cell(90, 8, 'Nama Barang', 1, 0, 'C', 1); pdf.cell(20, 8, 'Qty', 1, 0, 'C', 1); pdf.cell(30, 8, 'Harga', 1, 0, 'C', 1); pdf.cell(40, 8, 'Total', 1, 1, 'C', 1)
     for i, r in df_o.iterrows():
-        pdf.cell(10, 8, str(i+1), 1, 0, 'C'); pdf.cell(90, 8, str(r['Nama Barang']), 1)
-        pdf.cell(20, 8, str(int(r['Qty'])), 1, 0, 'C'); pdf.cell(30, 8, f"{r['Harga']:,.0f}", 1, 0, 'R')
-        pdf.cell(40, 8, f"{r['Total_Row']:,.0f}", 1, 1, 'R')
-    
-    pdf.ln(5); pdf.cell(150, 7, "Subtotal", 0, 0, 'R'); pdf.cell(40, 7, f"{subt:,.0f}", 1, 1, 'R')
-    pdf.cell(150, 7, "PPN 11%", 0, 0, 'R'); pdf.cell(40, 7, f"{tax:,.0f}", 1, 1, 'R')
-    pdf.set_font('Arial', 'B', 10); pdf.cell(150, 7, "GRAND TOTAL", 0, 0, 'R'); pdf.cell(40, 7, f"{gtot:,.0f}", 1, 1, 'R')
+        pdf.cell(10, 8, str(i+1), 1, 0, 'C'); pdf.cell(90, 8, str(r['Nama Barang']), 1); pdf.cell(20, 8, f"{int(r['Qty'])} {r['Satuan']}", 1, 0, 'C'); pdf.cell(30, 8, f"{r['Harga']:,.0f}", 1, 0, 'R'); pdf.cell(40, 8, f"{r['Total_Row']:,.0f}", 1, 1, 'R')
+    pdf.ln(5); pdf.cell(150, 7, "Grand Total (Inc. PPN 11%)", 0, 0, 'R'); pdf.cell(40, 7, f"{gtot:,.0f}", 1, 1, 'R')
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 5. NAVIGASI ---
-menu = st.sidebar.selectbox("🧭 Menu Utama", ["🏠 Beranda", "📑 Portal Customer", "🔒 Admin Dashboard"])
+# --- 5. INTERFACE ---
+if 'cart' not in st.session_state:
+    st.session_state.cart = []
+
+menu = st.sidebar.selectbox("🧭 Menu Utama", ["🏠 Beranda", "🛒 Penawaran Mandiri", "📄 Ambil Faktur Pajak", "🔒 Admin"])
 
 if menu == "🏠 Beranda":
-    st.markdown(f"""
-        <div style="background-color:#004a99; padding:50px; border-radius:15px; text-align:center; color:white;">
-            <h1>{COMPANY_NAME}</h1>
-            <p style="font-size:1.2em;">{SLOGAN}</p>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"<div style='background-color:#004a99; padding:40px; border-radius:15px; text-align:center; color:white;'><h1>{COMPANY_NAME}</h1><p>{SLOGAN}</p></div>", unsafe_allow_html=True)
     st.write("")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("📦 Status Gudang", "Ready Stock")
-    c2.metric("⚡ Penawaran", "Otomatis")
-    c3.metric("📄 Faktur", "Direct Drive")
+    c1, c2 = st.columns(2)
+    c1.info("### 🛒 Penawaran Mandiri\nPilih barang dari katalog, hitung sendiri, dan kirim pengajuan.")
+    c2.success("### 📄 Faktur Pajak\nDownload PDF Faktur Pajak secara otomatis.")
 
-elif menu == "📑 Portal Customer":
-    st.title("📑 Layanan Mandiri Pelanggan")
-    t_pajak, t_order = st.tabs(["🔍 Download Faktur Pajak", "📝 Request Penawaran Harga"])
+elif menu == "🛒 Penawaran Mandiri":
+    st.title("🛒 Katalog & Penawaran Mandiri")
+    
+    with st.container(border=True):
+        st.write("### 1. Cari & Tambah Barang")
+        c_sel, c_btn = st.columns([3, 1])
+        pilihan = c_sel.selectbox("Cari Produk:", ["-- Pilih Produk --"] + df_barang['Nama Barang'].tolist())
+        if c_btn.button("➕ Tambahkan"):
+            if pilihan != "-- Pilih Produk --" and pilihan not in st.session_state.cart:
+                st.session_state.cart.append(pilihan); st.rerun()
 
-    with t_pajak:
-        c_l, c_r = st.columns([1, 1])
-        with c_l:
-            st.subheader("Cari Faktur")
-            i_inv = st.text_input("Nomor Invoice", placeholder="Contoh: 260200977")
-            i_name = st.text_input("Nama PT / Toko", placeholder="Nama terdaftar di Pajak")
-            if st.button("🔍 Cari Sekarang"):
-                res = search_pajak_file(i_inv, i_name)
-                if res:
-                    st.balloons(); pdf = download_drive_file(res['id'])
-                    st.success(f"Ditemukan: {res['name']}")
-                    st.download_button("📥 Download PDF", data=pdf, file_name=res['name'])
-                else: st.error("Data tidak ditemukan. Cek kembali penulisan Anda.")
-        with c_r:
-            st.info("### Petunjuk\n1. Masukkan angka invoice saja.\n2. Nama PT harus sesuai dengan yang terdaftar.")
-
-    with t_order:
-        st.subheader("Pilih Item Barang")
-        if 'cart' not in st.session_state: st.session_state.cart = []
+    if st.session_state.cart:
+        st.write("### 2. Atur Keranjang Belanja")
+        final_list = []
+        subtotal_cust = 0
+        for item in st.session_state.cart:
+            db_row = df_barang[df_barang['Nama Barang'] == item].iloc[0]
+            with st.markdown(f'<div class="item-card">', unsafe_allow_html=True):
+                col_n, col_p, col_q, col_d = st.columns([3, 1.5, 1, 0.5])
+                col_n.write(f"**{item}**")
+                col_p.write(f"Rp {db_row['Harga']:,.0f} / {db_row['Satuan']}")
+                qty = col_q.number_input(f"Qty", min_value=1, value=1, key=f"q_{item}")
+                if col_d.button("🗑️", key=f"d_{item}"):
+                    st.session_state.cart.remove(item); st.rerun()
+                
+                t_row = qty * db_row['Harga']
+                subtotal_cust += t_row
+                final_list.append({"Nama Barang": item, "Qty": qty, "Harga": db_row['Harga'], "Satuan": db_row['Satuan'], "Total_Row": t_row})
+            st.markdown('</div>', unsafe_allow_html=True)
         
-        with st.container(border=True):
-            col_a, col_b = st.columns([3, 1])
-            sel = col_a.selectbox("Cari Barang:", ["-- Pilih --"] + df_barang['Nama Barang'].tolist())
-            if col_b.button("➕ Tambah"):
-                if sel != "-- Pilih --" and sel not in st.session_state.cart:
-                    st.session_state.cart.append(sel); st.rerun()
+        st.metric("Estimasi Subtotal", f"Rp {subtotal_cust:,.0f}")
 
-        if st.session_state.cart:
-            final_req = []
-            st.write("### Keranjang Anda")
-            for item in st.session_state.cart:
-                with st.container(border=True):
-                    cl1, cl2, cl3 = st.columns([3, 1, 0.5])
-                    cl1.write(f"**{item}**")
-                    qty = cl2.number_input("Qty", min_value=1, key=f"q_{item}")
-                    if cl3.button("🗑️", key=f"d_{item}"):
-                        st.session_state.cart.remove(item); st.rerun()
-                    b_data = df_barang[df_barang['Nama Barang'] == item].iloc[0]
-                    final_req.append({"Nama Barang": item, "Qty": qty, "Harga": b_data['Harga'], "Satuan": b_data['Satuan']})
-            
-            with st.expander("Isi Data Pengiriman"):
-                c_n = st.text_input("Nama Perusahaan / Toko")
-                c_p = st.text_input("Nama UP (PIC)")
-                c_w = st.text_input("Nomor WhatsApp")
-                if st.button("🚀 Kirim Request Penawaran"):
-                    sheet = connect_gsheet()
-                    if sheet and c_n:
-                        sheet.append_row([datetime.now().strftime("%Y-%m-%d"), c_n, c_p, c_w, str(final_req), "Pending"])
-                        st.success("Terkirim! Admin akan segera memproses."); st.session_state.cart = []
+        with st.expander("🚀 3. Kirim Pengajuan"):
+            c_nama = st.text_input("Nama Toko/Perusahaan")
+            c_up = st.text_input("Nama UP (PIC)")
+            c_wa = st.text_input("Nomor WhatsApp")
+            if st.button("Kirim Sekarang"):
+                if c_nama and c_wa:
+                    sh = connect_gsheet()
+                    if sh:
+                        sh.append_row([datetime.now().strftime("%Y-%m-%d"), c_nama, c_up, c_wa, str(final_list), "Pending"])
+                        st.balloons(); st.success("Berhasil! Silakan tunggu konfirmasi Admin."); st.session_state.cart = []; st.rerun()
+                else: st.warning("Nama & WA wajib diisi.")
 
-elif menu == "🔒 Admin Dashboard":
-    st.title("🔒 Admin Panel")
-    in_pass = st.sidebar.text_input("Password:", type="password")
-    if in_pass == ADMIN_PASSWORD:
-        sheet = connect_gsheet()
-        if sheet:
-            vals = sheet.get_all_values()
+elif menu == "📄 Ambil Faktur Pajak":
+    st.title("📄 Portal Faktur Pajak")
+    inv = st.text_input("Nomor Invoice:")
+    nama_pt = st.text_input("Nama Perusahaan (Sesuai Faktur):")
+    if st.button("Cari & Download"):
+        res = search_pajak_file(inv, nama_pt)
+        if res:
+            st.success(f"Ditemukan: {res['name']}")
+            data = download_drive_file(res['id'])
+            st.download_button("📥 Unduh PDF", data=data, file_name=res['name'])
+        else: st.error("Data tidak ditemukan.")
+
+elif menu == "🔒 Admin":
+    st.title("Admin Panel")
+    pwd = st.sidebar.text_input("Password", type="password")
+    if pwd == ADMIN_PASSWORD:
+        sh = connect_gsheet()
+        if sh:
+            vals = sh.get_all_values()
             if len(vals) > 1:
                 df_gs = pd.DataFrame(vals[1:], columns=vals[0])
-                pnd = df_gs[df_gs['Status'] == 'Pending']
-                for i, row in pnd.iterrows():
-                    with st.expander(f"🛒 Order: {row['Customer']}"):
-                        items = ast.literal_eval(row['Pesanan'])
-                        updated = []
-                        st.write("--- Edit Item ---")
-                        for idx, itm in enumerate(items):
+                pending = df_gs[df_gs['Status'] == 'Pending']
+                for idx, row in pending.iterrows():
+                    with st.expander(f"Order: {row['Customer']} ({row['Tanggal']})"):
+                        items_adm = ast.literal_eval(row['Pesanan'])
+                        upd = []
+                        for i, itm in enumerate(items_adm):
                             c1, c2, c3, c4 = st.columns([3, 1, 1, 0.5])
                             c1.write(itm['Nama Barang'])
-                            nq = c2.number_input("Qty", value=int(itm['Qty']), key=f"admin_q_{i}_{idx}")
-                            nh = c3.number_input("Harga", value=float(itm['Harga']), key=f"admin_h_{i}_{idx}")
-                            if not c4.checkbox("Hapus", key=f"admin_del_{i}_{idx}"):
-                                updated.append({"Nama Barang": itm['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": itm['Satuan'], "Total_Row": nq * nh})
+                            nq = c2.number_input("Qty", value=int(itm['Qty']), key=f"aq_{idx}_{i}")
+                            nh = c3.number_input("Harga", value=float(itm['Harga']), key=f"ah_{idx}_{i}")
+                            if not c4.checkbox("Hapus", key=f"ax_{idx}_{i}"):
+                                upd.append({"Nama Barang": itm['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": itm['Satuan'], "Total_Row": nq * nh})
                         
-                        st.write("--- Tambah Barang ---")
-                        add_b = st.multiselect("Tambah barang lain:", df_barang['Nama Barang'].tolist(), key=f"add_b_{i}")
-                        for ab in add_b:
-                            rb = df_barang[df_barang['Nama Barang'] == ab].iloc[0]
-                            aq = st.number_input(f"Qty {ab}", min_value=1, key=f"aq_{i}_{ab}")
-                            updated.append({"Nama Barang": ab, "Qty": aq, "Harga": rb['Harga'], "Satuan": rb['Satuan'], "Total_Row": aq * rb['Harga']})
-
-                        if st.button("💾 Simpan & Update", key=f"save_{i}"):
-                            sheet.update_cell(i+2, 5, str(updated)); st.rerun()
-
-                        if updated:
-                            df_f = pd.DataFrame(updated)
-                            sub = df_f['Total_Row'].sum(); ppn = sub * 0.11; gt = sub + ppn
-                            nos = st.text_input("No Surat:", value=".../S-TTS/II/2026", key=f"nos_{i}")
-                            pdf_gen = generate_pdf(nos, row['Customer'], row['UP'], df_f, sub, ppn, gt)
-                            st.download_button("📩 Download PDF Penawaran", data=pdf_gen, file_name=f"Penawaran_{row['Customer']}.pdf", key=f"dl_{i}")
-                            if st.button("✅ Tandai Selesai", key=f"fin_{i}"):
-                                sheet.update_cell(i+2, 6, "Processed"); st.rerun()
-            else: st.info("Tidak ada antrean pending.")
-    else: st.warning("Masukkan password admin yang benar di sidebar.")
-
-st.markdown('<div class="footer">© 2026 PT. THEA THEO STATIONARY - Internal System v5.0</div>', unsafe_allow_html=True)
+                        if st.button("Update & Buat PDF", key=f"upd_{idx}"):
+                            df_f = pd.DataFrame(upd); sub = df_f['Total_Row'].sum(); tax = sub * 0.11; gt = sub + tax
+                            pdf_b = generate_pdf("OFFER-TTS", row['Customer'], row['UP'], df_f, sub, tax, gt)
+                            st.download_button("📩 Download PDF", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_{idx}")
+                            sh.update_cell(idx+2, 5, str(upd)) # Update data ke gsheet
+                        
+                        if st.button("✅ Selesai (Arsipkan)", key=f"fin_{idx}"):
+                            sh.update_cell(idx+2, 6, "Processed"); st.rerun()
+            else: st.info("Antrean kosong.")
