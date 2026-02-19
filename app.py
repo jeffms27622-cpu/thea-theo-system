@@ -16,7 +16,9 @@ COMPANY_NAME = "PT. THEA THEO STATIONARY"
 SLOGAN = "Supplier Alat Tulis Kantor & Sekolah"
 ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 CONTACT = "Ph: 021-55780659, WA: 08158199775 | email: alattulis.tts@gmail.com"
-ADMIN_PASSWORD = "tts123" 
+
+# SEKARANG AMBIL DARI SECRETS (Jangan tulis "theo123" di sini lagi)
+ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
 
 # ID FOLDER GOOGLE DRIVE BAPAK
 PAJAK_FOLDER_ID = '19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z' 
@@ -269,3 +271,4 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                 else: st.info("Antrean kosong.")
             except Exception as e: st.error(f"Error: {e}")
+
