@@ -14,7 +14,7 @@ ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 CONTACT = "Ph: 021-55780659, WA: 08158199775 | email: alattulis.tts@gmail.com"
 ADMIN_PASSWORD = "tts123" 
 
-# Masukkan ID Folder Google Drive Bapak di sini
+# GANTI DENGAN ID FOLDER GOOGLE DRIVE BAPAK
 PAJAK_FOLDER_ID = '19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z' 
 
 st.set_page_config(page_title=COMPANY_NAME, layout="wide")
@@ -113,7 +113,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.multi_cell(0, 4, "Dokumen ini diterbitkan secara otomatis oleh sistem PT. THEA THEO STATIONARY.\nSah dan valid tanpa tanda tangan basah.")
     
     pdf.set_text_color(0, 0, 0); pdf.ln(5); pdf.set_font('Arial', 'B', 10)
-    pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15); pdf.cell(0, 6, "A.Sin", ln=1)
+    pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15); pdf.cell(0, 6, "Asin", ln=1)
     pdf.set_font('Arial', '', 9); pdf.cell(0, 5, "Sales Consultant", ln=1)
     return pdf.output(dest='S').encode('latin-1')
 
@@ -125,8 +125,8 @@ if 'cart' not in st.session_state:
 
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.write("Sistem Penawaran Otomatis & Portal Faktur Mandiri v4.1")
-    st.info("Customer dapat mengunduh Faktur Pajak dengan memasukkan Nomor Invoice dan Nama Perusahaan.")
+    st.write("Sistem Penawaran Otomatis & Portal Faktur Mandiri v4.2")
+    st.info("Pencarian faktur kini lebih fleksibel terhadap format penulisan.")
 
 elif menu == "📝 Portal Customer":
     tab_order, tab_pajak = st.tabs(["🛒 Buat Penawaran Baru", "📄 Ambil Faktur Pajak"])
@@ -162,39 +162,41 @@ elif menu == "📝 Portal Customer":
                 if sheet and nama_toko:
                     wkt = datetime.utcnow() + timedelta(hours=7)
                     sheet.append_row([wkt.strftime("%Y-%m-%d %H:%M"), nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending"])
-                    st.success("Terkirim! Marketing kami akan segera menghubungi Anda.")
+                    st.success("Terkirim! Terima kasih.")
                     st.session_state.cart = []
 
     with tab_pajak:
         st.subheader("Unduh Faktur Pajak")
-        st.write("Cari faktur berdasarkan data Invoice Anda.")
+        st.write("Masukkan data sesuai tagihan Anda.")
         
         with st.container(border=True):
-            # INPUT NOMOR INVOICE DAN NAMA PT (SESUAI NAMA FILE BAPAK)
-            cust_inv = st.text_input("Masukkan Nomor Invoice (Contoh: INV260200977):")
-            cust_nama_pt = st.text_input("Masukkan Nama Perusahaan (Sesuai Faktur):")
+            raw_inv = st.text_input("Nomor Invoice:", placeholder="Contoh: INV260200977")
+            raw_nama = st.text_input("Nama Perusahaan:", placeholder="Contoh: KEMASAN INDAH SEJAHTERA")
             
             if st.button("🔍 Cari Faktur"):
-                if cust_inv and cust_nama_pt:
-                    st.info("Mencari di database faktur...")
+                if raw_inv and raw_nama:
+                    # LOGIKA SMART SEARCH: Membersihkan karakter aneh
+                    clean_inv = "".join(filter(str.isalnum, raw_inv.upper()))
+                    clean_nama = raw_nama.upper().strip()
                     
-                    # LOGIKA: Mencari file yang mengandung Nomor Invoice DAN Nama PT
-                    # Berdasarkan contoh: INV260200977 - KEMASAN INDAH SEJAHTERA - 04002600036132306.pdf
+                    st.info("Sedang mencari di folder...")
                     
-                    target_inv = "INV260200977"
-                    target_nama = "KEMASAN INDAH SEJAHTERA"
+                    # DATA SIMULASI (Diganti koneksi Drive di tahap deploy)
+                    # File asli: INV260200977 - KEMASAN INDAH SEJAHTERA - 04002600036132306.pdf
+                    sim_file_name = "INV260200977 - KEMASAN INDAH SEJAHTERA - 04002600036132306.pdf"
+                    clean_sim_file = sim_file_name.replace("-", "").replace("/", "").replace(" ", "").upper()
                     
-                    # Verifikasi apakah input cocok dengan data simulasi (Nanti diganti API Drive)
-                    if target_inv in cust_inv.upper() and target_nama in cust_nama_pt.upper():
-                        st.success(f"✅ Faktur Ditemukan untuk {target_nama}")
-                        st.download_button("📥 Unduh Faktur Pajak (PDF)", data="...", file_name=f"FP_{cust_inv}.pdf")
+                    if clean_inv in clean_sim_file and clean_nama in sim_file_name.upper():
+                        st.success(f"✅ Faktur Ditemukan!")
+                        st.write(f"**Nama File:** {sim_file_name}")
+                        st.download_button("📥 Unduh Faktur (PDF)", data="...", file_name=sim_file_name)
                     else:
                         st.error("❌ Data tidak cocok atau faktur belum tersedia.")
                 else:
-                    st.warning("Mohon isi Nomor Invoice dan Nama Perusahaan.")
+                    st.warning("Mohon isi semua kolom.")
 
 elif menu == "👨‍💻 Admin Dashboard":
-    st.title("Admin Dashboard (v4.1)")
+    st.title("Admin Dashboard (v4.2)")
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         sheet = connect_gsheet()
@@ -211,42 +213,28 @@ elif menu == "👨‍💻 Admin Dashboard":
                                 items_list = ast.literal_eval(str(row['Pesanan']))
                                 edited_items = []
                                 
-                                st.subheader("1. Edit Item & Nego Harga")
                                 for i, r in enumerate(items_list):
                                     with st.container(border=True):
                                         ca, cb, cc, cd = st.columns([3, 1, 1.5, 0.5])
-                                        ca.write(f"**{r['Nama Barang']}** ({r['Satuan']})")
+                                        ca.write(f"**{r['Nama Barang']}**")
                                         nq = cb.number_input(f"Qty", value=int(r['Qty']), key=f"q_a_{idx}_{i}")
                                         nh = cc.number_input(f"Harga Nego", value=float(r['Harga']), key=f"h_a_{idx}_{i}")
                                         if not cd.checkbox("Hapus", key=f"d_a_{idx}_{i}"):
                                             edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": r['Satuan'], "Total_Row": nq * nh})
                                 
                                 st.divider()
-                                st.subheader("2. Tambah Barang Baru")
-                                new_ps = st.multiselect("Pilih Barang:", options=df_barang['Nama Barang'].tolist(), key=f"add_a_{idx}")
-                                for p in new_ps:
-                                    rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                    aq = st.number_input(f"Qty: {p}", min_value=1, value=1, key=f"aq_a_{idx}_{p}")
-                                    edited_items.append({"Nama Barang": str(p), "Qty": int(aq), "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(aq * rb['Harga'])})
-
                                 if st.button("💾 Simpan Perubahan", key=f"save_a_{idx}"):
                                     sheet.update_cell(real_row_idx, 5, str(edited_items))
                                     st.success("Update Berhasil!")
                                     st.rerun()
 
-                                st.divider()
                                 final_df = pd.DataFrame(edited_items)
                                 if not final_df.empty:
                                     subt = final_df['Total_Row'].sum()
                                     tax = subt * 0.11
                                     gtot = subt + tax
-                                    
-                                    c_res1, c_res2 = st.columns(2)
-                                    no_s = c_res1.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_a_{idx}")
-                                    c_res2.metric("Total Baru", f"Rp {gtot:,.0f}")
-                                    
-                                    pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                    st.download_button("📩 Download PDF Penawaran", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
+                                    pdf_b = generate_pdf(f"..../S-TTS/II/{datetime.now().year}", row['Customer'], row['UP'], final_df, subt, tax, gtot)
+                                    st.download_button("📩 Download PDF", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
                                     if st.button("✅ Selesai & Arsipkan", key=f"fin_a_{idx}"):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
                                         st.rerun()
