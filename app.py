@@ -131,6 +131,11 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(160, 8, "PPN 11%", 0, 0, 'R'); pdf.cell(30, 8, f"{ppn:,.0f}", 1, 1, 'R')
     pdf.cell(160, 8, "GRAND TOTAL", 0, 0, 'R')
     pdf.set_fill_color(255, 255, 0); pdf.cell(30, 8, f"{grand_total:,.0f}", 1, 1, 'R', True)
+
+    pdf.ln(5)
+    pdf.set_font('Arial', 'I', 8)
+    pdf.set_text_color(100, 100, 100)
+    pdf.multi_cell(0, 4, "Dokumen ini diterbitkan secara otomatis oleh sistem PT. THEA THEO STATIONARY.\nSah dan valid tanpa tanda tangan basah.")
     
     pdf.ln(10); pdf.set_font('Arial', 'B', 10)
     pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15)
@@ -296,5 +301,6 @@ elif menu == "👨‍💻 Admin Dashboard":
                         st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e:
                 st.error(f"Error detail: {e}")
+
 
 
