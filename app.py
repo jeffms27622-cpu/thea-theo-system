@@ -114,7 +114,6 @@ def generate_pdf(no_surat, nama_cust, pic, sales_name, df_order, subtotal, ppn, 
     
     pdf.cell(95, 6, f"No: {no_surat}", ln=0)
     pdf.cell(95, 6, f"Tangerang, {tgl_skrg}", ln=1, align='R')
-    pdf.cell(0, 6, f"Sales Consultant: {sales_name}", ln=1) # Nama Sales di PDF
     pdf.cell(0, 6, "Hal: Surat Penawaran Harga", ln=1)
     pdf.ln(5)
     
@@ -264,4 +263,5 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Belum ada antrean untuk {SALES_OWNER}.")
             except Exception as e: st.error(f"Error: {e}")
+
 
