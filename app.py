@@ -83,18 +83,27 @@ df_barang = load_db()
 
 class PenawaranPDF(FPDF):
     def header(self):
+        # CEK APAKAH FILE logo.png ADA
+        if os.path.exists("logo.png"):
+            self.image("logo.png", 10, 8, 25) # Ukuran logo 25mm
+            self.set_x(38) # Geser teks agar tidak tertutup logo
+        
         self.set_font('Arial', 'B', 15)
         self.set_text_color(0, 51, 102)
         self.cell(80, 7, COMPANY_NAME, ln=0)
+        
         self.set_font('Arial', '', 8)
         self.set_text_color(0, 0, 0)
         self.cell(0, 5, ADDR, ln=1, align='R')
+        
+        if os.path.exists("logo.png"): self.set_x(38)
         self.set_font('Arial', 'I', 9)
         self.cell(80, 5, SLOGAN, ln=0)
+        
         self.set_font('Arial', '', 8)
         self.cell(0, 5, CONTACT, ln=1, align='R')
-        self.line(10, 28, 200, 28)
-        self.ln(12)
+        self.line(10, 32, 200, 32) # Garis pembatas header
+        self.ln(15)
 
 def generate_pdf(no_surat, nama_cust, pic, sales_name, df_order, subtotal, ppn, grand_total):
     pdf = PenawaranPDF()
@@ -255,3 +264,4 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Belum ada antrean untuk {SALES_OWNER}.")
             except Exception as e: st.error(f"Error: {e}")
+
