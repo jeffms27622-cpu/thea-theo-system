@@ -164,16 +164,36 @@ elif menu == "📝 Portal Customer":
                 st.rerun()
 
         if st.session_state.cart:
+            st.markdown("### 📋 Daftar Pesanan")
             list_pesanan = []
             for item in st.session_state.cart:
+                # Mengambil data harga dan satuan dari database berdasarkan nama barang
                 row_b = df_barang[df_barang['Nama Barang'] == item].iloc[0]
+                
                 with st.container(border=True):
                     c1, c2, c3, c4 = st.columns([3, 1.5, 1, 0.5])
-                    c1.write(f"**{item}**")
+                    
+                    # KOLOM 1: Nama Barang
+                    c1.markdown(f"**{item}**")
+                    
+                    # KOLOM 2: Harga & Satuan (YANG TADI HILANG)
+                    c2.markdown(f"Rp {row_b['Harga']:,.0f} / {row_b['Satuan']}")
+                    
+                    # KOLOM 3: Input Qty
                     qty = c3.number_input(f"Jumlah", min_value=1, value=1, key=f"q_c_{item}")
+                    
+                    # KOLOM 4: Tombol Hapus
                     if c4.button("❌", key=f"del_c_{item}"):
                         st.session_state.cart.remove(item); st.rerun()
-                    list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(row_b['Harga']), "Satuan": str(row_b['Satuan']), "Total_Row": float(qty * row_b['Harga'])})
+                    
+                    # Simpan data ke list untuk dikirim ke GSheet
+                    list_pesanan.append({
+                        "Nama Barang": str(item), 
+                        "Qty": int(qty), 
+                        "Harga": float(row_b['Harga']), 
+                        "Satuan": str(row_b['Satuan']), 
+                        "Total_Row": float(qty * row_b['Harga'])
+                    })
 
             if st.button(f"🚀 Kirim Pengajuan ke {MARKETING_NAME}", use_container_width=True):
                 sheet = connect_gsheet()
@@ -276,4 +296,5 @@ elif menu == "👨‍💻 Admin Dashboard":
                         st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e:
                 st.error(f"Error detail: {e}")
+
 
