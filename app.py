@@ -193,7 +193,6 @@ elif menu == "📝 Portal Customer":
                 st.success(f"Ditemukan: {file_match['name']}")
                 st.download_button("📥 Download PDF", data=download_drive_file(file_match['id']), file_name=file_match['name'])
             else: st.error("❌ Tidak ditemukan.")
-
 elif menu == "👨‍💻 Admin Dashboard":
     st.title(f"Admin Dashboard - {MARKETING_NAME}")
     pwd = st.sidebar.text_input("Password:", type="password")
@@ -204,47 +203,77 @@ elif menu == "👨‍💻 Admin Dashboard":
                 all_vals = sheet.get_all_values()
                 if len(all_vals) > 1:
                     df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
-                    # FILTER: Hanya tampilkan data milik MARKETING_NAME di link ini
+                    # Filter agar sales hanya melihat miliknya sendiri
                     pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == MARKETING_NAME)]
                     
                     if not pending.empty:
                         for idx, row in pending.iterrows():
-                            real_row_idx = idx + 2
+                            # Menghitung index baris di gsheet (idx dimulai dari 0, +2 karena header)
+                            real_row_idx = df_gs.index[idx] + 2 
+                            
                             with st.expander(f"🛠️ KELOLA: {row['Customer']}"):
                                 items_list = ast.literal_eval(str(row['Pesanan']))
                                 edited_items = []
+                                
+                                st.write("### 1. Edit Barang & Harga")
                                 for i, r in enumerate(items_list):
                                     with st.container(border=True):
                                         ca, cb, cc, cd = st.columns([3, 1, 1.5, 0.5])
+                                        # --- BAGIAN YANG DIPERBAIKI: NAMA BARANG MUNCUL LAGI ---
+                                        ca.markdown(f"**Nama Barang:**\n\n{r['Nama Barang']}") 
                                         nq = cb.number_input(f"Qty", value=int(r['Qty']), key=f"q_a_{idx}_{i}")
                                         nh = cc.number_input(f"Harga Nego", value=float(r['Harga']), key=f"h_a_{idx}_{i}")
+                                        
                                         if not cd.checkbox("Hapus", key=f"d_a_{idx}_{i}"):
-                                            edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": r['Satuan'], "Total_Row": nq * nh})
+                                            edited_items.append({
+                                                "Nama Barang": r['Nama Barang'], 
+                                                "Qty": nq, 
+                                                "Harga": nh, 
+                                                "Satuan": r['Satuan'], 
+                                                "Total_Row": nq * nh
+                                            })
                                 
                                 # Tambah Barang Baru
                                 st.divider()
-                                new_items = st.multiselect("Tambah Barang Lain:", options=df_barang['Nama Barang'].tolist(), key=f"add_a_{idx}")
+                                st.write("### 2. Tambah Barang Baru")
+                                new_items = st.multiselect("Cari Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_a_{idx}")
                                 for p in new_items:
                                     rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                    aq = st.number_input(f"Qty Baru: {p}", min_value=1, value=1, key=f"aq_a_{idx}_{p}")
-                                    edited_items.append({"Nama Barang": p, "Qty": aq, "Harga": rb['Harga'], "Satuan": rb['Satuan'], "Total_Row": aq * rb['Harga']})
+                                    with st.container(border=True):
+                                        c_new1, c_new2 = st.columns([3, 1])
+                                        c_new1.write(f"**{p}**")
+                                        aq = c_new2.number_input(f"Qty Baru", min_value=1, value=1, key=f"aq_a_{idx}_{p}")
+                                        edited_items.append({
+                                            "Nama Barang": p, 
+                                            "Qty": int(aq), 
+                                            "Harga": float(rb['Harga']), 
+                                            "Satuan": str(rb['Satuan']), 
+                                            "Total_Row": float(aq * rb['Harga'])
+                                        })
 
-                                if st.button("💾 Simpan Perubahan", key=f"s_a_{idx}"):
+                                if st.button("💾 Simpan Perubahan ke GSheet", key=f"s_a_{idx}"):
                                     sheet.update_cell(real_row_idx, 5, str(edited_items))
-                                    st.success("Tersimpan!"); st.rerun()
+                                    st.success("Data di Google Sheet berhasil diupdate!"); st.rerun()
 
                                 st.divider()
                                 final_df = pd.DataFrame(edited_items)
                                 if not final_df.empty:
                                     subt = final_df['Total_Row'].sum()
-                                    tax = subt * 0.11; gtot = subt + tax
+                                    tax = subt * 0.11
+                                    gtot = subt + tax
+                                    
                                     c1, c2 = st.columns(2)
                                     no_s = c1.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_a_{idx}")
-                                    c2.metric("Total Baru", f"Rp {gtot:,.0f}")
+                                    c2.metric("Total Baru (Inc. PPN)", f"Rp {gtot:,.0f}")
                                     
                                     pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                    st.download_button("📩 Download PDF", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
+                                    st.download_button("📩 Download PDF Penawaran", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
+                                    
                                     if st.button("✅ Selesai & Arsipkan", key=f"fin_a_{idx}"):
-                                        sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
-                    else: st.info(f"Antrean {MARKETING_NAME} kosong.")
-            except Exception as e: st.error(f"Error: {e}")
+                                        sheet.update_cell(real_row_idx, 6, "Processed")
+                                        st.success("Status diupdate menjadi Processed!"); st.rerun()
+                    else:
+                        st.info(f"Antrean {MARKETING_NAME} kosong.")
+            except Exception as e:
+                st.error(f"Error detail: {e}")
+
