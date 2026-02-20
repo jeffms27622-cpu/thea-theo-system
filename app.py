@@ -12,12 +12,11 @@ import io
 import re
 
 # =========================================================
-# 1. KONFIGURASI PROFIL MARKETING (GANTI BAGIAN INI SAJA)
+# 1. KONFIGURASI MARKETING (GANTI BAGIAN INI SAJA)
 # =========================================================
-# Ganti data di bawah ini sesuai siapa yang punya link:
-SALES_NAME = "Asin" 
-SALES_WA   = "08158199775"
-SALES_EMAIL = "alattulis.tts@gmail.com"
+MARKETING_NAME  = "Asin"  # Ganti jadi: Alex, Topan, atau Artini
+MARKETING_WA    = "08158199775"
+MARKETING_EMAIL = "alattulis.tts@gmail.com"
 # =========================================================
 
 COMPANY_NAME = "PT. THEA THEO STATIONARY"
@@ -26,7 +25,7 @@ ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
 PAJAK_FOLDER_ID = '19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z' 
 
-st.set_page_config(page_title=f"TTS - {SALES_NAME}", layout="wide")
+st.set_page_config(page_title=f"{COMPANY_NAME} - {MARKETING_NAME}", layout="wide")
 
 # --- 2. KONEKSI GOOGLE SERVICES ---
 def get_creds():
@@ -82,26 +81,21 @@ df_barang = load_db()
 
 class PenawaranPDF(FPDF):
     def header(self):
-        # LOGO (Pastikan file logo.png ada di GitHub)
         if os.path.exists("logo.png"):
             self.image("logo.png", 10, 8, 25)
             self.set_x(38)
-        
         self.set_font('Arial', 'B', 15)
         self.set_text_color(0, 51, 102)
         self.cell(80, 7, COMPANY_NAME, ln=0)
-        
         self.set_font('Arial', '', 8)
         self.set_text_color(0, 0, 0)
         self.cell(0, 4, ADDR, ln=1, align='R')
-        
         if os.path.exists("logo.png"): self.set_x(38)
         self.set_font('Arial', 'I', 9)
         self.cell(80, 5, SLOGAN, ln=0)
-        
         self.set_font('Arial', '', 8)
-        # KONTAK MENGIKUTI DATA MARKETING
-        self.cell(0, 4, f"WA: {SALES_WA} | Email: {SALES_EMAIL}", ln=1, align='R')
+        # OTOMATIS MENGIKUTI KONFIGURASI DI ATAS
+        self.cell(0, 4, f"WA: {MARKETING_WA} | Email: {MARKETING_EMAIL}", ln=1, align='R')
         self.line(10, 30, 200, 30)
         self.ln(12)
 
@@ -114,7 +108,6 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     
     pdf.cell(95, 6, f"No: {no_surat}", ln=0)
     pdf.cell(95, 6, f"Tangerang, {tgl_skrg}", ln=1, align='R')
-    pdf.cell(0, 6, f"Sales Consultant: {SALES_NAME}", ln=1)
     pdf.cell(0, 6, "Hal: Surat Penawaran Harga", ln=1)
     pdf.ln(5)
     
@@ -122,7 +115,6 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(0, 6, "Kepada Yth,", ln=1); pdf.cell(0, 6, str(nama_cust), ln=1); pdf.cell(0, 6, f"Up. {pic}", ln=1)
     pdf.ln(5)
     
-    # Tabel
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(10, 10, 'No', 1, 0, 'C', True); pdf.cell(85, 10, 'Nama Barang', 1, 0, 'C', True)
     pdf.cell(20, 10, 'Qty', 1, 0, 'C', True); pdf.cell(20, 10, 'Satuan', 1, 0, 'C', True)
@@ -142,75 +134,117 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     
     pdf.ln(10); pdf.set_font('Arial', 'B', 10)
     pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15)
-    pdf.cell(0, 6, f"{SALES_NAME}", ln=1) # Nama di tanda tangan
+    pdf.cell(0, 6, f"{MARKETING_NAME}", ln=1) # Nama di tanda tangan otomatis
     pdf.set_font('Arial', '', 9); pdf.cell(0, 5, "Sales Consultant", ln=1)
-    pdf.cell(0, 5, f"WA: {SALES_WA}", ln=1)
-    
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 5. TAMPILAN ---
-st.title(f"🚀 Portal {SALES_NAME} - TTS")
-
-menu = st.sidebar.selectbox("Menu:", ["🛒 Portal Customer", "👨‍💻 Admin"])
+# --- 5. LOGIKA MENU UTAMA ---
+st.sidebar.title(f"Portal {MARKETING_NAME}")
+menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Portal Customer", "👨‍💻 Admin Dashboard"])
 
 if 'cart' not in st.session_state: st.session_state.cart = []
 
-if menu == "🛒 Portal Customer":
-    t1, t2 = st.tabs(["Buat Penawaran", "Ambil Faktur"])
-    with t1:
+if menu == "🏠 Home":
+    st.title(f"Selamat Datang di {COMPANY_NAME}")
+    st.info(f"Marketing Aktif: {MARKETING_NAME} ({MARKETING_EMAIL})")
+
+elif menu == "📝 Portal Customer":
+    tab_order, tab_pajak = st.tabs(["🛒 Buat Penawaran Baru", "📄 Ambil Faktur Pajak"])
+    with tab_order:
+        st.subheader("Form Pengajuan Penawaran")
         with st.container(border=True):
             col1, col2 = st.columns(2)
-            c_name = col1.text_input("Nama Toko/PT")
-            c_up = col2.text_input("Nama UP")
-            c_wa = col1.text_input("WhatsApp Pembeli")
-            picks = st.multiselect("Pilih Barang:", options=df_barang['Nama Barang'].tolist())
-            if st.button("Tambah ke List"):
+            nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko")
+            up_nama = col2.text_input("👤 Nama Penerima (UP)")
+            wa_nomor = col1.text_input("📞 Nomor WhatsApp Pembeli")
+            picks = st.multiselect("📦 Pilih Barang:", options=df_barang['Nama Barang'].tolist())
+            if st.button("Tambahkan ke Keranjang"):
                 for p in picks:
                     if p not in st.session_state.cart: st.session_state.cart.append(p)
                 st.rerun()
 
         if st.session_state.cart:
-            final_items = []
-            for itm in st.session_state.cart:
-                rb = df_barang[df_barang['Nama Barang'] == itm].iloc[0]
+            list_pesanan = []
+            for item in st.session_state.cart:
+                row_b = df_barang[df_barang['Nama Barang'] == item].iloc[0]
                 with st.container(border=True):
                     c1, c2, c3, c4 = st.columns([3, 1.5, 1, 0.5])
-                    c1.write(f"**{itm}**")
-                    qty = c3.number_input(f"Qty", min_value=1, value=1, key=f"q_{itm}")
-                    if c4.button("🗑️", key=f"d_{itm}"):
-                        st.session_state.cart.remove(itm); st.rerun()
-                    final_items.append({"Nama Barang": itm, "Qty": qty, "Harga": rb['Harga'], "Satuan": rb['Satuan'], "Total_Row": qty * rb['Harga']})
-            
-            if st.button(f"Kirim ke {SALES_NAME}", use_container_width=True):
-                sheet = connect_gsheet()
-                if sheet and c_name:
-                    sheet.append_row([(datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M"), c_name, c_up, c_wa, str(final_items), "Pending", SALES_NAME])
-                    st.success("Tersimpan!"); st.session_state.cart = []; st.rerun()
+                    c1.write(f"**{item}**")
+                    qty = c3.number_input(f"Jumlah", min_value=1, value=1, key=f"q_c_{item}")
+                    if c4.button("❌", key=f"del_c_{item}"):
+                        st.session_state.cart.remove(item); st.rerun()
+                    list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(row_b['Harga']), "Satuan": str(row_b['Satuan']), "Total_Row": float(qty * row_b['Harga'])})
 
-elif menu == "👨‍💻 Admin":
-    pwd = st.sidebar.text_input("Password", type="password")
+            if st.button(f"🚀 Kirim Pengajuan ke {MARKETING_NAME}", use_container_width=True):
+                sheet = connect_gsheet()
+                if sheet and nama_toko:
+                    wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
+                    # Tambahkan kolom MARKETING_NAME di akhir (Kolom G)
+                    sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending", MARKETING_NAME])
+                    st.success("Terkirim! Terima kasih."); st.session_state.cart = []
+
+    with tab_pajak:
+        st.subheader("Unduh Faktur Pajak Mandiri")
+        in_inv = st.text_input("Nomor Invoice:")
+        in_nama = st.text_input("Nama Perusahaan:")
+        if st.button("🔍 Cari Faktur"):
+            file_match = search_pajak_file(in_inv, in_nama)
+            if file_match:
+                st.success(f"Ditemukan: {file_match['name']}")
+                st.download_button("📥 Download PDF", data=download_drive_file(file_match['id']), file_name=file_match['name'])
+            else: st.error("❌ Tidak ditemukan.")
+
+elif menu == "👨‍💻 Admin Dashboard":
+    st.title(f"Admin Dashboard - {MARKETING_NAME}")
+    pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         sheet = connect_gsheet()
         if sheet:
-            data = sheet.get_all_values()
-            if len(data) > 1:
-                df_gs = pd.DataFrame(data[1:], columns=data[0])
-                # Filter agar sales hanya melihat miliknya sendiri
-                pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == SALES_NAME)]
-                for idx, row in pending.iterrows():
-                    with st.expander(f"Order: {row['Customer']}"):
-                        items = ast.literal_eval(row['Pesanan'])
-                        updated = []
-                        for i, r in enumerate(items):
-                            c1, c2, c3 = st.columns([3, 1, 1.5])
-                            nq = c1.number_input(f"{r['Nama Barang']}", value=int(r['Qty']), key=f"aq_{idx}_{i}")
-                            nh = c2.number_input(f"Harga", value=float(r['Harga']), key=f"ah_{idx}_{i}")
-                            updated.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": r['Satuan'], "Total_Row": nq * nh})
-                        
-                        no_s = st.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"ns_{idx}")
-                        if st.button("Cetak PDF", key=f"cp_{idx}"):
-                            df_f = pd.DataFrame(updated); subt = df_f['Total_Row'].sum(); tax = subt * 0.11; gt = subt + tax
-                            pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], df_f, subt, tax, gt)
-                            st.download_button("Download PDF", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_{idx}")
-                        if st.button("Arsipkan", key=f"ar_{idx}"):
-                            sheet.update_cell(idx+2, 6, "Processed"); st.rerun()
+            try:
+                all_vals = sheet.get_all_values()
+                if len(all_vals) > 1:
+                    df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
+                    # FILTER: Hanya tampilkan data milik MARKETING_NAME di link ini
+                    pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == MARKETING_NAME)]
+                    
+                    if not pending.empty:
+                        for idx, row in pending.iterrows():
+                            real_row_idx = idx + 2
+                            with st.expander(f"🛠️ KELOLA: {row['Customer']}"):
+                                items_list = ast.literal_eval(str(row['Pesanan']))
+                                edited_items = []
+                                for i, r in enumerate(items_list):
+                                    with st.container(border=True):
+                                        ca, cb, cc, cd = st.columns([3, 1, 1.5, 0.5])
+                                        nq = cb.number_input(f"Qty", value=int(r['Qty']), key=f"q_a_{idx}_{i}")
+                                        nh = cc.number_input(f"Harga Nego", value=float(r['Harga']), key=f"h_a_{idx}_{i}")
+                                        if not cd.checkbox("Hapus", key=f"d_a_{idx}_{i}"):
+                                            edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": r['Satuan'], "Total_Row": nq * nh})
+                                
+                                # Tambah Barang Baru
+                                st.divider()
+                                new_items = st.multiselect("Tambah Barang Lain:", options=df_barang['Nama Barang'].tolist(), key=f"add_a_{idx}")
+                                for p in new_items:
+                                    rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
+                                    aq = st.number_input(f"Qty Baru: {p}", min_value=1, value=1, key=f"aq_a_{idx}_{p}")
+                                    edited_items.append({"Nama Barang": p, "Qty": aq, "Harga": rb['Harga'], "Satuan": rb['Satuan'], "Total_Row": aq * rb['Harga']})
+
+                                if st.button("💾 Simpan Perubahan", key=f"s_a_{idx}"):
+                                    sheet.update_cell(real_row_idx, 5, str(edited_items))
+                                    st.success("Tersimpan!"); st.rerun()
+
+                                st.divider()
+                                final_df = pd.DataFrame(edited_items)
+                                if not final_df.empty:
+                                    subt = final_df['Total_Row'].sum()
+                                    tax = subt * 0.11; gtot = subt + tax
+                                    c1, c2 = st.columns(2)
+                                    no_s = c1.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_a_{idx}")
+                                    c2.metric("Total Baru", f"Rp {gtot:,.0f}")
+                                    
+                                    pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
+                                    st.download_button("📩 Download PDF", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
+                                    if st.button("✅ Selesai & Arsipkan", key=f"fin_a_{idx}"):
+                                        sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
+                    else: st.info(f"Antrean {MARKETING_NAME} kosong.")
+            except Exception as e: st.error(f"Error: {e}")
