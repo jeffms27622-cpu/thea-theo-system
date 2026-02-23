@@ -77,35 +77,30 @@ def get_or_create_customer_folder(customer_name):
         return None
 
 def upload_pdf_to_drive(file_name, pdf_bytes, folder_id):
-    """Upload file PDF ke folder spesifik dengan pengamanan ekstra."""
     try:
         service = get_drive_service()
         
-        # Pastikan data PDF tidak kosong
-        if not pdf_bytes:
-            st.error("Data PDF kosong, gagal upload.")
+        # Validasi sederhana: pastikan bytes ada isinya
+        if not pdf_bytes or len(pdf_bytes) < 100:
+            st.error("🔴 ERROR: Data PDF yang dihasilkan terlalu kecil atau kosong.")
             return None
-            
-        file_metadata = {
-            'name': file_name, 
-            'parents': [folder_id]
-        }
+
+        file_metadata = {'name': file_name, 'parents': [folder_id]}
         
-        # Gunakan BytesIO yang baru untuk memastikan data terbaca dari awal
-        media_content = io.BytesIO(pdf_bytes)
-        media = MediaIoBaseUpload(media_content, mimetype='application/pdf', resumable=True)
+        # Menggunakan resumable=False dulu untuk memastikan koneksi stabil
+        media = MediaIoBaseUpload(io.BytesIO(pdf_bytes), mimetype='application/pdf', resumable=False)
         
-        # Tambahkan supportsAllDrives=True jika Bapak pakai Google Workspace/Shared Drive
         file = service.files().create(
             body=file_metadata, 
             media_body=media, 
             fields='id',
-            supportsAllDrives=True # PENTING: Biar lancar di Drive kantor
+            supportsAllDrives=True # Wajib True jika pakai Drive kantor
         ).execute()
         
         return file.get('id')
     except Exception as e:
-        st.error(f"Gagal upload file: {e}")
+        # Tampilkan error lengkap agar Pak Asin bisa baca/foto
+        st.error(f"🔴 GAGAL UPLOAD KE DRIVE. Detail Error: {str(e)}")
         return None
         
 # --- Fungsi Cari Pajak ---
@@ -361,25 +356,38 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     
                                     # TOMBOL FINAL (ARCHIVE TO DRIVE)
                                     if st.button("✅ Selesai & Kirim ke Drive Customer", key=f"fin_a_{idx}"):
-                                        with st.spinner(f"Sedang mengarsipkan ke Drive {row['Customer']}..."):
-                                            try:
-                                                # 1. Cari/Buat Folder Customer
-                                                folder_id = get_or_create_customer_folder(row['Customer'])
-                                                if folder_id:
-                                                    # 2. Upload PDF
-                                                    file_name = f"Penawaran_{row['Customer']}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
-                                                    upload_pdf_to_drive(file_name, pdf_b, folder_id)
-                                                    
-                                                    # 3. Update Status di GSheet
-                                                    sheet.update_cell(real_row_idx, 6, "Processed")
-                                                    st.success(f"🔥 Berhasil! File tersimpan di Folder Google Drive: {row['Customer']}")
-                                                    st.rerun()
-                                                else:
-                                                    st.error("Gagal mendapatkan ID Folder.")
-                                            except Exception as e:
-                                                st.error(f"Gagal upload ke Drive: {e}")
+    with st.status(f"Sedang memproses Penawaran {row['Customer']}...", expanded=True) as status:
+        try:
+            # 1. Cari/Buat Folder
+            st.write("Mengecek Folder Customer...")
+            folder_id = get_or_create_customer_folder(row['Customer'])
+            
+            if folder_id:
+                st.write(f"Folder ditemukan (ID: {folder_id}). Menyiapkan PDF...")
+                
+                # 2. Generate PDF Segar
+                pdf_arsip = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
+                file_name = f"Penawaran_{row['Customer']}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
+                
+                # 3. Upload
+                st.write("Mengunggah ke Google Drive...")
+                result_id = upload_pdf_to_drive(file_name, pdf_arsip, folder_id)
+                
+                if result_id:
+                    st.write("Berhasil Upload! Mengupdate GSheet...")
+                    sheet.update_cell(real_row_idx, 6, "Processed")
+                    status.update(label="✅ Selesai! Semua data tersimpan.", state="complete", expanded=False)
+                    st.balloons()
+                    # Jangan pakai st.rerun() dulu supaya Bapak bisa lihat status suksesnya
+                else:
+                    status.update(label="❌ Upload Gagal. Cek pesan error di bawah.", state="error")
+            else:
+                st.error("Gagal membuat/menemukan folder.")
+        except Exception as e:
+            st.error(f"🔴 TERJADI KESALAHAN SISTEM: {str(e)}")
                     else:
                         st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e:
                 st.error(f"Error detail: {e}")
+
 
