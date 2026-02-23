@@ -4,25 +4,22 @@ import ast
 from datetime import datetime, timedelta
 from fpdf import FPDF
 import os
-import time
 import gspread
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
+from googleapiclient.http import MediaIoBaseDownload
 import io
 import re
 
 # =========================================================
-# 1. KONFIGURASI UTAMA (WAJIB DIISI)
+# 1. KONFIGURASI UTAMA
 # =========================================================
 MARKETING_NAME  = "Asin"
 MARKETING_WA    = "08158199775"
 MARKETING_EMAIL = "alattulis.tts@gmail.com"
 
-# --- ID FOLDER GOOGLE DRIVE ---
-# GANTI DENGAN ID FOLDER YANG SUDAH BAPAK SHARE KE EMAIL ROBOT
-PARENT_PENAWARAN_ID = "17qbmEz7kdSwYHYk6ywlGg3apDtFSXr6e" 
-PAJAK_FOLDER_ID     = "19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z"
+# ID FOLDER FAKTUR PAJAK (Tetap dipakai untuk fitur cari pajak)
+PAJAK_FOLDER_ID = "19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z"
 
 COMPANY_NAME    = "PT. THEA THEO STATIONARY"
 SLOGAN          = "Supplier Alat Tulis Kantor & Sekolah"
@@ -46,69 +43,14 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
-def get_drive_service():
-    return build('drive', 'v3', credentials=get_creds())
-
-# =========================================================
-# 3. FUNGSI GOOGLE DRIVE (ROBUST VERSION)
-# =========================================================
-def get_or_create_customer_folder(customer_name):
-    """Mencari folder customer, jika tidak ada maka buat baru."""
-    try:
-        service = get_drive_service()
-        # Cari folder
-        query = f"name = '{customer_name}' and '{PARENT_PENAWARAN_ID}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-        results = service.files().list(q=query, fields="files(id, name)", supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
-        items = results.get('files', [])
-
-        if items:
-            return items[0]['id'] # Folder sudah ada
-        else:
-            # Buat folder baru
-            file_metadata = {
-                'name': customer_name,
-                'mimeType': 'application/vnd.google-apps.folder',
-                'parents': [PARENT_PENAWARAN_ID]
-            }
-            folder = service.files().create(body=file_metadata, fields='id', supportsAllDrives=True).execute()
-            return folder.get('id')
-    except Exception as e:
-        st.error(f"Gagal membuat folder Drive: {e}")
-        return None
-
-def upload_pdf_to_drive(file_name, pdf_bytes, folder_id):
-    """Upload file PDF ke folder spesifik dengan handling error lengkap."""
-    try:
-        service = get_drive_service()
-        
-        file_metadata = {
-            'name': file_name, 
-            'parents': [folder_id]
-        }
-        
-        # Buat stream baru dari bytes PDF
-        media = MediaIoBaseUpload(io.BytesIO(pdf_bytes), mimetype='application/pdf', resumable=True)
-        
-        file = service.files().create(
-            body=file_metadata, 
-            media_body=media, 
-            fields='id',
-            supportsAllDrives=True
-        ).execute()
-        
-        return file.get('id')
-    except Exception as e:
-        st.error(f"🔴 CRITICAL ERROR UPLOAD: {str(e)}")
-        return None
-
-# --- Fungsi Cari Pajak ---
+# --- Fungsi Cari Pajak (Tetap Ada) ---
 def search_pajak_file(inv_keyword, name_keyword):
     try:
-        service = get_drive_service()
+        service = build('drive', 'v3', credentials=get_creds())
         clean_inv = re.sub(r'[^A-Z0-9]', '', inv_keyword.upper())
         clean_name = re.sub(r'[^A-Z0-9]', '', name_keyword.upper())
         query = f"'{PAJAK_FOLDER_ID}' in parents and mimeType = 'application/pdf' and trashed = false"
-        results = service.files().list(q=query, fields="files(id, name)", pageSize=1000, supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
+        results = service.files().list(q=query, fields="files(id, name)", pageSize=1000).execute()
         files = results.get('files', [])
         for f in files:
             file_name_clean = re.sub(r'[^A-Z0-9]', '', f['name'].upper())
@@ -118,7 +60,7 @@ def search_pajak_file(inv_keyword, name_keyword):
     except: return None
 
 def download_drive_file(file_id):
-    service = get_drive_service()
+    service = build('drive', 'v3', credentials=get_creds())
     request = service.files().get_media(fileId=file_id)
     fh = io.BytesIO()
     downloader = MediaIoBaseDownload(fh, request)
@@ -127,7 +69,7 @@ def download_drive_file(file_id):
     return fh.getvalue()
 
 # =========================================================
-# 4. DATABASE & PDF ENGINE
+# 3. DATABASE & PDF ENGINE
 # =========================================================
 def load_db():
     if os.path.exists("database_barang.xlsx"):
@@ -208,7 +150,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     return pdf.output(dest='S').encode('latin-1')
 
 # =========================================================
-# 5. UI UTAMA (SIDEBAR & MENU)
+# 4. UI UTAMA (SIDEBAR & MENU)
 # =========================================================
 st.sidebar.title(f"Portal {MARKETING_NAME}")
 menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Portal Customer", "👨‍💻 Admin Dashboard"])
@@ -294,7 +236,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                 edited_items = []
                                 
                                 st.write("### 1. Edit Barang & Harga")
-                                # --- DAFTAR ITEM ---
+                                # --- DAFTAR ITEM DENGAN EDIT SATUAN ---
                                 for i, r in enumerate(items_list):
                                     with st.container(border=True):
                                         ca, cb, cc, cd, ce = st.columns([3, 0.8, 1.2, 1.5, 0.5])
@@ -302,6 +244,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         ca.markdown(f"**{r['Nama Barang']}**")
                                         nq = cb.number_input("Qty", value=int(r['Qty']), key=f"q_a_{idx}_{i}")
                                         
+                                        # DROPDOWN SATUAN (FITUR YANG BAPAK MINTA)
                                         opsi_satuan = ["Pcs", "Roll", "Dus", "Pack", "Rim", "Box", "Lusin", "Unit", "Set", "Lembar", "Botol"]
                                         satuan_awal = r.get('Satuan', 'Pcs')
                                         if satuan_awal not in opsi_satuan: opsi_satuan.insert(0, satuan_awal)
@@ -347,37 +290,16 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     no_s = c1.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_a_{idx}")
                                     c2.metric("Total Baru (Inc. PPN)", f"Rp {gtot:,.0f}")
                                     
-                                    # TOMBOL FINAL (ARCHIVE TO DRIVE)
-                                    if st.button("✅ Selesai & Kirim ke Drive Customer", key=f"fin_a_{idx}"):
-                                        with st.status("Sedang memproses...", expanded=True) as status:
-                                            try:
-                                                # 1. Cari Folder
-                                                st.write(f"🔍 Mencari Folder '{row['Customer']}'...")
-                                                folder_id = get_or_create_customer_folder(row['Customer'])
-                                                
-                                                if folder_id:
-                                                    st.write(f"📂 Folder Siap (ID: {folder_id}). Membuat PDF...")
-                                                    
-                                                    # 2. Generate PDF Baru (Fresh)
-                                                    pdf_arsip = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                                    file_name = f"Penawaran_{row['Customer']}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
-                                                    
-                                                    # 3. Upload
-                                                    st.write("⬆️ Mengunggah ke Google Drive...")
-                                                    result_id = upload_pdf_to_drive(file_name, pdf_arsip, folder_id)
-                                                    
-                                                    if result_id:
-                                                        st.write("📝 Mengupdate Status GSheet...")
-                                                        sheet.update_cell(real_row_idx, 6, "Processed")
-                                                        status.update(label="✅ BERHASIL! File tersimpan aman di Drive.", state="complete", expanded=False)
-                                                        st.balloons()
-                                                        st.info("Silakan Refresh halaman manual jika ingin lanjut ke antrean berikutnya.")
-                                                    else:
-                                                        status.update(label="❌ Gagal Upload.", state="error")
-                                                else:
-                                                    status.update(label="❌ Gagal membuat folder.", state="error")
-                                            except Exception as e:
-                                                st.error(f"Error Sistem: {e}")
+                                    # GENERATE & DOWNLOAD PDF
+                                    pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
+                                    st.download_button("📩 Download PDF Penawaran", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
+                                    
+                                    st.caption("⚠️ PENTING: Download PDF dulu sebelum klik tombol Selesai di bawah.")
+                                    
+                                    # TOMBOL SELESAI MANUAL
+                                    if st.button("✅ Selesai & Hapus dari Antrean", key=f"fin_a_{idx}"):
+                                        sheet.update_cell(real_row_idx, 6, "Processed")
+                                        st.success("Status diupdate menjadi Processed! Data hilang dari antrean."); st.rerun()
                     else:
                         st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e:
