@@ -94,7 +94,6 @@ class PenawaranPDF(FPDF):
         self.set_font('Arial', 'I', 9)
         self.cell(80, 5, SLOGAN, ln=0)
         self.set_font('Arial', '', 8)
-        # OTOMATIS MENGIKUTI KONFIGURASI DI ATAS
         self.cell(0, 4, f"WA: {MARKETING_WA} | Email: {MARKETING_EMAIL}", ln=1, align='R')
         self.line(10, 30, 200, 30)
         self.ln(12)
@@ -139,7 +138,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     
     pdf.ln(10); pdf.set_font('Arial', 'B', 10)
     pdf.cell(0, 6, "Hormat Kami,", ln=1); pdf.ln(15)
-    pdf.cell(0, 6, f"{MARKETING_NAME}", ln=1) # Nama di tanda tangan otomatis
+    pdf.cell(0, 6, f"{MARKETING_NAME}", ln=1)
     pdf.set_font('Arial', '', 9); pdf.cell(0, 5, "Sales Consultant", ln=1)
     return pdf.output(dest='S').encode('latin-1')
 
@@ -172,26 +171,16 @@ elif menu == "📝 Portal Customer":
             st.markdown("### 📋 Daftar Pesanan")
             list_pesanan = []
             for item in st.session_state.cart:
-                # Mengambil data harga dan satuan dari database berdasarkan nama barang
                 row_b = df_barang[df_barang['Nama Barang'] == item].iloc[0]
                 
                 with st.container(border=True):
                     c1, c2, c3, c4 = st.columns([3, 1.5, 1, 0.5])
-                    
-                    # KOLOM 1: Nama Barang
                     c1.markdown(f"**{item}**")
-                    
-                    # KOLOM 2: Harga & Satuan (YANG TADI HILANG)
                     c2.markdown(f"Rp {row_b['Harga']:,.0f} / {row_b['Satuan']}")
-                    
-                    # KOLOM 3: Input Qty
                     qty = c3.number_input(f"Jumlah", min_value=1, value=1, key=f"q_c_{item}")
-                    
-                    # KOLOM 4: Tombol Hapus
                     if c4.button("❌", key=f"del_c_{item}"):
                         st.session_state.cart.remove(item); st.rerun()
                     
-                    # Simpan data ke list untuk dikirim ke GSheet
                     list_pesanan.append({
                         "Nama Barang": str(item), 
                         "Qty": int(qty), 
@@ -204,7 +193,6 @@ elif menu == "📝 Portal Customer":
                 sheet = connect_gsheet()
                 if sheet and nama_toko:
                     wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
-                    # Tambahkan kolom MARKETING_NAME di akhir (Kolom G)
                     sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending", MARKETING_NAME])
                     st.success("Terkirim! Terima kasih."); st.session_state.cart = []
 
@@ -218,6 +206,7 @@ elif menu == "📝 Portal Customer":
                 st.success(f"Ditemukan: {file_match['name']}")
                 st.download_button("📥 Download PDF", data=download_drive_file(file_match['id']), file_name=file_match['name'])
             else: st.error("❌ Tidak ditemukan.")
+
 elif menu == "👨‍💻 Admin Dashboard":
     st.title(f"Admin Dashboard - {MARKETING_NAME}")
     pwd = st.sidebar.text_input("Password:", type="password")
@@ -228,57 +217,62 @@ elif menu == "👨‍💻 Admin Dashboard":
                 all_vals = sheet.get_all_values()
                 if len(all_vals) > 1:
                     df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
-                    # Filter agar sales hanya melihat miliknya sendiri
                     pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == MARKETING_NAME)]
                     
                     if not pending.empty:
                         for idx, row in pending.iterrows():
-                            # Menghitung index baris di gsheet (idx dimulai dari 0, +2 karena header)
                             real_row_idx = df_gs.index[idx] + 2 
                             
                             with st.expander(f"🛠️ KELOLA: {row['Customer']}"):
                                 items_list = ast.literal_eval(str(row['Pesanan']))
                                 edited_items = []
                                 
-                                st.write("### 1. Edit Barang & Harga")
+                                st.write("### 1. Edit Barang, Harga & Satuan")
+                                # --- DAFTAR ITEM DENGAN EDIT SATUAN ---
                                 for i, r in enumerate(items_list):
                                     with st.container(border=True):
-                                        ca, cb, cc, cd = st.columns([3, 1, 1.5, 0.5])
-                                        # --- BAGIAN YANG DIPERBAIKI: NAMA BARANG MUNCUL LAGI ---
-                                        ca.markdown(f"**Nama Barang:**\n\n{r['Nama Barang']}") 
-                                        nq = cb.number_input(f"Qty", value=int(r['Qty']), key=f"q_a_{idx}_{i}")
-                                        nh = cc.number_input(f"Harga Nego", value=float(r['Harga']), key=f"h_a_{idx}_{i}")
+                                        # Layout Kolom: Nama(3) | Qty(0.8) | Satuan(1.2) | Harga(1.5) | Hapus(0.5)
+                                        ca, cb, cc, cd, ce = st.columns([3, 0.8, 1.2, 1.5, 0.5])
                                         
-                                        if not cd.checkbox("Hapus", key=f"d_a_{idx}_{i}"):
+                                        ca.markdown(f"**{r['Nama Barang']}**")
+                                        nq = cb.number_input("Qty", value=int(r['Qty']), key=f"q_a_{idx}_{i}")
+                                        
+                                        # LOGIKA EDIT SATUAN
+                                        opsi_satuan = ["Pcs", "Roll", "Dus", "Pack", "Rim", "Box", "Lusin", "Unit", "Set", "Lembar", "Botol"]
+                                        satuan_awal = r.get('Satuan', 'Pcs')
+                                        if satuan_awal not in opsi_satuan:
+                                            opsi_satuan.insert(0, satuan_awal)
+                                        
+                                        ns = cc.selectbox("Satuan", options=opsi_satuan, index=opsi_satuan.index(satuan_awal), key=f"s_a_{idx}_{i}")
+                                        
+                                        nh = cd.number_input("Harga/Unit", value=float(r['Harga']), key=f"h_a_{idx}_{i}")
+                                        
+                                        if not ce.checkbox("Hapus", key=f"d_a_{idx}_{i}"):
                                             edited_items.append({
                                                 "Nama Barang": r['Nama Barang'], 
                                                 "Qty": nq, 
                                                 "Harga": nh, 
-                                                "Satuan": r['Satuan'], 
+                                                "Satuan": ns, # Menggunakan satuan baru dr dropdown
                                                 "Total_Row": nq * nh
                                             })
                                 
-                                # Tambah Barang Baru
                                 st.divider()
                                 st.write("### 2. Tambah Barang Baru")
                                 new_items = st.multiselect("Cari Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_a_{idx}")
                                 for p in new_items:
                                     rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                    with st.container(border=True):
-                                        c_new1, c_new2 = st.columns([3, 1])
-                                        c_new1.write(f"**{p}**")
-                                        aq = c_new2.number_input(f"Qty Baru", min_value=1, value=1, key=f"aq_a_{idx}_{p}")
-                                        edited_items.append({
-                                            "Nama Barang": p, 
-                                            "Qty": int(aq), 
-                                            "Harga": float(rb['Harga']), 
-                                            "Satuan": str(rb['Satuan']), 
-                                            "Total_Row": float(aq * rb['Harga'])
-                                        })
+                                    edited_items.append({
+                                        "Nama Barang": p, 
+                                        "Qty": 1, 
+                                        "Harga": float(rb['Harga']), 
+                                        "Satuan": str(rb['Satuan']), 
+                                        "Total_Row": float(1 * rb['Harga'])
+                                    })
+                                    st.info(f"Barang {p} ditambahkan. Klik Simpan lalu edit Satuan di atas jika perlu.")
 
                                 if st.button("💾 Simpan Perubahan ke GSheet", key=f"s_a_{idx}"):
                                     sheet.update_cell(real_row_idx, 5, str(edited_items))
-                                    st.success("Data di Google Sheet berhasil diupdate!"); st.rerun()
+                                    st.success("Data berhasil diupdate! Silakan refresh atau lanjutkan cetak PDF."); st.rerun()
 
                                 st.divider()
                                 final_df = pd.DataFrame(edited_items)
@@ -301,6 +295,3 @@ elif menu == "👨‍💻 Admin Dashboard":
                         st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e:
                 st.error(f"Error detail: {e}")
-
-
-
