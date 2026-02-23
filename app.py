@@ -77,17 +77,37 @@ def get_or_create_customer_folder(customer_name):
         return None
 
 def upload_pdf_to_drive(file_name, pdf_bytes, folder_id):
-    """Upload file PDF ke folder spesifik."""
+    """Upload file PDF ke folder spesifik dengan pengamanan ekstra."""
     try:
         service = get_drive_service()
-        file_metadata = {'name': file_name, 'parents': [folder_id]}
-        media = MediaIoBaseUpload(io.BytesIO(pdf_bytes), mimetype='application/pdf')
-        file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        
+        # Pastikan data PDF tidak kosong
+        if not pdf_bytes:
+            st.error("Data PDF kosong, gagal upload.")
+            return None
+            
+        file_metadata = {
+            'name': file_name, 
+            'parents': [folder_id]
+        }
+        
+        # Gunakan BytesIO yang baru untuk memastikan data terbaca dari awal
+        media_content = io.BytesIO(pdf_bytes)
+        media = MediaIoBaseUpload(media_content, mimetype='application/pdf', resumable=True)
+        
+        # Tambahkan supportsAllDrives=True jika Bapak pakai Google Workspace/Shared Drive
+        file = service.files().create(
+            body=file_metadata, 
+            media_body=media, 
+            fields='id',
+            supportsAllDrives=True # PENTING: Biar lancar di Drive kantor
+        ).execute()
+        
         return file.get('id')
     except Exception as e:
         st.error(f"Gagal upload file: {e}")
         return None
-
+        
 # --- Fungsi Cari Pajak ---
 def search_pajak_file(inv_keyword, name_keyword):
     try:
@@ -362,3 +382,4 @@ elif menu == "👨‍💻 Admin Dashboard":
                         st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e:
                 st.error(f"Error detail: {e}")
+
