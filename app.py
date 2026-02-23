@@ -9,9 +9,9 @@ from google.oauth2.service_account import Credentials
 import io
 
 # =========================================================
-# 1. KONFIGURASI UTAMA
+# 1. KONFIGURASI UTAMA (SESUAIKAN NAMA DI SINI)
 # =========================================================
-MARKETING_NAME  = "Asin"
+MARKETING_NAME  = "Asin" 
 MARKETING_WA    = "08158199775"
 MARKETING_EMAIL = "alattulis.tts@gmail.com"
 
@@ -22,7 +22,7 @@ OFFICE_PHONE    = "(021) 55780659"
 
 ADMIN_PASSWORD  = st.secrets["ADMIN_PASSWORD"]
 
-st.set_page_config(page_title=f"{COMPANY_NAME}", layout="wide")
+st.set_page_config(page_title=f"Portal {MARKETING_NAME} - TTS", layout="wide")
 
 # =========================================================
 # 2. KONEKSI DATA
@@ -50,7 +50,7 @@ def load_db():
 df_barang = load_db()
 
 # =========================================================
-# 3. PDF ENGINE (PROFESSIONAL NAVY)
+# 3. PDF ENGINE
 # =========================================================
 class PenawaranPDF(FPDF):
     def header(self):
@@ -83,83 +83,73 @@ def generate_pdf(no_s, cust, pic, df_f, subt, tax, gtot):
 # =========================================================
 # 4. MENU APLIKASI
 # =========================================================
-st.sidebar.title("NAVIGASI TTS")
+st.sidebar.title(f"PORTAL {MARKETING_NAME.upper()}")
 menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "🛒 1. Input Staff", "🔐 2. Pak Asin (Nego)", "📄 3. Cetak Staff"])
 sheet = connect_gsheet()
 
-# --- MENU 1: HOME ---
 if menu == "🏠 Home":
     st.title(f"Portal Penawaran {COMPANY_NAME}")
-    st.info("Selamat bekerja! Gunakan menu di samping untuk memproses penawaran.")
+    st.info(f"Aplikasi ini hanya menampilkan penawaran milik: **{MARKETING_NAME}**")
 
-# --- MENU 2: INPUT STAFF (SUDAH DIPERBAIKI) ---
+# --- MENU 1: INPUT STAFF ---
 elif menu == "🛒 1. Input Staff":
-    st.header("Admin/Staff: Masukkan Pesanan Awal")
+    st.header(f"Admin: Input Pesanan untuk {MARKETING_NAME}")
     if 'cart' not in st.session_state: st.session_state.cart = []
-    
     with st.container(border=True):
         c1, c2 = st.columns(2)
         nama_t = c1.text_input("Nama Toko/Customer")
         up = c2.text_input("UP (Nama Penerima)")
-        wa = c1.text_input("Nomor WhatsApp")
-        barang_pilihan = st.multiselect("Pilih Barang dari Database:", options=df_barang['Nama Barang'].tolist())
-        if st.button("Tambahkan ke Daftar"):
-            for b in barang_pilihan:
+        wa = c1.text_input("Nomor WA")
+        barang_p = st.multiselect("Pilih Barang:", options=df_barang['Nama Barang'].tolist())
+        if st.button("Tambah ke Daftar"):
+            for b in barang_p:
                 if b not in st.session_state.cart: st.session_state.cart.append(b)
             st.rerun()
 
     if st.session_state.cart:
-        st.markdown("### 📋 Preview Pesanan")
         list_p = []
         for item in st.session_state.cart:
-            # Ambil detail barang dari database
             rb = df_barang[df_barang['Nama Barang'] == item].iloc[0]
             with st.container(border=True):
                 ca, cb, cc, cd, ce = st.columns([3, 1, 1, 1.2, 0.5])
-                ca.markdown(f"**{item}**")
-                cb.write(f"Sat: {rb['Satuan']}") # Menampilkan Satuan
-                cc.write(f"Rp {rb['Harga']:,.0f}") # Menampilkan Harga Standar
-                qty = cd.number_input("Jumlah (Qty)", min_value=1, value=1, key=f"staff_q_{item}")
-                if ce.button("❌", key=f"staff_d_{item}"): 
-                    st.session_state.cart.remove(item); st.rerun()
-                
-                list_p.append({
-                    "Nama Barang": item, 
-                    "Qty": qty, 
-                    "Harga": float(rb['Harga']), 
-                    "Satuan": rb['Satuan'], 
-                    "Total_Row": qty * rb['Harga']
-                })
+                ca.write(f"**{item}**")
+                cb.write(f"Sat: {rb['Satuan']}")
+                cc.write(f"Rp {rb['Harga']:,.0f}")
+                qty = cd.number_input("Qty", min_value=1, value=1, key=f"staff_q_{item}")
+                if ce.button("❌", key=f"staff_d_{item}"): st.session_state.cart.remove(item); st.rerun()
+                list_p.append({"Nama Barang": item, "Qty": qty, "Harga": float(rb['Harga']), "Satuan": rb['Satuan'], "Total_Row": qty * rb['Harga']})
         
-        if st.button("🚀 Kirim ke Pak Asin", use_container_width=True):
+        if st.button("🚀 Kirim ke Antrean Pak Asin", use_container_width=True):
             if sheet and nama_t:
                 wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
+                # DISINI KITA KUNCI NAMA SALESNYA
                 sheet.append_row([wkt, nama_t, up, wa, str(list_p), "Pending", MARKETING_NAME])
-                st.success(f"Tersimpan! Silakan lapor ke Pak Asin untuk penawaran {nama_t}."); st.session_state.cart = []
+                st.success(f"Berhasil! Data masuk ke antrean {MARKETING_NAME}."); st.session_state.cart = []
 
-# --- MENU 3: PAK ASIN (TETAP SAMA) ---
+# --- MENU 2: PAK ASIN (NEGOSIASI) ---
 elif menu == "🔐 2. Pak Asin (Nego)":
-    st.header("🔐 Bagian Pak Asin: Finalisasi Harga & Item")
+    st.header(f"🔐 Management Penawaran: {MARKETING_NAME}")
     pwd = st.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         if sheet:
             all_v = sheet.get_all_values()
             df_g = pd.DataFrame(all_v[1:], columns=all_v[0]) if len(all_v) > 1 else pd.DataFrame()
-            status_f = st.radio("Cek Data:", ["🆕 Baru (Pending)", "🔄 Siap Cetak (Ready)", "✅ Selesai (Processed)"], horizontal=True)
-            f_val = "Pending"
-            if "Ready" in status_f: f_val = "Ready"
-            if "Processed" in status_f: f_val = "Processed"
             
-            data_edit = df_g[df_g['Status'] == f_val]
-            if data_edit.empty: st.info(f"Data {f_val} tidak ditemukan.")
+            # --- FILTER NAMA SALES DI SINI (AGAR TIDAK BOCOR) ---
+            status_f = st.radio("Status:", ["🆕 Pending", "🔄 Ready", "✅ Processed"], horizontal=True)
+            f_val = status_f.split(" ")[1]
+            
+            # Kunci filter: Status match DAN Sales match
+            data_edit = df_g[(df_g['Status'] == f_val) & (df_g['Sales'] == MARKETING_NAME)]
+            
+            if data_edit.empty: st.info(f"Tidak ada data {f_val} untuk {MARKETING_NAME}.")
             for idx, row in data_edit.iterrows():
                 real_idx = df_g.index[idx] + 2
-                with st.expander(f"🛠️ KELOLA: {row['Customer']}", expanded=(f_val == "Pending")):
+                with st.expander(f"🛠️ EDIT: {row['Customer']}", expanded=(f_val == "Pending")):
                     items_asli = ast.literal_eval(str(row['Pesanan']))
                     
                     st.markdown("### ➕ Tambah Barang Baru:")
-                    tambah_b = st.multiselect("Tambah barang yang belum ada:", options=df_barang['Nama Barang'].tolist(), key=f"pa_add_{idx}")
-                    
+                    tambah_b = st.multiselect("Tambah barang:", options=df_barang['Nama Barang'].tolist(), key=f"pa_add_{idx}")
                     combined = items_asli.copy()
                     for t in tambah_b:
                         if not any(d['Nama Barang'] == t for d in items_asli):
@@ -171,25 +161,28 @@ elif menu == "🔐 2. Pak Asin (Nego)":
                     for i, r in enumerate(combined):
                         with st.container(border=True):
                             c1, c2, c3, c4 = st.columns([3, 0.8, 1, 1.2])
-                            c1.markdown(f"**{r['Nama Barang']}**")
-                            nq = c2.number_input("Qty", value=int(r['Qty']), key=f"pa_q_{idx}_{i}")
-                            ns = c3.text_input("Sat", value=r['Satuan'], key=f"pa_s_{idx}_{i}")
-                            nh = c4.number_input("Harga Nego", value=float(r['Harga']), key=f"pa_h_{idx}_{i}")
+                            c1.write(f"**{r['Nama Barang']}**")
+                            nq = c2.number_input("Qty", value=int(r['Qty']), key=f"pa_q_{idx}_{i}_{r['Nama Barang']}")
+                            ns = c3.text_input("Sat", value=r['Satuan'], key=f"pa_s_{idx}_{i}_{r['Nama Barang']}")
+                            nh = c4.number_input("Harga", value=float(r['Harga']), key=f"pa_h_{idx}_{i}_{r['Nama Barang']}")
                             final_save.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": ns, "Total_Row": nq * nh})
 
                     if st.button("💾 SIMPAN FINAL", key=f"pa_sv_{idx}"):
                         sheet.update_cell(real_idx, 5, str(final_save))
                         sheet.update_cell(real_idx, 6, "Ready")
-                        st.success("Berhasil! Admin bisa cetak di Menu 3."); st.rerun()
+                        st.success("Tersimpan!"); st.rerun()
 
-# --- MENU 4: CETAK STAFF ---
+# --- MENU 3: CETAK STAFF ---
 elif menu == "📄 3. Cetak Staff":
-    st.header("📄 Admin: Download PDF")
+    st.header(f"📄 Bagian Cetak Penawaran {MARKETING_NAME}")
     if sheet:
         all_v = sheet.get_all_values()
         df_g = pd.DataFrame(all_v[1:], columns=all_v[0]) if len(all_v) > 1 else pd.DataFrame()
-        data_c = df_g[df_g['Status'] == 'Ready']
-        if data_c.empty: st.warning("Menunggu finalisasi harga dari Pak Asin.")
+        
+        # FILTER NAMA SALES DI SINI JUGA
+        data_c = df_g[(df_g['Status'] == 'Ready') & (df_g['Sales'] == MARKETING_NAME)]
+        
+        if data_c.empty: st.warning(f"Tidak ada penawaran {MARKETING_NAME} yang siap cetak.")
         for idx, row in data_c.iterrows():
             real_idx = df_g.index[idx] + 2
             with st.expander(f"🖨️ CETAK: {row['Customer']}", expanded=True):
