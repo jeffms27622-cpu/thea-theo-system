@@ -20,7 +20,7 @@ MARKETING_EMAIL = "alattulis.tts@gmail.com"
 
 # --- DATA KANTOR ---
 COMPANY_NAME    = "PT. THEA THEO STATIONARY"
-SLOGAN          = "Premium Office & School Supplies Solution"
+SLOGAN          = "Office & School Supplies Solution"
 ADDR            = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 OFFICE_PHONE    = "(021) 55780659"
 
@@ -212,7 +212,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(0, 5, "TERMS & CONDITIONS:", ln=1)
     pdf.set_font('Arial', '', 8)
     pdf.set_text_color(100, 100, 100)
-    pdf.multi_cell(0, 4, "1. Prices are subject to change with notice.\n2. Validity: 14 Days from the date of quotation.\n3. Delivery: Within 3 working days after PO confirmation.\n4. Payment: T/T or Bank Transfer.")
+    pdf.multi_cell(0, 4, "1. Prices are subject to change with notice.\n2. Validity: 14 Days from the date of quotation.\n3. Delivery: Within 1 working day after PO confirmation.\n4. Payment: T/T or Bank Transfer.")
 
     # Signature Area
     pdf.ln(10)
@@ -350,3 +350,4 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         st.success("Processed!"); st.rerun()
                     else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
