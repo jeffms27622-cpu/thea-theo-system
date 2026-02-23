@@ -198,18 +198,24 @@ tc_text = (
     "   Account Number   : [1550010174996]\n"
     "   Account Name     : PT. THEA THEO STATIONARY"
 )
-
 pdf.multi_cell(0, 4, tc_text)
 
-    # Closing & Signature (Formal - No E-Sign mention)
-    pdf.ln(10); pdf.set_font('Arial', '', 10); pdf.set_text_color(*COLOR_TEXT)
+# Closing & Signature (Pastikan sejajar dengan baris di atasnya)
+    pdf.ln(10)
+    pdf.set_font('Arial', '', 10)
+    pdf.set_text_color(*COLOR_TEXT)
     pdf.cell(130, 5, "", 0, 0)
     pdf.cell(60, 5, "Yours Faithfully,", 0, 1, 'C')
-    pdf.ln(20) # Ruang tanda tangan manual
-    pdf.set_font('Arial', 'B', 10); pdf.set_text_color(*COLOR_NAVY)
+    
+    pdf.ln(18)
+    
+    pdf.set_font('Arial', 'B', 10)
+    pdf.set_text_color(*COLOR_NAVY)
     pdf.cell(130, 5, "", 0, 0)
     pdf.cell(60, 5, MARKETING_NAME.upper(), 0, 1, 'C')
-    pdf.set_font('Arial', '', 9); pdf.set_text_color(100, 100, 100)
+    
+    pdf.set_font('Arial', '', 9)
+    pdf.set_text_color(100, 100, 100)
     pdf.cell(130, 5, "", 0, 0)
     pdf.cell(60, 5, "Sales Consultant", 0, 1, 'C')
     
@@ -315,4 +321,5 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
