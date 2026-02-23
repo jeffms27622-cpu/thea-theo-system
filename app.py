@@ -119,4 +119,80 @@ elif menu == "🛒 1. Input Staff":
         if st.button("🚀 Kirim ke Pak Asin", use_container_width=True):
             if sheet and nama_t:
                 wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
-                sheet.append_row([wkt, nama_t, up, wa, str(list_p), "Pending",
+                sheet.append_row([wkt, nama_t, up, wa, str(list_p), "Pending", MARKETING_NAME])
+                st.success("Terkirim ke Menu 2!"); st.session_state.cart = []
+
+elif menu == "🔐 2. Pak Asin (Edit Harga & Barang)":
+    st.header("🔐 Bagian Pak Asin: Finalisasi Harga & Tambah Item")
+    pwd = st.text_input("Password:", type="password")
+    if pwd == ADMIN_PASSWORD:
+        if sheet:
+            all_v = sheet.get_all_values()
+            df_g = pd.DataFrame(all_v[1:], columns=all_v[0]) if len(all_v) > 1 else pd.DataFrame()
+            
+            status_filter = st.radio("Cek Data:", ["🆕 Baru (Pending)", "🔄 Sudah Siap (Ready)", "✅ Selesai (Processed)"], horizontal=True)
+            filter_val = "Pending"
+            if "Ready" in status_filter: filter_val = "Ready"
+            if "Processed" in status_filter: filter_val = "Processed"
+            
+            data_edit = df_g[df_g['Status'] == filter_val]
+            
+            if data_edit.empty: st.info(f"Data {filter_val} tidak ditemukan.")
+            for idx, row in data_edit.iterrows():
+                real_idx = df_g.index[idx] + 2
+                with st.expander(f"🛠️ KELOLA: {row['Customer']}", expanded=(filter_val == "Pending")):
+                    # 1. Ambil Barang Lama
+                    items_asli = ast.literal_eval(str(row['Pesanan']))
+                    
+                    # 2. Fitur Tambah Barang (Diletakkan di Atas agar Jelas)
+                    st.write("---")
+                    st.markdown("### ➕ Tambah Barang Baru Ke Daftar:")
+                    tambah_baru = st.multiselect("Cari Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_brg_{idx}")
+                    
+                    # Gabungkan barang lama dengan barang yang baru dipilih di multiselect
+                    combined_items = items_asli.copy()
+                    for t in tambah_baru:
+                        # Cek apakah barang sudah ada di daftar biar tidak duplikat
+                        if not any(d['Nama Barang'] == t for d in items_asli):
+                            rb_t = df_barang[df_barang['Nama Barang'] == t].iloc[0]
+                            combined_items.append({"Nama Barang": t, "Qty": 1, "Harga": float(rb_t['Harga']), "Satuan": str(rb_t['Satuan']), "Total_Row": float(rb_t['Harga'])})
+                    
+                    st.write("---")
+                    st.markdown("### 📋 Daftar Barang & Harga Nego:")
+                    final_to_save = []
+                    
+                    # 3. Tampilkan semua (Lama + Baru) untuk diedit
+                    for i, r in enumerate(combined_items):
+                        with st.container(border=True):
+                            c1, c2, c3, c4 = st.columns([3, 0.8, 1, 1.2])
+                            c1.markdown(f"**{r['Nama Barang']}**")
+                            nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{idx}_{i}_{r['Nama Barang']}")
+                            ns = c3.text_input("Sat", value=r['Satuan'], key=f"s_{idx}_{i}_{r['Nama Barang']}")
+                            nh = c4.number_input("Harga", value=float(r['Harga']), key=f"h_{idx}_{i}_{r['Nama Barang']}")
+                            final_to_save.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": ns, "Total_Row": nq * nh})
+
+                    if st.button("💾 SIMPAN SEMUA PERUBAHAN", key=f"save_all_{idx}"):
+                        sheet.update_cell(real_idx, 5, str(final_to_save))
+                        sheet.update_cell(real_idx, 6, "Ready")
+                        st.success("Berhasil disimpan! Admin bisa cetak di Menu 3."); st.rerun()
+
+elif menu == "📄 3. Cetak Staff":
+    st.header("📄 Admin: Cetak PDF")
+    if sheet:
+        all_v = sheet.get_all_values()
+        df_g = pd.DataFrame(all_v[1:], columns=all_v[0]) if len(all_v) > 1 else pd.DataFrame()
+        data_cetak = df_g[df_g['Status'] == 'Ready']
+        
+        if data_cetak.empty: st.warning("Menunggu Pak Asin memproses penawaran di Menu 2.")
+        for idx, row in data_cetak.iterrows():
+            real_idx = df_g.index[idx] + 2
+            with st.expander(f"🖨️ CETAK: {row['Customer']}", expanded=True):
+                itms = pd.DataFrame(ast.literal_eval(str(row['Pesanan'])))
+                sb = itms['Total_Row'].sum()
+                tx, gt = sb * 0.11, sb * 1.11
+                st.write(f"Total Akhir: **Rp {gt:,.0f}**")
+                nosur = st.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_{idx}")
+                p_file = generate_pdf(nosur, row['Customer'], row['UP'], itms, sb, tx, gt)
+                st.download_button("📩 Download PDF", data=p_file, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_{idx}")
+                if st.button("✅ Selesai (Arsipkan)", key=f"ok_{idx}"):
+                    sheet.update_cell(real_idx, 6, "Processed"); st.rerun()
