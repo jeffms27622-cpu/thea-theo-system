@@ -20,9 +20,9 @@ MARKETING_EMAIL = "alattulis.tts@gmail.com"
 
 # --- DATA KANTOR ---
 COMPANY_NAME    = "PT. THEA THEO STATIONARY"
-SLOGAN          = "Supplier Alat Tulis Kantor & Sekolah"
+SLOGAN          = "Partner Terpercaya Kebutuhan Kantor & Sekolah"
 ADDR            = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
-OFFICE_PHONE    = "(021) 55780659" # <--- Tambahan Nomor Telepon Kantor
+OFFICE_PHONE    = "(021) 55780659"
 
 PAJAK_FOLDER_ID = "19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z"
 ADMIN_PASSWORD  = st.secrets["ADMIN_PASSWORD"]
@@ -47,14 +47,19 @@ def connect_gsheet():
 def search_pajak_file(inv_keyword, name_keyword):
     try:
         service = build('drive', 'v3', credentials=get_creds())
-        clean_inv = re.sub(r'[^A-Z0-9]', '', inv_keyword.upper())
-        clean_name = re.sub(r'[^A-Z0-9]', '', name_keyword.upper())
+        clean_inv = re.sub(r'[^A-Z0-9]', '', inv_keyword.upper()) if inv_keyword else ""
+        clean_name = re.sub(r'[^A-Z0-9]', '', name_keyword.upper()) if name_keyword else ""
+        
         query = f"'{PAJAK_FOLDER_ID}' in parents and mimeType = 'application/pdf' and trashed = false"
         results = service.files().list(q=query, fields="files(id, name)", pageSize=1000).execute()
         files = results.get('files', [])
+        
         for f in files:
-            file_name_clean = re.sub(r'[^A-Z0-9]', '', f['name'].upper())
-            if clean_inv in file_name_clean and clean_name in file_name_clean:
+            fname = re.sub(r'[^A-Z0-9]', '', f['name'].upper())
+            match_inv = clean_inv in fname if clean_inv else True
+            match_name = clean_name in fname if clean_name else True
+            
+            if match_inv and match_name:
                 return f 
         return None
     except: return None
@@ -69,15 +74,14 @@ def download_drive_file(file_id):
     return fh.getvalue()
 
 # =========================================================
-# 3. DATABASE & PDF ENGINE (PROFESSIONAL VERSION)
+# 3. DATABASE & PDF ENGINE (PROFESSIONAL LUXURY VERSION)
 # =========================================================
 def load_db():
     if os.path.exists("database_barang.xlsx"):
         try:
             df = pd.read_excel("database_barang.xlsx")
             df.columns = df.columns.str.strip()
-            if 'Harga' in df.columns:
-                df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce').fillna(0)
+            df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce').fillna(0)
             return df
         except: pass
     return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
@@ -86,119 +90,189 @@ df_barang = load_db()
 
 class PenawaranPDF(FPDF):
     def header(self):
+        # A. ORNAMEN GARIS ATAS (Header Bar)
+        self.set_fill_color(0, 51, 102) # Navy Blue
+        self.rect(0, 0, 210, 5, 'F') # Garis biru di paling atas kertas
+        
+        # B. LOGO
         if os.path.exists("logo.png"):
             self.image("logo.png", 10, 10, 30)
             self.set_x(45)
-        
-        # Nama Perusahaan - Biru Navy
-        self.set_font('Arial', 'B', 16)
+        else:
+            self.set_x(10)
+
+        # C. NAMA & ALAMAT (Lebih Rapi)
+        self.set_y(12)
+        self.set_x(45)
+        self.set_font('Arial', 'B', 18)
         self.set_text_color(0, 51, 102)
         self.cell(0, 8, COMPANY_NAME, ln=1)
         
-        # Slogan, Alamat & Telepon Kantor
         self.set_x(45)
-        self.set_font('Arial', '', 9)
+        self.set_font('Arial', 'I', 9) # Italic untuk Slogan
         self.set_text_color(100, 100, 100)
         self.cell(0, 5, SLOGAN, ln=1)
-        self.set_x(45)
-        self.cell(0, 5, ADDR, ln=1)
-        self.set_x(45)
-        self.cell(0, 5, f"Telp: {OFFICE_PHONE}", ln=1) # <--- Baris Telepon Baru
         
-        # Info Kontak Kanan Atas (Marketing)
-        self.set_y(12)
-        self.set_font('Arial', '', 8)
-        self.set_text_color(0, 0, 0)
-        self.cell(0, 4, f"WhatsApp: {MARKETING_WA}", ln=1, align='R')
-        self.cell(0, 4, f"Email: {MARKETING_EMAIL}", ln=1, align='R')
+        self.set_x(45)
+        self.set_font('Arial', '', 9)
+        self.cell(0, 5, f"{ADDR}", ln=1)
+        self.set_x(45)
+        self.cell(0, 5, f"Phone: {OFFICE_PHONE} | Email: {MARKETING_EMAIL}", ln=1)
         
-        # Garis Tebal Dekoratif
+        # D. GARIS PEMBATAS GANDA (Kesan Mahal)
         self.set_draw_color(0, 51, 102)
-        self.set_line_width(0.8)
-        self.line(10, 40, 200, 40)
-        self.ln(22)
+        self.set_line_width(0.5)
+        self.line(10, 42, 200, 42)
+        self.set_line_width(0.1)
+        self.line(10, 43, 200, 43)
+        self.ln(20)
+
+    def footer(self):
+        # A. ORNAMEN BAWAH (Footer Bar)
+        self.set_y(-25)
+        self.set_fill_color(245, 245, 245) # Abu-abu sangat muda background footer
+        self.rect(0, 272, 210, 25, 'F')
+        
+        # B. TEXT FOOTER
+        self.set_y(-20)
+        self.set_font('Arial', 'B', 8)
+        self.set_text_color(0, 51, 102)
+        self.cell(0, 4, COMPANY_NAME, 0, 1, 'C')
+        
+        self.set_font('Arial', '', 7)
+        self.set_text_color(120, 120, 120)
+        self.cell(0, 4, "Document generated automatically. Valid without wet signature.", 0, 1, 'C')
+        self.cell(0, 4, f"Page {self.page_no()}", 0, 0, 'C')
 
 def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
     pdf = PenawaranPDF()
+    pdf.set_auto_page_break(auto=True, margin=30)
     pdf.add_page()
     
-    # Header Info Customer
-    pdf.set_font('Arial', 'B', 12)
+    # 1. JUDUL SURAT
+    pdf.set_font('Arial', 'B', 14)
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 7, "SURAT PENAWARAN HARGA", ln=1, align='C')
+    pdf.cell(0, 8, "PENAWARAN HARGA", ln=1, align='C')
+    # Garis bawah judul
+    pdf.set_line_width(0.2)
+    width_title = pdf.get_string_width("PENAWARAN HARGA") + 10
+    start_x = (210 - width_title) / 2
+    pdf.line(start_x, pdf.get_y(), start_x + width_title, pdf.get_y())
     pdf.ln(5)
     
+    # 2. INFO TANGGAL & NO SURAT
     pdf.set_font('Arial', '', 10)
     waktu_jkt = datetime.utcnow() + timedelta(hours=7)
     tgl_skrg = waktu_jkt.strftime('%d %B %Y')
     
-    col_width = 95
-    pdf.cell(col_width, 6, f"No Surat : {no_surat}", ln=0)
-    pdf.cell(col_width, 6, f"Tanggal : {tgl_skrg}", ln=1, align='R')
-    pdf.ln(2)
+    # Layout 2 Kolom (Kiri No Surat, Kanan Tanggal)
+    pdf.cell(100, 6, f"Nomor   : {no_surat}", ln=0)
+    pdf.cell(0, 6, f"Tanggal : {tgl_skrg}", ln=1, align='R')
+    pdf.ln(5)
+    
+    # 3. KEPADA YTH
+    pdf.set_fill_color(245, 245, 245) # Kotak abu-abu untuk area alamat
+    pdf.rect(10, 65, 190, 25, 'F')
     
     pdf.set_font('Arial', 'B', 10)
-    pdf.cell(0, 6, "Kepada Yth,", ln=1)
-    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 6, "Kepada Yth.", ln=1)
+    pdf.set_font('Arial', 'B', 12)
     pdf.cell(0, 6, str(nama_cust).upper(), ln=1)
     pdf.set_font('Arial', '', 10)
-    pdf.cell(0, 6, f"Up. {pic}", ln=1)
-    pdf.ln(8)
+    pdf.cell(0, 6, f"UP: {pic}", ln=1)
+    pdf.cell(0, 6, f"Di Tempat", ln=1)
     
-    # HEADER TABEL
-    pdf.set_fill_color(0, 51, 102)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_draw_color(0, 51, 102)
+    pdf.ln(10)
     
-    h = 10
+    # 4. KATA PENGANTAR (Gaya Surat Bisnis Formal)
+    pdf.multi_cell(0, 5, "Dengan hormat,\nBersama surat ini, kami mengajukan penawaran harga terbaik untuk kebutuhan perusahaan Bapak/Ibu sebagai berikut:")
+    pdf.ln(5)
+    
+    # 5. HEADER TABEL (Modern & Mahal)
+    pdf.set_fill_color(0, 51, 102) # Navy Blue
+    pdf.set_text_color(255, 255, 255) # Putih
+    pdf.set_font('Arial', 'B', 9)
+    
+    h = 8
     pdf.cell(10, h, 'NO', 1, 0, 'C', True)
     pdf.cell(85, h, 'NAMA BARANG', 1, 0, 'C', True)
     pdf.cell(20, h, 'QTY', 1, 0, 'C', True)
-    pdf.cell(20, h, 'SATUAN', 1, 0, 'C', True)
+    pdf.cell(20, h, 'SAT', 1, 0, 'C', True)
     pdf.cell(25, h, 'HARGA (Rp)', 1, 0, 'C', True)
     pdf.cell(30, h, 'TOTAL (Rp)', 1, 1, 'C', True)
 
-    # ISI TABEL (Zebra Style)
+    # 6. ISI TABEL (Zebra Striping)
     pdf.set_font('Arial', '', 9)
     pdf.set_text_color(0, 0, 0)
     
     fill = False
     for i, row in df_order.iterrows():
-        pdf.set_fill_color(245, 245, 245) if fill else pdf.set_fill_color(255, 255, 255)
-        pdf.cell(10, 8, str(i+1), 'LRBT', 0, 'C', True)
-        pdf.cell(85, 8, f" {row['Nama Barang']}", 'LRBT', 0, 'L', True)
-        pdf.cell(20, 8, str(int(row['Qty'])), 'LRBT', 0, 'C', True)
-        pdf.cell(20, 8, str(row['Satuan']), 'LRBT', 0, 'C', True)
-        pdf.cell(25, 8, f"{row['Harga']:,.0f} ", 'LRBT', 0, 'R', True)
-        pdf.cell(30, 8, f"{row['Total_Row']:,.0f} ", 'LRBT', 1, 'R', True)
+        # Zebra Warna
+        if fill: pdf.set_fill_color(240, 248, 255) # AliceBlue (Biru Pucat)
+        else: pdf.set_fill_color(255, 255, 255)
+        
+        pdf.cell(10, 7, str(i+1), 'LRTB', 0, 'C', True)
+        pdf.cell(85, 7, f" {row['Nama Barang']}", 'LRTB', 0, 'L', True)
+        pdf.cell(20, 7, str(int(row['Qty'])), 'LRTB', 0, 'C', True)
+        pdf.cell(20, 7, str(row['Satuan']), 'LRTB', 0, 'C', True)
+        pdf.cell(25, 7, f"{row['Harga']:,.0f} ", 'LRTB', 0, 'R', True)
+        pdf.cell(30, 7, f"{row['Total_Row']:,.0f} ", 'LRTB', 1, 'R', True)
         fill = not fill
 
-    # TOTAL SECTION
-    pdf.ln(2)
-    pdf.set_font('Arial', 'B', 10)
-    pdf.cell(160, 8, "Sub Total", 0, 0, 'R'); pdf.cell(30, 8, f" {subtotal:,.0f}", 1, 1, 'R')
-    pdf.cell(160, 8, "PPN 11%", 0, 0, 'R'); pdf.cell(30, 8, f" {ppn:,.0f}", 1, 1, 'R')
+    # 7. TOTAL SECTION (Kotak Khusus)
+    pdf.ln(5)
     
+    # Hitung Lebar Kotak Total
+    start_x_total = 120
+    
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(110, 8, "SUB TOTAL", 0, 0, 'R')
+    pdf.cell(50, 8, f"Rp {subtotal:,.0f}", 1, 1, 'R')
+    
+    pdf.cell(110, 8, "PPN 11%", 0, 0, 'R')
+    pdf.cell(50, 8, f"Rp {ppn:,.0f}", 1, 1, 'R')
+    
+    # Grand Total Biru
     pdf.set_fill_color(0, 51, 102)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(160, 10, "GRAND TOTAL  ", 0, 0, 'R')
-    pdf.cell(30, 10, f" {grand_total:,.0f}", 1, 1, 'R', True)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(110, 10, "GRAND TOTAL  ", 0, 0, 'R')
+    pdf.cell(50, 10, f"Rp {grand_total:,.0f}", 1, 1, 'R', True)
 
-    # Footer Validasi
+    # 8. TERMS & CONDITIONS (Penting untuk Profesional)
     pdf.ln(10)
-    pdf.set_font('Arial', 'I', 8)
-    pdf.set_text_color(100, 100, 100)
-    pdf.multi_cell(0, 4, "* Dokumen ini diterbitkan secara otomatis oleh sistem PT. THEA THEO STATIONARY.\n* Surat ini sah dan valid secara hukum tanpa memerlukan tanda tangan basah.")
+    pdf.set_font('Arial', 'B', 9)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 5, "SYARAT & KETENTUAN:", ln=1)
     
-    pdf.ln(10)
-    pdf.set_font('Arial', '', 10)
+    pdf.set_font('Arial', '', 8)
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 6, "Hormat Kami,", ln=1)
-    pdf.ln(15)
-    pdf.set_font('Arial', 'B', 11)
-    pdf.cell(0, 6, f"{MARKETING_NAME}", ln=1)
+    pdf.multi_cell(0, 4, "1. Harga diatas sudah termasuk PPN 11%.\n2. Pembayaran maksimal 14 hari setelah invoice diterima.\n3. Barang yang sudah dibeli tidak dapat ditukar/dikembalikan kecuali cacat produksi.\n4. Harga tidak mengikat dan dapat berubah sewaktu-waktu tanpa pemberitahuan.\n5. Penawaran ini berlaku selama 14 hari kerja.")
+    
+    # 9. PENUTUP & TANDA TANGAN ELEKTRONIK
+    pdf.ln(5)
+    
+    # Layout 2 Kolom TTD (Kiri Kosong, Kanan TTD)
+    y_ttd = pdf.get_y()
+    
+    pdf.set_xy(130, y_ttd)
     pdf.set_font('Arial', '', 10)
-    pdf.cell(0, 5, "Sales Consultant", ln=1)
+    pdf.cell(60, 5, "Hormat Kami,", ln=1, align='C')
+    pdf.set_x(130)
+    pdf.cell(60, 5, COMPANY_NAME, ln=1, align='C')
+    
+    # Ruang Tanda Tangan (bisa tambah gambar TTD.png kalau mau)
+    pdf.ln(15)
+    
+    pdf.set_x(130)
+    pdf.set_font('Arial', 'B', 11)
+    pdf.set_text_color(0, 51, 102) # Biru Nama
+    pdf.cell(60, 5, MARKETING_NAME, ln=1, align='C')
+    
+    pdf.set_x(130)
+    pdf.set_font('Arial', '', 9)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(60, 5, "Sales Consultant", ln=1, align='C')
     
     return pdf.output(dest='S').encode('latin-1')
 
@@ -216,6 +290,8 @@ if menu == "🏠 Home":
 
 elif menu == "📝 Portal Customer":
     tab_order, tab_pajak = st.tabs(["🛒 Buat Penawaran Baru", "📄 Ambil Faktur Pajak"])
+    
+    # --- TAB 1: INPUT PESANAN ---
     with tab_order:
         st.subheader("Form Pengajuan Penawaran")
         with st.container(border=True):
@@ -251,6 +327,28 @@ elif menu == "📝 Portal Customer":
                     sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending", MARKETING_NAME])
                     st.success("Terkirim! Terima kasih."); st.session_state.cart = []
 
+    # --- TAB 2: FAKTUR PAJAK ---
+    with tab_pajak:
+        st.subheader("Pencarian Faktur Pajak")
+        st.caption("Cari berdasarkan Nomor Invoice atau Nama Perusahaan.")
+        
+        col_a, col_b = st.columns(2)
+        in_inv = col_a.text_input("Nomor Invoice (Contoh: INV/...)")
+        in_nama = col_b.text_input("Nama Perusahaan")
+        
+        if st.button("🔍 Cari Faktur di Drive"):
+            if not in_inv and not in_nama:
+                st.warning("Mohon isi salah satu kolom pencarian.")
+            else:
+                with st.spinner("Sedang mencari di Google Drive..."):
+                    file_match = search_pajak_file(in_inv, in_nama)
+                    if file_match:
+                        st.success(f"Ditemukan: {file_match['name']}")
+                        pdf_data = download_drive_file(file_match['id'])
+                        st.download_button("📥 Download PDF Faktur", data=pdf_data, file_name=file_match['name'], use_container_width=True)
+                    else:
+                        st.error("❌ File tidak ditemukan. Pastikan nama/nomor benar.")
+
 elif menu == "👨‍💻 Admin Dashboard":
     st.title(f"Admin Dashboard - {MARKETING_NAME}")
     pwd = st.sidebar.text_input("Password:", type="password")
@@ -268,7 +366,12 @@ elif menu == "👨‍💻 Admin Dashboard":
                             real_row_idx = df_gs.index[idx] + 2 
                             
                             with st.expander(f"🛠️ KELOLA: {row['Customer']}", expanded=True):
-                                items_list = ast.literal_eval(str(row['Pesanan']))
+                                # Load Data dengan Safety Check
+                                try:
+                                    pesanan_str = str(row['Pesanan'])
+                                    items_list = ast.literal_eval(pesanan_str) if pesanan_str != 'nan' else []
+                                except: items_list = []
+                                
                                 edited_items = []
                                 
                                 st.write("### 1. Edit Barang & Harga")
@@ -311,11 +414,10 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     c2.metric("Total Baru (Inc. PPN)", f"Rp {gtot:,.0f}")
                                     
                                     pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                    st.download_button("📩 Download PDF Penawaran", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
+                                    st.download_button("📩 Download PDF Penawaran Professional", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
                                     
                                     if st.button("✅ Selesai & Hapus dari Antrean", key=f"fin_a_{idx}"):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
                                         st.success("Processed!"); st.rerun()
                     else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
-
