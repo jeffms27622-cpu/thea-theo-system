@@ -133,7 +133,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.set_auto_page_break(auto=True, margin=40)
     pdf.add_page()
     
-    # Judul Quotation
+    # 1. Judul Quotation
     pdf.set_y(45)
     pdf.set_font('Arial', 'B', 24); pdf.set_text_color(*COLOR_NAVY)
     pdf.cell(0, 12, "QUOTATION", ln=1, align='R')
@@ -141,7 +141,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(0, 5, f"Reference: {no_surat}", ln=1, align='R')
     pdf.cell(0, 5, f"Date: {(datetime.utcnow() + timedelta(hours=7)).strftime('%d %B %Y')}", ln=1, align='R')
     
-    # Client Info (Clean Style)
+    # 2. Client Info
     pdf.set_xy(10, 45)
     pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_GOLD)
     pdf.cell(0, 5, "PREPARED FOR:", ln=1)
@@ -152,13 +152,13 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     
     pdf.ln(15)
     
-    # Header Tabel
+    # 3. Header Tabel
     pdf.set_font('Arial', 'B', 9); pdf.set_text_color(255, 255, 255); pdf.set_fill_color(*COLOR_NAVY)
     pdf.cell(10, 10, 'NO', 0, 0, 'C', True); pdf.cell(90, 10, 'DESCRIPTION', 0, 0, 'L', True)
     pdf.cell(20, 10, 'QTY', 0, 0, 'C', True); pdf.cell(20, 10, 'UNIT', 0, 0, 'C', True)
     pdf.cell(25, 10, 'PRICE', 0, 0, 'R', True); pdf.cell(25, 10, 'TOTAL', 0, 1, 'R', True)
 
-    # Isi Tabel
+    # 4. Isi Tabel
     pdf.set_font('Arial', '', 9); pdf.set_text_color(*COLOR_TEXT)
     fill = False
     for i, row in df_order.iterrows():
@@ -169,13 +169,11 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.cell(20, 8, str(row['Satuan']), 0, 0, 'C', True)
         pdf.cell(25, 8, f"{row['Harga']:,.0f} ", 0, 0, 'R', True)
         pdf.cell(25, 8, f"{row['Total_Row']:,.0f} ", 0, 1, 'R', True)
-        # Garis tipis separator
         pdf.set_draw_color(230, 230, 230); pdf.line(10, pdf.get_y(), 200, pdf.get_y())
         fill = not fill
 
-    # Summary Section
-    pdf.ln(5)
-    pdf.set_x(130)
+    # 5. Summary Section
+    pdf.ln(5); pdf.set_x(130)
     pdf.set_font('Arial', 'B', 10)
     pdf.cell(45, 8, "Sub Total", 0, 0, 'L'); pdf.cell(25, 8, f" {subtotal:,.0f}", 0, 1, 'R')
     pdf.set_x(130)
@@ -183,39 +181,30 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.set_x(130); pdf.set_fill_color(*COLOR_NAVY); pdf.set_text_color(255, 255, 255)
     pdf.cell(70, 10, f" TOTAL IDR {grand_total:,.0f} ", 0, 1, 'R', True)
 
-    # TERMS & CONDITIONS
-pdf.ln(10); pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_NAVY)
-pdf.cell(0, 5, "TERMS & CONDITIONS:", ln=1)
-pdf.set_font('Arial', '', 8); pdf.set_text_color(100, 100, 100)
+    # 6. TERMS & CONDITIONS (Input Rekening di Sini)
+    pdf.ln(10); pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_NAVY); pdf.cell(0, 5, "TERMS & CONDITIONS:", ln=1)
+    pdf.set_font('Arial', '', 8); pdf.set_text_color(100, 100, 100)
+    
+    rekening_info = (
+        "1. Prices are subject to change with notice.\n"
+        "2. Validity: 14 Days from the date of quotation.\n"
+        "3. Delivery: Within 1 working day after PO confirmation.\n"
+        "4. Payment via Bank Transfer to:\n"
+        "   Bank Name      : [Bank Mandiri]\n"
+        "   Account No.     : [1550010174996]\n"
+        "   Beneficiary      : PT. THEA THEO STATIONARY"
+    )
+    pdf.multi_cell(0, 4, rekening_info)
 
-# Narasi T&C dengan penulisan Rekening yang elegan
-tc_text = (
-    "1. Prices are subject to change with notice.\n"
-    "2. Validity: 14 Days from the date of quotation.\n"
-    "3. Delivery: Within 1 working day after PO confirmation.\n"
-    "4. Payment via Bank Transfer to:\n"
-    "   Beneficiary Bank : [Bank Mandiri]\n"
-    "   Account Number   : [1550010174996]\n"
-    "   Account Name     : PT. THEA THEO STATIONARY"
-)
-pdf.multi_cell(0, 4, tc_text)
-
-# Closing & Signature (Pastikan sejajar dengan baris di atasnya)
-    pdf.ln(10)
-    pdf.set_font('Arial', '', 10)
-    pdf.set_text_color(*COLOR_TEXT)
+    # 7. Closing & Signature
+    pdf.ln(10); pdf.set_font('Arial', '', 10); pdf.set_text_color(*COLOR_TEXT)
     pdf.cell(130, 5, "", 0, 0)
     pdf.cell(60, 5, "Yours Faithfully,", 0, 1, 'C')
-    
     pdf.ln(18)
-    
-    pdf.set_font('Arial', 'B', 10)
-    pdf.set_text_color(*COLOR_NAVY)
+    pdf.set_font('Arial', 'B', 10); pdf.set_text_color(*COLOR_NAVY)
     pdf.cell(130, 5, "", 0, 0)
     pdf.cell(60, 5, MARKETING_NAME.upper(), 0, 1, 'C')
-    
-    pdf.set_font('Arial', '', 9)
-    pdf.set_text_color(100, 100, 100)
+    pdf.set_font('Arial', '', 9); pdf.set_text_color(100, 100, 100)
     pdf.cell(130, 5, "", 0, 0)
     pdf.cell(60, 5, "Sales Consultant", 0, 1, 'C')
     
@@ -321,5 +310,6 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
 
