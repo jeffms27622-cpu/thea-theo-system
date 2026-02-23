@@ -27,6 +27,11 @@ OFFICE_PHONE    = "(021) 55780659" # <--- Tambahan Nomor Telepon Kantor
 PAJAK_FOLDER_ID = "19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z"
 ADMIN_PASSWORD  = st.secrets["ADMIN_PASSWORD"]
 
+# Warna Tema (Deep Navy & Gold)
+COLOR_PRIMARY = (0, 40, 85)     # Navy Gelap
+COLOR_ACCENT  = (212, 175, 55)  # Emas
+COLOR_BG_GRAY = (245, 247, 250) # Abu-abu sangat muda
+
 st.set_page_config(page_title=f"{COMPANY_NAME} - {MARKETING_NAME}", layout="wide")
 
 # =========================================================
@@ -385,5 +390,6 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         st.success("Processed!"); st.rerun()
                     else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
 
