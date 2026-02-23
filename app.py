@@ -6,10 +6,7 @@ from fpdf import FPDF
 import os
 import gspread
 from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
 import io
-import re
 
 # =========================================================
 # 1. KONFIGURASI UTAMA
@@ -23,7 +20,6 @@ SLOGAN          = "Supplier Alat Tulis Kantor & Sekolah"
 ADDR            = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 OFFICE_PHONE    = "(021) 55780659"
 
-PAJAK_FOLDER_ID = "19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z"
 ADMIN_PASSWORD  = st.secrets["ADMIN_PASSWORD"]
 
 st.set_page_config(page_title=f"{COMPANY_NAME} - {MARKETING_NAME}", layout="wide")
@@ -78,7 +74,7 @@ class PenawaranPDF(FPDF):
         self.set_y(12)
         self.set_font('Arial', '', 8)
         self.set_text_color(0, 0, 0)
-        self.cell(0, 4, f"WhatsApp: {MARKETING_WA}", ln=1, align='R')
+        self.cell(0, 4, f"WA: {MARKETING_WA}", ln=1, align='R')
         self.cell(0, 4, f"Email: {MARKETING_EMAIL}", ln=1, align='R')
         self.set_draw_color(0, 51, 102)
         self.set_line_width(0.8)
@@ -95,11 +91,13 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, "Kepada Yth,", ln=1)
     pdf.set_font('Arial', 'B', 11); pdf.cell(0, 6, str(nama_cust).upper(), ln=1)
     pdf.set_font('Arial', '', 10); pdf.cell(0, 6, f"Up. {pic}", ln=1); pdf.ln(8)
+    
     # Header Tabel
     pdf.set_fill_color(0, 51, 102); pdf.set_text_color(255, 255, 255)
     pdf.cell(10, 10, 'NO', 1, 0, 'C', True); pdf.cell(85, 10, 'NAMA BARANG', 1, 0, 'C', True)
     pdf.cell(20, 10, 'QTY', 1, 0, 'C', True); pdf.cell(20, 10, 'SATUAN', 1, 0, 'C', True)
     pdf.cell(25, 10, 'HARGA', 1, 0, 'C', True); pdf.cell(30, 10, 'TOTAL', 1, 1, 'C', True)
+    
     # Isi Tabel
     pdf.set_font('Arial', '', 9); pdf.set_text_color(0, 0, 0)
     fill = False
@@ -109,12 +107,13 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.cell(20, 8, str(int(row['Qty'])), 1, 0, 'C', True); pdf.cell(20, 8, str(row['Satuan']), 1, 0, 'C', True)
         pdf.cell(25, 8, f"{row['Harga']:,.0f} ", 1, 0, 'R', True); pdf.cell(30, 8, f"{row['Total_Row']:,.0f} ", 1, 1, 'R', True)
         fill = not fill
-    # Totals
+        
     pdf.ln(2); pdf.set_font('Arial', 'B', 10)
     pdf.cell(160, 8, "Sub Total", 0, 0, 'R'); pdf.cell(30, 8, f" {subtotal:,.0f}", 1, 1, 'R')
     pdf.cell(160, 8, "PPN 11%", 0, 0, 'R'); pdf.cell(30, 8, f" {ppn:,.0f}", 1, 1, 'R')
     pdf.set_fill_color(0, 51, 102); pdf.set_text_color(255, 255, 255)
     pdf.cell(160, 10, "GRAND TOTAL  ", 0, 0, 'R'); pdf.cell(30, 10, f" {grand_total:,.0f}", 1, 1, 'R', True)
+    
     pdf.ln(10); pdf.set_font('Arial', 'I', 8); pdf.set_text_color(100, 100, 100)
     pdf.multi_cell(0, 4, "* Dokumen otomatis sistem TTS. Sah tanpa tanda tangan basah.")
     pdf.ln(10); pdf.set_font('Arial', 'B', 11); pdf.set_text_color(0, 0, 0)
@@ -123,27 +122,35 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     return pdf.output(dest='S').encode('latin-1')
 
 # =========================================================
-# 4. DASHBOARD UTAMA
+# 4. LOGIKA MENU
 # =========================================================
-st.sidebar.title(f"Portal {MARKETING_NAME}")
-menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Portal Customer", "👨‍💻 Admin Dashboard"])
+st.sidebar.title(f"Portal PT. TTS")
+menu = st.sidebar.selectbox("Pilih Menu:", [
+    "🏠 Home", 
+    "🛒 Input Pesanan (Staff)", 
+    "🔐 Edit Harga (Pak Asin)", 
+    "📄 Cetak Penawaran (Staff)"
+])
 
+sheet = connect_gsheet()
+
+# --- MENU 1: HOME ---
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.info(f"Marketing: {MARKETING_NAME}")
+    st.info(f"Sistem Penawaran Harga Otomatis - Marketing: {MARKETING_NAME}")
 
-elif menu == "📝 Portal Customer":
-    # --- TEMPAT ADMIN INPUT PESANAN AWAL ---
-    st.subheader("Admin: Input Pesanan Baru")
+# --- MENU 2: INPUT PESANAN (TUGAS STAFF) ---
+elif menu == "🛒 Input Pesanan (Staff)":
+    st.subheader("Tugas Staff: Masukkan Data Customer & Barang Awal")
     if 'cart' not in st.session_state: st.session_state.cart = []
     
     with st.container(border=True):
         col1, col2 = st.columns(2)
         nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko")
         up_nama = col2.text_input("👤 Nama Penerima (UP)")
-        wa_nomor = col1.text_input("📞 Nomor WA")
+        wa_nomor = col1.text_input("📞 Nomor WhatsApp")
         picks = st.multiselect("📦 Pilih Barang:", options=df_barang['Nama Barang'].tolist())
-        if st.button("Tambahkan ke List"):
+        if st.button("Tambah ke List"):
             for p in picks:
                 if p not in st.session_state.cart: st.session_state.cart.append(p)
             st.rerun()
@@ -161,73 +168,80 @@ elif menu == "📝 Portal Customer":
                     st.session_state.cart.remove(item); st.rerun()
                 list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(row_b['Harga']), "Satuan": str(row_b['Satuan']), "Total_Row": float(qty * row_b['Harga'])})
 
-        if st.button("🚀 Kirim ke Antrean Dashboard", use_container_width=True):
-            sheet = connect_gsheet()
+        if st.button("🚀 Kirim ke Pak Asin", use_container_width=True):
             if sheet and nama_toko:
                 wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
+                # Status 'Pending' berarti butuh sentuhan Pak Asin
                 sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending", MARKETING_NAME])
-                st.success("Tersimpan! Silakan Pak Asin edit harganya di Dashboard."); st.session_state.cart = []
+                st.success("Berhasil dikirim ke antrean Pak Asin!"); st.session_state.cart = []
 
-elif menu == "👨‍💻 Admin Dashboard":
-    st.title("Admin Dashboard - PT TTS")
-    pwd = st.sidebar.text_input("Password:", type="password")
-    
+# --- MENU 3: EDIT HARGA (TUGAS PAK ASIN - PAKAI PASSWORD) ---
+elif menu == "🔐 Edit Harga (Pak Asin)":
+    st.title("🔐 Management Harga & Negosiasi")
+    pwd = st.text_input("Masukkan Password Admin:", type="password")
     if pwd == ADMIN_PASSWORD:
-        sheet = connect_gsheet()
         if sheet:
-            tab_sales, tab_admin = st.tabs(["🛠️ 1. Pak Asin (Edit Harga & Barang)", "📦 2. Admin (Download PDF)"])
-            
             all_vals = sheet.get_all_values()
             df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0]) if len(all_vals) > 1 else pd.DataFrame()
-            pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == MARKETING_NAME)]
-
-            with tab_sales:
-                st.subheader("🛠️ Tugas Pak Asin: Finalisasi Barang & Harga")
-                if pending.empty: st.info("Antrean kosong.")
-                for idx, row in pending.iterrows():
+            # Hanya tampilkan yang statusnya 'Pending' (butuh diedit)
+            antrean_edit = df_gs[df_gs['Status'] == 'Pending']
+            
+            if antrean_edit.empty:
+                st.info("Tidak ada penawaran baru yang butuh diedit harganya.")
+            else:
+                for idx, row in antrean_edit.iterrows():
                     real_row_idx = df_gs.index[idx] + 2
-                    with st.expander(f"NEGOSIASI: {row['Customer']}", expanded=False):
+                    with st.expander(f"🛠️ EDIT: {row['Customer']}", expanded=True):
                         items = ast.literal_eval(str(row['Pesanan']))
                         new_items = []
-                        
-                        st.write("--- Edit Item dari Admin ---")
                         for i, r in enumerate(items):
-                            ca, cb, cc, cd = st.columns([3, 0.8, 1, 1.2])
-                            ca.markdown(f"**{r['Nama Barang']}**")
-                            nq = cb.number_input("Qty", value=int(r['Qty']), key=f"s_q_{idx}_{i}")
-                            ns = cc.text_input("Satuan", value=r['Satuan'], key=f"s_s_{idx}_{i}")
-                            nh = cd.number_input("Harga Nego", value=float(r['Harga']), key=f"s_h_{idx}_{i}")
+                            c1, c2, c3, c4 = st.columns([3, 0.8, 1, 1.2])
+                            c1.markdown(f"**{r['Nama Barang']}**")
+                            nq = c2.number_input("Qty", value=int(r['Qty']), key=f"s_q_{idx}_{i}")
+                            ns = c3.text_input("Satuan", value=r['Satuan'], key=f"s_s_{idx}_{i}")
+                            nh = c4.number_input("Harga Nego", value=float(r['Harga']), key=f"s_h_{idx}_{i}")
                             new_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": ns, "Total_Row": nq * nh})
                         
                         st.divider()
-                        st.write("--- Pak Asin Tambah Barang Baru ---")
-                        add_more = st.multiselect("Cari Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"s_add_{idx}")
+                        add_more = st.multiselect("Tambah Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"s_add_{idx}")
                         for p in add_more:
                             rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
                             new_items.append({"Nama Barang": p, "Qty": 1, "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(rb['Harga'])})
-                        
-                        if st.button("💾 Simpan Final (Siap Cetak)", key=f"btn_s_{idx}"):
-                            sheet.update_cell(real_row_idx, 5, str(new_items))
-                            st.success(f"Berhasil! Admin sudah bisa download PDF {row['Customer']}."); st.rerun()
 
-            with tab_admin:
-                st.subheader("📦 Tugas Admin: Penomoran & Cetak PDF")
-                if pending.empty: st.info("Antrean kosong.")
-                for idx, row in pending.iterrows():
-                    real_row_idx = df_gs.index[idx] + 2
-                    with st.expander(f"CETAK PDF: {row['Customer']}", expanded=True):
-                        items = ast.literal_eval(str(row['Pesanan']))
-                        df_final = pd.DataFrame(items)
-                        subt = df_final['Total_Row'].sum()
-                        tax, gtot = subt * 0.11, subt * 1.11
-                        
-                        st.write(f"**Total (Inc. PPN):** Rp {gtot:,.0f}")
-                        no_s = st.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_ad_{idx}")
-                        
-                        c1, c2 = st.columns(2)
-                        pdf_file = generate_pdf(no_s, row['Customer'], row['UP'], df_final, subt, tax, gtot)
-                        c1.download_button("📩 Download PDF", data=pdf_file, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_ad_{idx}")
-                        
-                        if c2.button("✅ Selesai & Kirim", key=f"fin_ad_{idx}"):
-                            sheet.update_cell(real_row_idx, 6, "Processed")
-                            st.success("Tuntas!"); st.rerun()
+                        if st.button("✅ Selesai Edit & Kirim ke Bagian Cetak", key=f"btn_s_{idx}"):
+                            # Ubah status ke 'Ready' agar muncul di menu cetak staff
+                            sheet.update_cell(real_row_idx, 5, str(new_items))
+                            sheet.update_cell(real_row_idx, 6, "Ready")
+                            st.success("Data sudah dikirim ke bagian Cetak!"); st.rerun()
+
+# --- MENU 4: CETAK PENAWARAN (TUGAS STAFF - TANPA PASSWORD) ---
+elif menu == "📄 Cetak Penawaran (Staff)":
+    st.title("📄 Bagian Cetak & Pengiriman")
+    st.write("Silakan pilih penawaran yang sudah selesai diedit Pak Asin untuk dicetak.")
+    if sheet:
+        all_vals = sheet.get_all_values()
+        df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0]) if len(all_vals) > 1 else pd.DataFrame()
+        # Hanya tampilkan yang statusnya 'Ready' (sudah lolos dari Pak Asin)
+        antrean_cetak = df_gs[df_gs['Status'] == 'Ready']
+        
+        if antrean_cetak.empty:
+            st.warning("Belum ada penawaran yang siap dicetak.")
+        else:
+            for idx, row in antrean_cetak.iterrows():
+                real_row_idx = df_gs.index[idx] + 2
+                with st.expander(f"🖨️ SIAP CETAK: {row['Customer']}", expanded=True):
+                    items = ast.literal_eval(str(row['Pesanan']))
+                    df_final = pd.DataFrame(items)
+                    subt = df_final['Total_Row'].sum()
+                    tax, gtot = subt * 0.11, subt * 1.11
+                    
+                    st.write(f"**Total Penawaran:** Rp {gtot:,.0f}")
+                    no_s = st.text_input("Input Nomor Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_ad_{idx}")
+                    
+                    c1, c2 = st.columns(2)
+                    pdf_file = generate_pdf(no_s, row['Customer'], row['UP'], df_final, subt, tax, gtot)
+                    c1.download_button("📩 Download PDF", data=pdf_file, file_name=f"Penawaran_{row['Customer']}.pdf", key=f"dl_ad_{idx}")
+                    
+                    if c2.button("✅ Tandai Sudah Dikirim (Selesai)", key=f"fin_ad_{idx}"):
+                        sheet.update_cell(real_row_idx, 6, "Processed")
+                        st.success("Tuntas! Data diarsipkan."); st.rerun()
