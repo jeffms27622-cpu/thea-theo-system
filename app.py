@@ -93,10 +93,10 @@ st.sidebar.title("NAVIGASI UTAMA")
 menu = st.sidebar.selectbox("Pilih Menu:", ["1. Input Pesanan Baru", "2. KELOLA & CETAK (Admin)"])
 sheet = connect_gsheet()
 
-# --- MENU 1: INPUT SEDERHANA (SIAPAPUN BISA) ---
+# --- MENU 1: INPUT SEDERHANA ---
 if menu == "1. Input Pesanan Baru":
     st.header("🛒 Input Pesanan Baru")
-    st.info("Masukkan data customer dan barang awal di sini.")
+    st.info("Admin/Staff: Masukkan data customer di sini.")
     
     if 'cart' not in st.session_state: st.session_state.cart = []
     
@@ -105,14 +105,12 @@ if menu == "1. Input Pesanan Baru":
         nama_t = c1.text_input("Nama Toko/Customer")
         up = c2.text_input("UP (Nama Penerima)")
         wa = c1.text_input("Nomor WA")
-        # Tambah barang disini
         barang_pilihan = st.multiselect("Cari Barang:", options=df_barang['Nama Barang'].tolist())
         if st.button("➕ Tambahkan ke List"):
             for b in barang_pilihan:
                 if b not in st.session_state.cart: st.session_state.cart.append(b)
             st.rerun()
 
-    # Tampilan Cart Sederhana
     if st.session_state.cart:
         st.write("---")
         st.write("### Daftar Barang Sementara:")
@@ -134,9 +132,9 @@ if menu == "1. Input Pesanan Baru":
                 sheet.append_row([wkt, nama_t, up, wa, str(list_pesanan), "Pending", MARKETING_NAME])
                 st.success("Terkirim! Silakan proses di Menu 2."); st.session_state.cart = []
 
-# --- MENU 2: DASHBOARD SAKTI (SEMUA JADI SATU) ---
+# --- MENU 2: DASHBOARD SAKTI ---
 elif menu == "2. KELOLA & CETAK (Admin)":
-    st.header("🔐 Dashboard Pengelola")
+    st.header(f"🔐 Dashboard: {MARKETING_NAME}")
     pwd = st.sidebar.text_input("Password Admin:", type="password")
     
     if pwd == ADMIN_PASSWORD:
@@ -144,10 +142,9 @@ elif menu == "2. KELOLA & CETAK (Admin)":
             all_data = sheet.get_all_values()
             df = pd.DataFrame(all_data[1:], columns=all_data[0]) if len(all_data) > 1 else pd.DataFrame()
             
-            # Filter hanya punya 'Asin' biar gak kecampur
+            # Filter hanya punya 'Sales Tertentu'
             df = df[df['Sales'] == MARKETING_NAME]
             
-            # Pilihan Tampilan Sederhana
             filter_status = st.radio("Tampilkan Data:", ["Antrean Baru (Pending)", "Sudah Selesai/Arsip"], horizontal=True)
             status_key = "Pending" if "Pending" in filter_status else "Processed"
             
@@ -157,29 +154,25 @@ elif menu == "2. KELOLA & CETAK (Admin)":
                 st.info("Tidak ada data.")
             
             for idx, row in df_show.iterrows():
-                real_idx = df.index[idx] + 2
+                # --- PERBAIKAN PENTING DI SINI (Supaya Index Gak Error) ---
+                real_idx = idx + 2 
+                # -----------------------------------------------------------
                 
-                # --- SATU KOTAK UNTUK SEMUA ---
                 with st.expander(f"📄 {row['Customer']} ({row['Tanggal']})", expanded=(status_key=="Pending")):
-                    
-                    # 1. Ambil Data
                     try: 
                         pesanan_str = str(row['Pesanan'])
                         items = ast.literal_eval(pesanan_str) if pesanan_str != 'nan' else []
                     except: items = []
                     
-                    # 2. FITUR TAMBAH BARANG (Langsung disini)
                     st.caption("Tambah Barang Baru:")
                     add_items = st.multiselect("Cari Barang:", options=df_barang['Nama Barang'].tolist(), key=f"add_{idx}")
                     
-                    # Gabung barang lama + baru
                     current_items = items.copy()
                     for new_item in add_items:
                         if not any(x['Nama Barang'] == new_item for x in current_items):
                             rb = df_barang[df_barang['Nama Barang'] == new_item].iloc[0]
                             current_items.append({"Nama Barang": new_item, "Qty": 1, "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(rb['Harga'])})
                     
-                    # 3. TABEL EDIT (Harga, Qty, Hapus)
                     final_items = []
                     for i, item in enumerate(current_items):
                         c1, c2, c3, c4, c5 = st.columns([3, 0.7, 0.8, 1.2, 0.5])
@@ -194,16 +187,12 @@ elif menu == "2. KELOLA & CETAK (Admin)":
                     
                     st.divider()
                     
-                    # 4. BAGIAN BAWAH: SIMPAN & CETAK (BERDAMPINGAN)
                     col_save, col_print = st.columns([1, 1])
-                    
-                    # Tombol Simpan
                     if col_save.button("💾 UPDATE DATA", key=f"save_{idx}"):
                         sheet.update_cell(real_idx, 5, str(final_items))
                         st.toast("Data berhasil disimpan!")
                         st.rerun()
                         
-                    # Tombol Cetak (Langsung disini, gak usah pindah menu)
                     df_final = pd.DataFrame(final_items)
                     if not df_final.empty:
                         subtotal = df_final['Total_Row'].sum()
@@ -218,7 +207,7 @@ elif menu == "2. KELOLA & CETAK (Admin)":
                         col_print.download_button("📩 DOWNLOAD PDF", data=pdf_bytes, file_name=f"Penawaran_{row['Customer']}.pdf", key=f"dl_{idx}")
                         
                         if col_print.button("✅ SELESAI (Arsipkan)", key=f"done_{idx}"):
-                            sheet.update_cell(real_idx, 6, "Processed") # Ubah status jadi Processed
+                            sheet.update_cell(real_idx, 6, "Processed")
                             st.success("Selesai! Data masuk arsip."); st.rerun()
     else:
         st.warning("Masukkan Password untuk mengakses dashboard ini.")
