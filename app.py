@@ -190,9 +190,9 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         "2. Validity: 14 Days from the date of quotation.\n"
         "3. Delivery: Within 1 working day after PO confirmation.\n"
         "4. Payment via Bank Transfer to:\n"
-        "   Bank Name      : [Bank Mandiri]\n"
-        "   Account No.     : [1550010174996]\n"
-        "   Beneficiary      : PT. THEA THEO STATIONARY"
+        "   Bank Name      : Bank Mandiri\n"
+        "   Account No.    : 1550010174996\n"
+        "   Beneficiary    : PT. THEA THEO STATIONARY"
     )
     pdf.multi_cell(0, 4, rekening_info)
 
@@ -310,6 +310,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
 
 
