@@ -18,10 +18,13 @@ MARKETING_NAME  = "Asin"
 MARKETING_WA    = "08158199775"
 MARKETING_EMAIL = "alattulis.tts@gmail.com"
 
-PAJAK_FOLDER_ID = "19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z"
+# --- DATA KANTOR ---
 COMPANY_NAME    = "PT. THEA THEO STATIONARY"
 SLOGAN          = "Supplier Alat Tulis Kantor & Sekolah"
 ADDR            = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
+OFFICE_PHONE    = "(021) 55780659" # <--- Tambahan Nomor Telepon Kantor
+
+PAJAK_FOLDER_ID = "19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z"
 ADMIN_PASSWORD  = st.secrets["ADMIN_PASSWORD"]
 
 st.set_page_config(page_title=f"{COMPANY_NAME} - {MARKETING_NAME}", layout="wide")
@@ -92,15 +95,17 @@ class PenawaranPDF(FPDF):
         self.set_text_color(0, 51, 102)
         self.cell(0, 8, COMPANY_NAME, ln=1)
         
-        # Slogan & Alamat
+        # Slogan, Alamat & Telepon Kantor
         self.set_x(45)
         self.set_font('Arial', '', 9)
         self.set_text_color(100, 100, 100)
         self.cell(0, 5, SLOGAN, ln=1)
         self.set_x(45)
         self.cell(0, 5, ADDR, ln=1)
+        self.set_x(45)
+        self.cell(0, 5, f"Telp: {OFFICE_PHONE}", ln=1) # <--- Baris Telepon Baru
         
-        # Info Kontak Kanan Atas
+        # Info Kontak Kanan Atas (Marketing)
         self.set_y(12)
         self.set_font('Arial', '', 8)
         self.set_text_color(0, 0, 0)
@@ -110,8 +115,8 @@ class PenawaranPDF(FPDF):
         # Garis Tebal Dekoratif
         self.set_draw_color(0, 51, 102)
         self.set_line_width(0.8)
-        self.line(10, 35, 200, 35)
-        self.ln(18)
+        self.line(10, 40, 200, 40)
+        self.ln(22)
 
 def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
     pdf = PenawaranPDF()
@@ -153,15 +158,13 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(25, h, 'HARGA (Rp)', 1, 0, 'C', True)
     pdf.cell(30, h, 'TOTAL (Rp)', 1, 1, 'C', True)
 
-    # ISI TABEL
+    # ISI TABEL (Zebra Style)
     pdf.set_font('Arial', '', 9)
     pdf.set_text_color(0, 0, 0)
     
     fill = False
     for i, row in df_order.iterrows():
-        if fill: pdf.set_fill_color(245, 245, 245)
-        else: pdf.set_fill_color(255, 255, 255)
-        
+        pdf.set_fill_color(245, 245, 245) if fill else pdf.set_fill_color(255, 255, 255)
         pdf.cell(10, 8, str(i+1), 'LRBT', 0, 'C', True)
         pdf.cell(85, 8, f" {row['Nama Barang']}", 'LRBT', 0, 'L', True)
         pdf.cell(20, 8, str(int(row['Qty'])), 'LRBT', 0, 'C', True)
@@ -200,7 +203,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     return pdf.output(dest='S').encode('latin-1')
 
 # =========================================================
-# 4. UI UTAMA
+# 4. UI UTAMA (SIDEBAR & MENU)
 # =========================================================
 st.sidebar.title(f"Portal {MARKETING_NAME}")
 menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Portal Customer", "👨‍💻 Admin Dashboard"])
@@ -285,20 +288,12 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         if not ce.checkbox("Hapus", key=f"d_a_{idx}_{i}"):
                                             edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": ns, "Total_Row": nq * nh})
                                 
-                                # --- FITUR TAMBAH BARANG (YANG TADI HILANG) ---
                                 st.divider()
                                 st.write("### 2. Tambah Barang Baru")
                                 new_items = st.multiselect("Cari Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_a_{idx}")
                                 for p in new_items:
                                     rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                    edited_items.append({
-                                        "Nama Barang": p, 
-                                        "Qty": 1, 
-                                        "Harga": float(rb['Harga']), 
-                                        "Satuan": str(rb['Satuan']), 
-                                        "Total_Row": float(1 * rb['Harga'])
-                                    })
-                                # ----------------------------------------------
+                                    edited_items.append({"Nama Barang": p, "Qty": 1, "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(1 * rb['Harga'])})
 
                                 if st.button("💾 Simpan Perubahan ke GSheet", key=f"s_a_{idx}"):
                                     sheet.update_cell(real_row_idx, 5, str(edited_items))
