@@ -140,11 +140,10 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(0, 6, f"Up. {pic}", ln=1)
     pdf.ln(8)
     
-    # HEADER TABEL (Modern Look)
-    pdf.set_fill_color(0, 51, 102) # Navy Blue
-    pdf.set_text_color(255, 255, 255) # Putih
+    # HEADER TABEL
+    pdf.set_fill_color(0, 51, 102)
+    pdf.set_text_color(255, 255, 255)
     pdf.set_draw_color(0, 51, 102)
-    pdf.set_line_width(0.1)
     
     h = 10
     pdf.cell(10, h, 'NO', 1, 0, 'C', True)
@@ -154,13 +153,13 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(25, h, 'HARGA (Rp)', 1, 0, 'C', True)
     pdf.cell(30, h, 'TOTAL (Rp)', 1, 1, 'C', True)
 
-    # ISI TABEL (Zebra Style)
+    # ISI TABEL
     pdf.set_font('Arial', '', 9)
     pdf.set_text_color(0, 0, 0)
     
     fill = False
     for i, row in df_order.iterrows():
-        if fill: pdf.set_fill_color(245, 245, 245) # Abu-abu tipis
+        if fill: pdf.set_fill_color(245, 245, 245)
         else: pdf.set_fill_color(255, 255, 255)
         
         pdf.cell(10, 8, str(i+1), 'LRBT', 0, 'C', True)
@@ -177,24 +176,22 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(160, 8, "Sub Total", 0, 0, 'R'); pdf.cell(30, 8, f" {subtotal:,.0f}", 1, 1, 'R')
     pdf.cell(160, 8, "PPN 11%", 0, 0, 'R'); pdf.cell(30, 8, f" {ppn:,.0f}", 1, 1, 'R')
     
-    # Grand Total Highlight
     pdf.set_fill_color(0, 51, 102)
     pdf.set_text_color(255, 255, 255)
     pdf.cell(160, 10, "GRAND TOTAL  ", 0, 0, 'R')
     pdf.cell(30, 10, f" {grand_total:,.0f}", 1, 1, 'R', True)
 
-    # Footer Validasi (Sesuai Permintaan: Tanpa TTD Basah)
+    # Footer Validasi
     pdf.ln(10)
     pdf.set_font('Arial', 'I', 8)
     pdf.set_text_color(100, 100, 100)
     pdf.multi_cell(0, 4, "* Dokumen ini diterbitkan secara otomatis oleh sistem PT. THEA THEO STATIONARY.\n* Surat ini sah dan valid secara hukum tanpa memerlukan tanda tangan basah.")
     
-    # Penutup & Nama Sales
     pdf.ln(10)
     pdf.set_font('Arial', '', 10)
     pdf.set_text_color(0, 0, 0)
     pdf.cell(0, 6, "Hormat Kami,", ln=1)
-    pdf.ln(15) # Ruang kosong pengganti TTD
+    pdf.ln(15)
     pdf.set_font('Arial', 'B', 11)
     pdf.cell(0, 6, f"{MARKETING_NAME}", ln=1)
     pdf.set_font('Arial', '', 10)
@@ -203,7 +200,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     return pdf.output(dest='S').encode('latin-1')
 
 # =========================================================
-# 4. UI UTAMA (SIDEBAR & MENU)
+# 4. UI UTAMA
 # =========================================================
 st.sidebar.title(f"Portal {MARKETING_NAME}")
 menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Portal Customer", "👨‍💻 Admin Dashboard"])
@@ -242,13 +239,7 @@ elif menu == "📝 Portal Customer":
                     if c4.button("❌", key=f"del_c_{item}"):
                         st.session_state.cart.remove(item); st.rerun()
                     
-                    list_pesanan.append({
-                        "Nama Barang": str(item), 
-                        "Qty": int(qty), 
-                        "Harga": float(row_b['Harga']), 
-                        "Satuan": str(row_b['Satuan']), 
-                        "Total_Row": float(qty * row_b['Harga'])
-                    })
+                    list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(row_b['Harga']), "Satuan": str(row_b['Satuan']), "Total_Row": float(qty * row_b['Harga'])})
 
             if st.button(f"🚀 Kirim Pengajuan ke {MARKETING_NAME}", use_container_width=True):
                 sheet = connect_gsheet()
@@ -256,17 +247,6 @@ elif menu == "📝 Portal Customer":
                     wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
                     sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending", MARKETING_NAME])
                     st.success("Terkirim! Terima kasih."); st.session_state.cart = []
-
-    with tab_pajak:
-        st.subheader("Unduh Faktur Pajak Mandiri")
-        in_inv = st.text_input("Nomor Invoice:")
-        in_nama = st.text_input("Nama Perusahaan:")
-        if st.button("🔍 Cari Faktur"):
-            file_match = search_pajak_file(in_inv, in_nama)
-            if file_match:
-                st.success(f"Ditemukan: {file_match['name']}")
-                st.download_button("📥 Download PDF", data=download_drive_file(file_match['id']), file_name=file_match['name'])
-            else: st.error("❌ Tidak ditemukan.")
 
 elif menu == "👨‍💻 Admin Dashboard":
     st.title(f"Admin Dashboard - {MARKETING_NAME}")
@@ -305,6 +285,21 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         if not ce.checkbox("Hapus", key=f"d_a_{idx}_{i}"):
                                             edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": ns, "Total_Row": nq * nh})
                                 
+                                # --- FITUR TAMBAH BARANG (YANG TADI HILANG) ---
+                                st.divider()
+                                st.write("### 2. Tambah Barang Baru")
+                                new_items = st.multiselect("Cari Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_a_{idx}")
+                                for p in new_items:
+                                    rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
+                                    edited_items.append({
+                                        "Nama Barang": p, 
+                                        "Qty": 1, 
+                                        "Harga": float(rb['Harga']), 
+                                        "Satuan": str(rb['Satuan']), 
+                                        "Total_Row": float(1 * rb['Harga'])
+                                    })
+                                # ----------------------------------------------
+
                                 if st.button("💾 Simpan Perubahan ke GSheet", key=f"s_a_{idx}"):
                                     sheet.update_cell(real_row_idx, 5, str(edited_items))
                                     st.success("Data diupdate!"); st.rerun()
@@ -321,7 +316,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     c2.metric("Total Baru (Inc. PPN)", f"Rp {gtot:,.0f}")
                                     
                                     pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                    st.download_button("📩 Download PDF Penawaran Professional", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
+                                    st.download_button("📩 Download PDF Penawaran", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
                                     
                                     if st.button("✅ Selesai & Hapus dari Antrean", key=f"fin_a_{idx}"):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
