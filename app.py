@@ -84,122 +84,189 @@ def load_db():
 
 df_barang = load_db()
 
-class PenawaranPDF(FPDF):
+class LuxuryPDF(FPDF):
     def header(self):
-        if os.path.exists("logo.png"):
-            self.image("logo.png", 10, 10, 30)
-            self.set_x(45)
+        # 1. Top Banner (Deep Navy)
+        self.set_fill_color(*COLOR_PRIMARY)
+        self.rect(0, 0, 210, 40, 'F')
         
-        # Nama Perusahaan - Biru Navy
-        self.set_font('Arial', 'B', 16)
-        self.set_text_color(0, 51, 102)
+        # 2. Gold Accent Line
+        self.set_fill_color(*COLOR_ACCENT)
+        self.rect(0, 39, 210, 1.5, 'F') # Garis emas tipis di bawah navy
+        
+        # 3. Logo & Info
+        if os.path.exists("logo.png"): 
+            self.image("logo.png", 10, 5, 30)
+            self.set_x(45)
+        else:
+            self.set_x(10)
+            
+        # Nama PT (Putih)
+        self.set_y(10)
+        self.set_x(45)
+        self.set_text_color(255, 255, 255)
+        self.set_font('Arial', 'B', 18)
         self.cell(0, 8, COMPANY_NAME, ln=1)
         
-        # Slogan, Alamat & Telepon Kantor
+        # Slogan (Emas Pucat)
         self.set_x(45)
-        self.set_font('Arial', '', 9)
-        self.set_text_color(100, 100, 100)
+        self.set_text_color(240, 230, 140) 
+        self.set_font('Arial', 'I', 9)
         self.cell(0, 5, SLOGAN, ln=1)
-        self.set_x(45)
-        self.cell(0, 5, ADDR, ln=1)
-        self.set_x(45)
-        self.cell(0, 5, f"Telp: {OFFICE_PHONE}", ln=1) # <--- Baris Telepon Baru
         
-        # Info Kontak Kanan Atas (Marketing)
-        self.set_y(12)
+        # Kontak (Putih)
+        self.set_x(45)
+        self.set_text_color(255, 255, 255)
         self.set_font('Arial', '', 8)
-        self.set_text_color(0, 0, 0)
-        self.cell(0, 4, f"WhatsApp: {MARKETING_WA}", ln=1, align='R')
-        self.cell(0, 4, f"Email: {MARKETING_EMAIL}", ln=1, align='R')
-        
-        # Garis Tebal Dekoratif
-        self.set_draw_color(0, 51, 102)
-        self.set_line_width(0.8)
-        self.line(10, 40, 200, 40)
-        self.ln(22)
+        self.cell(0, 4, f"{ADDR}", ln=1)
+        self.set_x(45)
+        self.cell(0, 4, f"P: {OFFICE_PHONE} | WA: {WA_MARKETING} | E: {EMAIL_MARKETING}", ln=1)
+        self.ln(20)
 
-def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
-    pdf = PenawaranPDF()
+    def footer(self):
+        self.set_y(-30)
+        self.set_font('Arial', '', 8)
+        self.set_text_color(128, 128, 128)
+        # Garis tipis footer
+        self.set_draw_color(200, 200, 200)
+        self.line(10, 275, 200, 275)
+        self.ln(2)
+        self.cell(0, 4, f"{COMPANY_NAME} - Automated Document System", 0, 1, 'L')
+        self.cell(0, 4, f"Page {self.page_no()}", 0, 0, 'R')
+
+def generate_pdf(no_s, cust, pic, df_f, subt, tax, gtot):
+    pdf = LuxuryPDF()
+    pdf.set_auto_page_break(auto=True, margin=35)
     pdf.add_page()
     
-    # Header Info Customer
-    pdf.set_font('Arial', 'B', 12)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 7, "SURAT PENAWARAN HARGA", ln=1, align='C')
-    pdf.ln(5)
-    
+    # --- JUDUL BESAR ---
+    pdf.set_y(50)
+    pdf.set_font('Arial', 'B', 24)
+    pdf.set_text_color(*COLOR_PRIMARY)
+    pdf.cell(0, 10, "PENAWARAN HARGA", ln=1, align='R')
     pdf.set_font('Arial', '', 10)
-    waktu_jkt = datetime.utcnow() + timedelta(hours=7)
-    tgl_skrg = waktu_jkt.strftime('%d %B %Y')
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(0, 6, "QUOTATION", ln=1, align='R')
     
-    col_width = 95
-    pdf.cell(col_width, 6, f"No Surat : {no_surat}", ln=0)
-    pdf.cell(col_width, 6, f"Tanggal : {tgl_skrg}", ln=1, align='R')
-    pdf.ln(2)
+    # --- INFO KIRI (DATA CUSTOMER - KOTAK ABU) ---
+    pdf.set_xy(10, 50)
+    pdf.set_fill_color(*COLOR_BG_GRAY)
+    pdf.rect(10, 50, 95, 30, 'F')
     
-    pdf.set_font('Arial', 'B', 10)
-    pdf.cell(0, 6, "Kepada Yth,", ln=1)
+    pdf.set_xy(15, 55)
+    pdf.set_font('Arial', 'B', 8)
+    pdf.set_text_color(150, 150, 150)
+    pdf.cell(0, 4, "KEPADA YTH (BILL TO):", ln=1)
+    
+    pdf.set_x(15)
     pdf.set_font('Arial', 'B', 11)
-    pdf.cell(0, 6, str(nama_cust).upper(), ln=1)
-    pdf.set_font('Arial', '', 10)
-    pdf.cell(0, 6, f"Up. {pic}", ln=1)
-    pdf.ln(8)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 6, str(cust).upper(), ln=1)
     
-    # HEADER TABEL
-    pdf.set_fill_color(0, 51, 102)
+    pdf.set_x(15)
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(0, 5, f"UP: {pic}", ln=1)
+    
+    # --- INFO KANAN (DETAIL SURAT) ---
+    pdf.set_xy(120, 65)
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(30, 6, "Nomor Surat", 0, 0)
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(0, 6, f": {no_s}", 0, 1)
+    
+    pdf.set_x(120)
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(30, 6, "Tanggal", 0, 0)
+    pdf.set_font('Arial', '', 10)
+    tgl = (datetime.utcnow() + timedelta(hours=7)).strftime('%d %B %Y')
+    pdf.cell(0, 6, f": {tgl}", 0, 1)
+    
+    pdf.ln(20)
+    
+    # --- TABEL BARANG ---
+    # Header Tabel
+    pdf.set_fill_color(*COLOR_PRIMARY)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_draw_color(0, 51, 102)
+    pdf.set_font('Arial', 'B', 9)
+    pdf.set_line_width(0.1)
     
     h = 10
-    pdf.cell(10, h, 'NO', 1, 0, 'C', True)
-    pdf.cell(85, h, 'NAMA BARANG', 1, 0, 'C', True)
-    pdf.cell(20, h, 'QTY', 1, 0, 'C', True)
-    pdf.cell(20, h, 'SATUAN', 1, 0, 'C', True)
-    pdf.cell(25, h, 'HARGA (Rp)', 1, 0, 'C', True)
-    pdf.cell(30, h, 'TOTAL (Rp)', 1, 1, 'C', True)
-
-    # ISI TABEL (Zebra Style)
+    pdf.cell(10, h, '#', 0, 0, 'C', True)
+    pdf.cell(85, h, 'DESKRIPSI BARANG', 0, 0, 'L', True)
+    pdf.cell(20, h, 'QTY', 0, 0, 'C', True)
+    pdf.cell(20, h, 'SAT', 0, 0, 'C', True)
+    pdf.cell(25, h, 'HARGA', 0, 0, 'R', True)
+    pdf.cell(30, h, 'TOTAL', 0, 1, 'R', True)
+    
+    # Isi Tabel
     pdf.set_font('Arial', '', 9)
     pdf.set_text_color(0, 0, 0)
-    
     fill = False
-    for i, row in df_order.iterrows():
-        pdf.set_fill_color(245, 245, 245) if fill else pdf.set_fill_color(255, 255, 255)
-        pdf.cell(10, 8, str(i+1), 'LRBT', 0, 'C', True)
-        pdf.cell(85, 8, f" {row['Nama Barang']}", 'LRBT', 0, 'L', True)
-        pdf.cell(20, 8, str(int(row['Qty'])), 'LRBT', 0, 'C', True)
-        pdf.cell(20, 8, str(row['Satuan']), 'LRBT', 0, 'C', True)
-        pdf.cell(25, 8, f"{row['Harga']:,.0f} ", 'LRBT', 0, 'R', True)
-        pdf.cell(30, 8, f"{row['Total_Row']:,.0f} ", 'LRBT', 1, 'R', True)
+    
+    for i, row in df_f.iterrows():
+        # Zebra Striping Halus
+        if fill: pdf.set_fill_color(240, 248, 255) # AliceBlue
+        else: pdf.set_fill_color(255, 255, 255)
+        
+        pdf.cell(10, 9, str(i+1), 0, 0, 'C', True)
+        pdf.cell(85, 9, f" {row['Nama Barang']}", 0, 0, 'L', True)
+        pdf.cell(20, 9, str(int(row['Qty'])), 0, 0, 'C', True)
+        pdf.cell(20, 9, str(row['Satuan']), 0, 0, 'C', True)
+        pdf.cell(25, 9, f"{row['Harga']:,.0f} ", 0, 0, 'R', True)
+        pdf.cell(30, 9, f"{row['Total_Row']:,.0f} ", 0, 1, 'R', True)
+        
+        # Garis tipis bawah per baris
+        pdf.set_draw_color(230, 230, 230)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
         fill = not fill
 
-    # TOTAL SECTION
-    pdf.ln(2)
-    pdf.set_font('Arial', 'B', 10)
-    pdf.cell(160, 8, "Sub Total", 0, 0, 'R'); pdf.cell(30, 8, f" {subtotal:,.0f}", 1, 1, 'R')
-    pdf.cell(160, 8, "PPN 11%", 0, 0, 'R'); pdf.cell(30, 8, f" {ppn:,.0f}", 1, 1, 'R')
-    
-    pdf.set_fill_color(0, 51, 102)
-    pdf.set_text_color(255, 255, 255)
-    pdf.cell(160, 10, "GRAND TOTAL  ", 0, 0, 'R')
-    pdf.cell(30, 10, f" {grand_total:,.0f}", 1, 1, 'R', True)
+    pdf.ln(5)
 
-    # Footer Validasi
-    pdf.ln(10)
-    pdf.set_font('Arial', 'I', 8)
-    pdf.set_text_color(100, 100, 100)
-    pdf.multi_cell(0, 4, "* Dokumen ini diterbitkan secara otomatis oleh sistem PT. THEA THEO STATIONARY.\n* Surat ini sah dan valid secara hukum tanpa memerlukan tanda tangan basah.")
+    # --- TOTAL & NOTES ---
+    y_start = pdf.get_y()
     
-    pdf.ln(10)
+    # Kolom Kiri: Notes & Terms
+    pdf.set_font('Arial', 'B', 9)
+    pdf.set_text_color(*COLOR_PRIMARY)
+    pdf.cell(100, 5, "SYARAT & KETENTUAN:", ln=1)
+    pdf.set_font('Arial', '', 8)
+    pdf.set_text_color(80, 80, 80)
+    pdf.multi_cell(90, 4, "1. Harga sudah termasuk PPN 11%.\n2. Pembayaran maks 14 hari setelah invoice.\n3. Barang tidak dapat diretur kecuali cacat.\n4. Penawaran berlaku 14 hari.")
+    
+    # Kolom Kanan: Angka Total
+    pdf.set_xy(110, y_start)
     pdf.set_font('Arial', '', 10)
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 6, "Hormat Kami,", ln=1)
-    pdf.ln(15)
-    pdf.set_font('Arial', 'B', 11)
-    pdf.cell(0, 6, f"{MARKETING_NAME}", ln=1)
-    pdf.set_font('Arial', '', 10)
-    pdf.cell(0, 5, "Sales Consultant", ln=1)
+    pdf.cell(50, 8, "Sub Total", 0, 0, 'R')
+    pdf.cell(40, 8, f"Rp {subt:,.0f}", 0, 1, 'R')
     
+    pdf.set_x(110)
+    pdf.cell(50, 8, "PPN (11%)", 0, 0, 'R')
+    pdf.cell(40, 8, f"Rp {tax:,.0f}", 0, 1, 'R')
+    
+    # Grand Total (Kotak Navy)
+    pdf.set_x(110)
+    pdf.set_fill_color(*COLOR_PRIMARY)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(50, 10, "GRAND TOTAL", 0, 0, 'R', True)
+    pdf.cell(40, 10, f"Rp {gtot:,.0f}", 0, 1, 'R', True)
+    
+    # --- TANDA TANGAN ---
+    pdf.ln(15)
+    pdf.set_x(140)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(50, 5, "Hormat Kami,", 0, 1, 'C')
+    pdf.ln(15)
+    
+    pdf.set_x(140)
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(50, 5, MARKETING_NAME, 0, 1, 'C')
+    pdf.set_x(140)
+    pdf.set_font('Arial', '', 9)
+    pdf.cell(50, 5, "Sales Consultant", 0, 1, 'C')
+
     return pdf.output(dest='S').encode('latin-1')
 
 # =========================================================
@@ -318,4 +385,5 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         st.success("Processed!"); st.rerun()
                     else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
