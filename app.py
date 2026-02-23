@@ -183,10 +183,23 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.set_x(130); pdf.set_fill_color(*COLOR_NAVY); pdf.set_text_color(255, 255, 255)
     pdf.cell(70, 10, f" TOTAL IDR {grand_total:,.0f} ", 0, 1, 'R', True)
 
-    # Terms & Conditions
-    pdf.ln(10); pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_NAVY); pdf.cell(0, 5, "TERMS & CONDITIONS:", ln=1)
-    pdf.set_font('Arial', '', 8); pdf.set_text_color(100, 100, 100)
-    pdf.multi_cell(0, 4, "1. Prices are subject to change with prior notice.\n2. Validity: 14 Days from the date of quotation.\n3. Goods remain the property of PT. TTS until fully paid.\n4. Payment should be made via bank transfer to our official account.")
+    # TERMS & CONDITIONS
+pdf.ln(10); pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_NAVY)
+pdf.cell(0, 5, "TERMS & CONDITIONS:", ln=1)
+pdf.set_font('Arial', '', 8); pdf.set_text_color(100, 100, 100)
+
+# Narasi T&C dengan penulisan Rekening yang elegan
+tc_text = (
+    "1. Prices are subject to change with notice.\n"
+    "2. Validity: 14 Days from the date of quotation.\n"
+    "3. Delivery: Within 1 working day after PO confirmation.\n"
+    "4. Payment via Bank Transfer to:\n"
+    "   Beneficiary Bank : [Bank Mandiri]\n"
+    "   Account Number   : [1550010174996]\n"
+    "   Account Name     : PT. THEA THEO STATIONARY"
+)
+
+pdf.multi_cell(0, 4, tc_text)
 
     # Closing & Signature (Formal - No E-Sign mention)
     pdf.ln(10); pdf.set_font('Arial', '', 10); pdf.set_text_color(*COLOR_TEXT)
@@ -302,3 +315,4 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
