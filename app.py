@@ -306,10 +306,15 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     c2.metric("Total Baru (Inc. PPN)", f"Rp {gtot:,.0f}")
                                     pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
                                     st.download_button("📩 Download PDF Luxury Professional", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
+                                    # CARI BAGIAN INI DI KODE ADMIN DASHBOARD:
                                     if st.button("✅ Selesai & Hapus dari Antrean", key=f"fin_a_{idx}"):
-                                        sheet.update_cell(real_idx, 6, "Processed"); st.rerun()
-                    else: st.info(f"Antrean {MARKETING_NAME} kosong.")
+                                    # Pastikan namanya 'real_row_idx' sesuai dengan yang kita buat di baris 174
+                                    sheet.update_cell(real_row_idx, 6, "Processed") 
+                                    st.success("Berhasil! Antrean telah dibersihkan.")
+                                    st.rerun()
+                                else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
 
 
