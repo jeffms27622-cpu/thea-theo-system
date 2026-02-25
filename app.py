@@ -91,26 +91,30 @@ df_barang = load_db()
 # =========================================================
 class PenawaranPDF(FPDF):
     def header(self):
-        # Header Navy Bar
-        self.set_fill_color(*COLOR_NAVY)
-        self.rect(0, 0, 210, 35, 'F')
-        # Aksen Garis Emas Header
-        self.set_fill_color(*COLOR_GOLD)
-        self.rect(0, 34, 210, 1.2, 'F')
+        # 1. Background Navy Utama
+        self.set_fill_color(0, 40, 85) 
+        self.rect(0, 0, 210, 40, 'F')
         
+        # 2. Kotak Putih untuk Logo (Biar warna Hitam/Biru logo tidak samar)
+        # Kita buat kotak putih kecil sebagai alas logo
+        self.set_fill_color(255, 255, 255)
+        self.rect(10, 8, 28, 25, 'F') # Alas putih
+        
+        # 3. Tempel Logo di atas kotak putih tadi
         if os.path.exists("logo.png"):
-            self.image("logo.png", 12, 7, 22)
-            self.set_x(40)
+            self.image("logo.png", 11, 10, 26) 
+            
+        # 4. Teks PT. TTS (Tetap Putih & Gold)
+        self.set_y(12)
+        self.set_x(42)
+        self.set_font('Arial', 'B', 16)
+        self.set_text_color(255, 255, 255)
+        self.cell(0, 10, 'PT. THEA THEO STATIONARY', ln=1)
         
-        self.set_y(8); self.set_x(40)
-        self.set_font('Arial', 'B', 16); self.set_text_color(255, 255, 255)
-        self.cell(0, 8, COMPANY_NAME, ln=1)
-        self.set_x(40); self.set_font('Arial', 'I', 8); self.cell(0, 5, SLOGAN, ln=1)
-        self.set_x(40); self.set_font('Arial', '', 8)
-        self.cell(0, 4, f"{ADDR}", ln=1)
-        self.set_x(40)
-        self.cell(0, 4, f"Telp: {OFFICE_PHONE} | Email: {MARKETING_EMAIL}", ln=1)
-        self.ln(25)
+        self.set_x(42)
+        self.set_font('Arial', '', 10)
+        self.set_text_color(184, 134, 11) # Gold
+        self.cell(0, 5, 'Premium Office & School Supplies', ln=1)
 
     def footer(self):
         # Footer Navy Bar (Senada dengan Atas)
@@ -313,6 +317,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         st.rerun()
                                 else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
 
 
