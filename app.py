@@ -127,6 +127,7 @@ class PenawaranPDF(FPDF):
         self.set_fill_color(184, 134, 11) # Gold
         self.rect(10, y_garis + 2, 190, 0.6, 'F')
         self.ln(8)
+       
     def footer(self):
         # Footer Navy Bar (Senada dengan Atas)
         self.set_y(-20)
@@ -328,6 +329,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         st.rerun()
                                 else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
 
 
