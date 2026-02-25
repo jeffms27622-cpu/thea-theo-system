@@ -91,72 +91,84 @@ def load_db():
 df_barang = load_db()
 
 # =========================================================
-# 3. PDF ENGINE (MNC LUXURY VERSION - FIXED LOGO)
-# =========================================================
-# =========================================================
-# 3. PDF ENGINE (ULTRA LUXURY - GEOMETRIC SLASH DESIGN)
-# =========================================================
-# =========================================================
-# 3. PDF ENGINE (MODERN VERTICAL SPLIT - ANTI ERROR)
+# 3. PDF ENGINE (THE PRESIDENTIAL SUITE DESIGN)
 # =========================================================
 class PenawaranPDF(FPDF):
     def header(self):
-        # 1. AREA KIRI: Putih Bersih (Lebar 50mm)
-        # Ini rumahnya Logo. Dijamin logo Bapak terlihat sangat jelas.
-        self.set_fill_color(255, 255, 255)
-        self.rect(0, 0, 50, 40, 'F')
-        
-        # 2. AREA KANAN: Navy Mewah (Sisanya)
+        # 1. SETUP BACKGROUND UTAMA (NAVY DEEP)
         self.set_fill_color(*COLOR_NAVY)
-        self.rect(50, 0, 160, 40, 'F')
-        
-        # 3. TIANG EMAS (Pemisah Elegan)
-        # Garis vertikal tebal yang bikin kesan kokoh
+        self.rect(0, 0, 210, 50, 'F') # Header lebih tinggi (50mm) biar gagah
+
+        # 2. WHITE CANVAS (AREA LOGO)
+        # Blok putih vertikal dari atas sampai bawah header di sebelah kiri
+        self.set_fill_color(255, 255, 255)
+        self.rect(10, 0, 50, 50, 'F') # Lebar 50mm, margin kiri 10mm
+
+        # 3. THE GOLDEN PILLARS (DETAIL KUNCI MEWAHNYA)
+        # Tiang Emas 1 (Tebal)
         self.set_fill_color(*COLOR_GOLD)
-        self.rect(50, 0, 1.5, 40, 'F')
-        
-        # 4. PASANG LOGO (Di area Putih)
+        self.rect(60, 0, 2, 50, 'F') 
+        # Tiang Emas 2 (Tipis - Aksen) -> Ini yang bikin kesan "Detail Mahal"
+        self.rect(64, 0, 0.5, 50, 'F') 
+
+        # 4. LOGO PLACEMENT
         if os.path.exists("logo.png"):
-            # Posisi Center di dalam kotak putih 50mm
-            self.image("logo.png", 10, 8, 30) 
-            
-        # 5. TEKS PERUSAHAAN (Di area Navy - Rata Kanan)
-        # Gaya Rata Kanan (Align Right) ini ciri khas desain modern
-        self.set_y(9)
-        self.set_right_margin(10) # Kasih jarak napas dari pinggir kanan
+            # Logo duduk manis di tengah area putih
+            # Koordinat X=15 (tengah-tengah blok putih 10-60)
+            self.image("logo.png", 15, 12, 40) 
+
+        # 5. TYPOGRAPHY (TEXT YANG BIKIN TERPANAH)
+        self.set_y(12)
+        self.set_x(70) # Mulai setelah tiang emas
         
-        self.set_font('Arial', 'B', 18)
+        # Nama PT Besar & Tegas
+        self.set_font('Arial', 'B', 20) 
         self.set_text_color(255, 255, 255) # Putih
-        self.cell(0, 8, COMPANY_NAME, ln=1, align='R')
+        self.cell(0, 8, COMPANY_NAME, ln=1)
         
-        self.set_font('Arial', 'I', 9)
-        self.set_text_color(184, 134, 11) # Gold Slogan
-        self.cell(0, 5, SLOGAN, ln=1, align='R')
+        # Slogan (Gold & Spaced)
+        self.set_x(70)
+        self.set_font('Arial', 'B', 10)
+        self.set_text_color(184, 134, 11) # Gold
+        # Trik nambah spasi antar huruf biar elegan (manual spacing)
+        slogan_spaced = "  ".join(SLOGAN.upper()) 
+        self.cell(0, 6, slogan_spaced, ln=1)
         
+        # Garis Tipis Putih di bawah slogan
+        self.set_fill_color(255, 255, 255)
+        self.rect(70, 28, 120, 0.2, 'F')
+
+        # Info Kontak (Clean & Minimalis)
+        self.set_y(32)
+        self.set_x(70)
         self.set_font('Arial', '', 8)
-        self.set_text_color(220, 220, 220) # Abu Silver
-        self.cell(0, 4, f"{ADDR}", ln=1, align='R')
-        self.cell(0, 4, f"Telp: {OFFICE_PHONE} | Email: {MARKETING_EMAIL}", ln=1, align='R')
+        self.set_text_color(220, 220, 220) # Silver
+        self.cell(0, 4, ADDR, ln=1)
+        self.set_x(70)
+        self.cell(0, 4, f"Phone: {OFFICE_PHONE}  |  Email: {MARKETING_EMAIL}", ln=1)
         
-        self.set_right_margin(10) # Kembalikan margin normal
+        # Jarak aman ke konten
         self.ln(20)
 
     def footer(self):
-        # Footer Senada: Navy Full dengan aksen Emas di bawah
-        self.set_y(-20)
+        # Footer yang "Mirroring" Header
+        self.set_y(-25)
+        
+        # Blok Navy
         self.set_fill_color(*COLOR_NAVY)
-        self.rect(0, 277, 210, 20, 'F')
+        self.rect(0, 272, 210, 25, 'F')
         
-        # Garis Emas Tipis di atas footer
+        # Aksen Emas di Bawah (Bottom Bar)
         self.set_fill_color(*COLOR_GOLD)
-        self.rect(0, 277, 210, 0.8, 'F')
+        self.rect(0, 292, 210, 5, 'F') # Bar tebal di paling bawah
+
+        # Teks Footer
+        self.set_y(-18)
+        self.set_font('Arial', 'B', 9); self.set_text_color(255, 255, 255)
+        self.cell(0, 5, "THANK YOU FOR YOUR BUSINESS", 0, 1, 'C')
         
-        self.set_y(-15)
-        self.set_font('Arial', 'B', 8); self.set_text_color(255, 255, 255)
-        self.cell(0, 5, f"{COMPANY_NAME} Official Quotation", 0, 0, 'C')
-        self.set_font('Arial', '', 7); self.set_text_color(200, 200, 200)
-        self.set_y(-11)
-        self.cell(0, 5, f"Page {self.page_no()} | Generated by TTS Secure System", 0, 0, 'C')
+        self.set_font('Arial', '', 7); self.set_text_color(184, 134, 11) # Gold Text
+        self.cell(0, 4, f"{COMPANY_NAME} - Premium Office Supplies Partner", 0, 0, 'C')
 
 def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
     pdf = PenawaranPDF()
@@ -331,6 +343,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
 
 
