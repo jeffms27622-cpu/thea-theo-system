@@ -20,7 +20,7 @@ MARKETING_EMAIL = "alattulis.tts@gmail.com"
 
 # --- DATA KANTOR ---
 COMPANY_NAME    = "PT. THEA THEO STATIONARY"
-SLOGAN          = "Premium Office & School Supplies Solution"
+SLOGAN          = "Office & School Supplies Solution"
 ADDR            = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 OFFICE_PHONE    = "(021) 55780659"
 
@@ -90,32 +90,43 @@ df_barang = load_db()
 # 3. PDF ENGINE (MNC LUXURY VERSION - SYMMETRICAL)
 # =========================================================
 class PenawaranPDF(FPDF):
-    def header(self):
-        # 1. Background Navy Utama
-        self.set_fill_color(0, 40, 85) 
-        self.rect(0, 0, 210, 40, 'F')
-        
-        # 2. Kotak Putih untuk Logo (Biar warna Hitam/Biru logo tidak samar)
-        # Kita buat kotak putih kecil sebagai alas logo
-        self.set_fill_color(255, 255, 255)
-        self.rect(10, 8, 28, 25, 'F') # Alas putih
-        
-        # 3. Tempel Logo di atas kotak putih tadi
+   def header(self):
+        # 1. Logo di Kiri (Warna asli logo aman di atas putih)
         if os.path.exists("logo.png"):
-            self.image("logo.png", 11, 10, 26) 
+            self.image("logo.png", 10, 10, 28)
             
-        # 4. Teks PT. TTS (Tetap Putih & Gold)
+        # 2. Nama Perusahaan & Slogan (Di samping logo)
         self.set_y(12)
         self.set_x(42)
-        self.set_font('Arial', 'B', 16)
-        self.set_text_color(255, 255, 255)
-        self.cell(0, 10, 'PT. THEA THEO STATIONARY', ln=1)
+        self.set_font('Arial', 'B', 15)
+        self.set_text_color(0, 40, 85) # Navy
+        self.cell(0, 8, 'PT. THEA THEO STATIONARY', ln=1)
         
         self.set_x(42)
-        self.set_font('Arial', '', 10)
+        self.set_font('Arial', 'I', 9)
         self.set_text_color(184, 134, 11) # Gold
-        self.cell(0, 5, 'Premium Office & School Supplies', ln=1)
-
+        self.cell(0, 5, 'Office & School Supplies Solution', ln=1)
+        
+        # 3. Info Kontak (Alamat, WA, Email di Kanan Atas)
+        self.set_y(10)
+        self.set_font('Arial', '', 8)
+        self.set_text_color(50, 50, 50)
+        self.cell(0, 4, 'Ruko Modernland Blok AR NO 27 Cipondoh Tangerang', ln=1, align='R')
+        self.cell(0, 4, 'Telp: (021) 55780659', ln=1, align='R')
+        self.cell(0, 4, 'Email: allatullis.tis@gmail.com', ln=1, align='R')
+        self.set_font('Arial', 'B', 8)
+        self.set_text_color(0, 40, 85)
+        self.cell(0, 4, 'WA: 0815-8199-775 (Asin)', ln=1, align='R')
+        
+        # 4. Garis Aksen Luxury (Navy & Gold tebal)
+        # Ini yang memberikan kesan mahal tanpa menutupi logo
+        self.ln(12)
+        y_garis = self.get_y()
+        self.set_fill_color(0, 40, 85) # Navy
+        self.rect(10, y_garis, 190, 2, 'F')
+        self.set_fill_color(184, 134, 11) # Gold
+        self.rect(10, y_garis + 2, 190, 0.6, 'F')
+        self.ln(8)
     def footer(self):
         # Footer Navy Bar (Senada dengan Atas)
         self.set_y(-20)
@@ -317,6 +328,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         st.rerun()
                                 else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
 
 
