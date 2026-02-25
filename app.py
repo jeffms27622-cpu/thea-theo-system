@@ -25,7 +25,11 @@ ADDR            = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 OFFICE_PHONE    = "(021) 55780659"
 
 PAJAK_FOLDER_ID = "19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z"
-ADMIN_PASSWORD  = st.secrets["ADMIN_PASSWORD"]
+# Pastikan secrets sudah diatur di Streamlit Cloud
+if "ADMIN_PASSWORD" in st.secrets:
+    ADMIN_PASSWORD  = st.secrets["ADMIN_PASSWORD"]
+else:
+    ADMIN_PASSWORD = "admin" # Fallback jika belum setting secrets
 
 # Warna Tema Luxury (Navy & Gold)
 COLOR_NAVY = (0, 40, 85)
@@ -87,27 +91,40 @@ def load_db():
 df_barang = load_db()
 
 # =========================================================
-# 3. PDF ENGINE (MNC LUXURY VERSION - SYMMETRICAL)
+# 3. PDF ENGINE (MNC LUXURY VERSION - FIXED LOGO)
 # =========================================================
 class PenawaranPDF(FPDF):
     def header(self):
-        # Header Navy Bar
+        # Header Navy Bar (Background Biru)
         self.set_fill_color(*COLOR_NAVY)
         self.rect(0, 0, 210, 35, 'F')
+        
         # Aksen Garis Emas Header
         self.set_fill_color(*COLOR_GOLD)
         self.rect(0, 34, 210, 1.2, 'F')
         
+        # --- PERBAIKAN LOGO ---
         if os.path.exists("logo.png"):
+            # Buat kotak PUTIH di belakang logo agar warna asli logo keluar
+            self.set_fill_color(255, 255, 255) 
+            self.rect(11, 6, 24, 24, 'F') # Posisi di (11,6) sedikit lebih besar dari logo
+            
+            # Tempel logo di atas kotak putih
             self.image("logo.png", 12, 7, 22)
             self.set_x(40)
+        # ----------------------
         
+        # Teks Header (Warna Putih di atas Biru)
         self.set_y(8); self.set_x(40)
         self.set_font('Arial', 'B', 16); self.set_text_color(255, 255, 255)
         self.cell(0, 8, COMPANY_NAME, ln=1)
-        self.set_x(40); self.set_font('Arial', 'I', 8); self.cell(0, 5, SLOGAN, ln=1)
+        
+        self.set_x(40); self.set_font('Arial', 'I', 8)
+        self.cell(0, 5, SLOGAN, ln=1)
+        
         self.set_x(40); self.set_font('Arial', '', 8)
         self.cell(0, 4, f"{ADDR}", ln=1)
+        
         self.set_x(40)
         self.cell(0, 4, f"Telp: {OFFICE_PHONE} | Email: {MARKETING_EMAIL}", ln=1)
         self.ln(25)
@@ -182,7 +199,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.set_x(130); pdf.set_fill_color(*COLOR_NAVY); pdf.set_text_color(255, 255, 255)
     pdf.cell(70, 10, f" TOTAL IDR {grand_total:,.0f} ", 0, 1, 'R', True)
 
-    # TERMS & CONDITIONS (Updated as Requested)
+    # TERMS & CONDITIONS
     pdf.ln(10); pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_NAVY); pdf.cell(0, 5, "TERMS & CONDITIONS:", ln=1)
     pdf.set_font('Arial', '', 8); pdf.set_text_color(100, 100, 100)
     pdf.multi_cell(0, 4, "1. Prices are subject to change with notice.\n2. Validity: 14 Days from the date of quotation.\n3. Delivery: Within 1 working day after PO confirmation.\n4. Payment: T/T or Bank Transfer.")
