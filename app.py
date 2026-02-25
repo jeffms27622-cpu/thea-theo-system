@@ -95,37 +95,46 @@ df_barang = load_db()
 # =========================================================
 class PenawaranPDF(FPDF):
     def header(self):
-        # Header Navy Bar (Background Biru)
+        # 1. SETUP WARNA & BACKGROUND
+        # Kita buat background dasar Navy dulu
         self.set_fill_color(*COLOR_NAVY)
         self.rect(0, 0, 210, 35, 'F')
-        
-        # Aksen Garis Emas Header
+
+        # 2. AREA LOGO (MODERN SIDEBAR STYLE)
+        # Buat area Putih Elegan di sebelah kiri (Full Height Header)
+        # Ini bikin logo terlihat 'Bernafas' dan Mahal, bukan seperti stiker
+        self.set_fill_color(255, 255, 255) 
+        self.rect(0, 0, 42, 35, 'F') # Lebar 42mm dari kiri putih bersih
+
+        # 3. AKSEN GOLD DIVIDER (PEMISAH MEWAH)
+        # Garis emas vertikal yang memisahkan area Logo dan Teks
         self.set_fill_color(*COLOR_GOLD)
-        self.rect(0, 34, 210, 1.2, 'F')
+        self.rect(42, 0, 1.5, 34, 'F') # Garis vertikal
         
-        # --- PERBAIKAN LOGO ---
+        # Garis emas horizontal di bawah header (Pemanis akhir)
+        self.rect(0, 34, 210, 1.5, 'F') 
+
+        # 4. PASANG LOGO (Di area Putih)
         if os.path.exists("logo.png"):
-            # Buat kotak PUTIH di belakang logo agar warna asli logo keluar
-            self.set_fill_color(255, 255, 255) 
-            self.rect(11, 6, 24, 24, 'F') # Posisi di (11,6) sedikit lebih besar dari logo
-            
-            # Tempel logo di atas kotak putih
-            self.image("logo.png", 12, 7, 22)
-            self.set_x(40)
-        # ----------------------
+            # Logo sekarang aman 100%, warnanya bakal keluar semua (Hitam/Biru/Merah)
+            # Posisi kita atur center di area putih
+            self.image("logo.png", 8, 6, 26) 
         
-        # Teks Header (Warna Putih di atas Biru)
-        self.set_y(8); self.set_x(40)
+        # 5. TULISAN PERUSAHAAN (Di area Navy)
+        # Kita geser posisi X ke 48 (melewati area putih & garis emas)
+        self.set_y(8); self.set_x(48)
         self.set_font('Arial', 'B', 16); self.set_text_color(255, 255, 255)
         self.cell(0, 8, COMPANY_NAME, ln=1)
         
-        self.set_x(40); self.set_font('Arial', 'I', 8)
+        self.set_x(48); self.set_font('Arial', 'I', 8)
+        self.set_text_color(184, 134, 11) # Warna Gold untuk Slogan
         self.cell(0, 5, SLOGAN, ln=1)
         
-        self.set_x(40); self.set_font('Arial', '', 8)
+        self.set_x(48); self.set_font('Arial', '', 8)
+        self.set_text_color(255, 255, 255) # Putih kembali
         self.cell(0, 4, f"{ADDR}", ln=1)
         
-        self.set_x(40)
+        self.set_x(48)
         self.cell(0, 4, f"Telp: {OFFICE_PHONE} | Email: {MARKETING_EMAIL}", ln=1)
         self.ln(25)
 
@@ -318,3 +327,4 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
