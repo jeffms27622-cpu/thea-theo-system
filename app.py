@@ -96,71 +96,61 @@ df_barang = load_db()
 # =========================================================
 # 3. PDF ENGINE (ULTRA LUXURY - GEOMETRIC SLASH DESIGN)
 # =========================================================
+# =========================================================
+# 3. PDF ENGINE (MODERN VERTICAL SPLIT - ANTI ERROR)
+# =========================================================
 class PenawaranPDF(FPDF):
     def header(self):
-        # 1. Background Dasar Putih (Aman buat Logo)
+        # 1. AREA KIRI: Putih Bersih (Lebar 50mm)
+        # Ini rumahnya Logo. Dijamin logo Bapak terlihat sangat jelas.
         self.set_fill_color(255, 255, 255)
-        self.rect(0, 0, 210, 40, 'F')
-
-        # 2. Poligon Navy (Bentuk Miring di Kanan)
-        # Kita gambar bentuk trapesium biru di sisi kanan header
+        self.rect(0, 0, 50, 40, 'F')
+        
+        # 2. AREA KANAN: Navy Mewah (Sisanya)
         self.set_fill_color(*COLOR_NAVY)
-        # Koordinat sudut: (Atas-Kiri, Atas-Kanan, Bawah-Kanan, Bawah-Kiri)
-        # Angka 60 dan 40 di bawah ini yang bikin efek miring (Slash)
-        self.code_polygon([(60, 0), (210, 0), (210, 40), (40, 40)]) 
-
-        # 3. Garis Emas Miring (Pemisah Mewah)
-        self.set_draw_color(*COLOR_GOLD)
-        self.set_line_width(1.5)
-        self.line(60, 0, 40, 40) # Garis miring mengikuti potongan biru
-
-        # 4. Garis Emas Horizontal di Bawah
+        self.rect(50, 0, 160, 40, 'F')
+        
+        # 3. TIANG EMAS (Pemisah Elegan)
+        # Garis vertikal tebal yang bikin kesan kokoh
         self.set_fill_color(*COLOR_GOLD)
-        self.rect(0, 40, 210, 1, 'F')
-
-        # 5. LOGO (Di Area Putih - Kiri)
+        self.rect(50, 0, 1.5, 40, 'F')
+        
+        # 4. PASANG LOGO (Di area Putih)
         if os.path.exists("logo.png"):
-            # Logo punya ruang luas di kiri, bebas warna apa saja pasti kontras
-            self.image("logo.png", 8, 8, 26) 
-
-        # 6. TEKS PERUSAHAAN (Di Area Navy - Kanan)
-        # Teks rata kanan (Align Right) biar makin modern
-        self.set_y(8)
-        self.set_right_margin(10) # Kasih jarak dari pinggir kanan kertas
+            # Posisi Center di dalam kotak putih 50mm
+            self.image("logo.png", 10, 8, 30) 
+            
+        # 5. TEKS PERUSAHAAN (Di area Navy - Rata Kanan)
+        # Gaya Rata Kanan (Align Right) ini ciri khas desain modern
+        self.set_y(9)
+        self.set_right_margin(10) # Kasih jarak napas dari pinggir kanan
         
         self.set_font('Arial', 'B', 18)
-        self.set_text_color(255, 255, 255) # Putih di atas Biru
+        self.set_text_color(255, 255, 255) # Putih
         self.cell(0, 8, COMPANY_NAME, ln=1, align='R')
         
         self.set_font('Arial', 'I', 9)
-        self.set_text_color(184, 134, 11) # Gold
+        self.set_text_color(184, 134, 11) # Gold Slogan
         self.cell(0, 5, SLOGAN, ln=1, align='R')
         
         self.set_font('Arial', '', 8)
-        self.set_text_color(220, 220, 220) # Abu terang
+        self.set_text_color(220, 220, 220) # Abu Silver
         self.cell(0, 4, f"{ADDR}", ln=1, align='R')
         self.cell(0, 4, f"Telp: {OFFICE_PHONE} | Email: {MARKETING_EMAIL}", ln=1, align='R')
         
-        # Reset margin kanan
-        self.set_right_margin(10) 
+        self.set_right_margin(10) # Kembalikan margin normal
         self.ln(20)
 
-    # Fungsi bantuan untuk gambar Polygon (Karena FPDF standar kadang ga punya ini)
-    def code_polygon(self, points):
-        self.out(' '.join(f'{x*self.k:.2f} {(self.h-y)*self.k:.2f}' for x, y in points) + ' f')
-
     def footer(self):
-        # Footer juga kita bikin miring sedikit aksennya
+        # Footer Senada: Navy Full dengan aksen Emas di bawah
         self.set_y(-20)
-        
-        # Blok Navy Full
         self.set_fill_color(*COLOR_NAVY)
         self.rect(0, 277, 210, 20, 'F')
         
-        # Aksen Segitiga Emas di pojok kanan bawah
+        # Garis Emas Tipis di atas footer
         self.set_fill_color(*COLOR_GOLD)
-        self.code_polygon([(180, 297), (210, 297), (210, 277)]) # Sudut emas
-
+        self.rect(0, 277, 210, 0.8, 'F')
+        
         self.set_y(-15)
         self.set_font('Arial', 'B', 8); self.set_text_color(255, 255, 255)
         self.cell(0, 5, f"{COMPANY_NAME} Official Quotation", 0, 0, 'C')
@@ -341,5 +331,6 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
 
