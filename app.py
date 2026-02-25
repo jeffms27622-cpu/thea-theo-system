@@ -12,29 +12,27 @@ import io
 import re
 
 # =========================================================
-# 1. KONFIGURASI UTAMA & DATA KANTOR
+# 1. KONFIGURASI UTAMA
 # =========================================================
-# --- Marketing Data ---
 MARKETING_NAME  = "Asin"
-MARKETING_WA    = "0815-8199-775"
+MARKETING_WA    = "08158199775"
 MARKETING_EMAIL = "alattulis.tts@gmail.com"
 
-# --- Company Data ---
+# --- DATA KANTOR ---
 COMPANY_NAME    = "PT. THEA THEO STATIONARY"
 SLOGAN          = "Office & School Supplies Solution"
 ADDR            = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 OFFICE_PHONE    = "(021) 55780659"
 
-# --- Folder ID Google Drive (Untuk Faktur Pajak) ---
 PAJAK_FOLDER_ID = "19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z"
 
-# --- Password Admin (Fallback jika secrets belum diset) ---
+# Proteksi Password Admin (Cek di Streamlit Secrets)
 if "ADMIN_PASSWORD" in st.secrets:
     ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
 else:
-    ADMIN_PASSWORD = "admin" 
+    ADMIN_PASSWORD = "admin"
 
-# --- Warna Tema Luxury (Navy & Gold) ---
+# Warna Tema Luxury (Navy & Gold)
 COLOR_NAVY = (0, 40, 85)
 COLOR_GOLD = (184, 134, 11)
 COLOR_TEXT = (30, 30, 30)
@@ -42,7 +40,7 @@ COLOR_TEXT = (30, 30, 30)
 st.set_page_config(page_title=f"{COMPANY_NAME} - {MARKETING_NAME}", layout="wide")
 
 # =========================================================
-# 2. FUNGSI KONEKSI & DATABASE
+# 2. KONEKSI GOOGLE SERVICES
 # =========================================================
 def get_creds():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -56,17 +54,39 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
+def search_pajak_file(inv_keyword, name_keyword):
+    try:
+        service = build('drive', 'v3', credentials=get_creds())
+        clean_inv = re.sub(r'[^A-Z0-9]', '', inv_keyword.upper())
+        clean_name = re.sub(r'[^A-Z0-9]', '', name_keyword.upper())
+        query = f"'{PAJAK_FOLDER_ID}' in parents and mimeType = 'application/pdf' and trashed = false"
+        results = service.files().list(q=query, fields="files(id, name)", pageSize=1000).execute()
+        files = results.get('files', [])
+        for f in files:
+            file_name_clean = re.sub(r'[^A-Z0-9]', '', f['name'].upper())
+            if clean_inv in file_name_clean and clean_name in file_name_clean:
+                return f 
+        return None
+    except: return None
+
+def download_drive_file(file_id):
+    service = build('drive', 'v3', credentials=get_creds())
+    request = service.files().get_media(fileId=file_id)
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while not done: _, done = downloader.next_chunk()
+    return fh.getvalue()
+
 def load_db():
     if os.path.exists("database_barang.xlsx"):
         try:
             df = pd.read_excel("database_barang.xlsx")
             df.columns = df.columns.str.strip()
-            # Pastikan kolom Harga jadi angka
             if 'Harga' in df.columns:
                 df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce').fillna(0)
             return df
         except: pass
-    # Return dataframe kosong jika gagal load biar gak error
     return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
 
 df_barang = load_db()
@@ -78,67 +98,56 @@ class PenawaranPDF(FPDF):
     def header(self):
         # 1. SETUP BACKGROUND UTAMA (NAVY DEEP)
         self.set_fill_color(*COLOR_NAVY)
-        self.rect(0, 0, 210, 50, 'F') # Header tinggi 50mm
+        self.rect(0, 0, 210, 50, 'F') 
 
-        # 2. WHITE CANVAS (AREA LOGO) - Blok putih vertikal
+        # 2. WHITE CANVAS (AREA KHUSUS LOGO)
         self.set_fill_color(255, 255, 255)
-        self.rect(10, 0, 50, 50, 'F') # Lebar 50mm, margin kiri 10mm
+        self.rect(10, 0, 50, 50, 'F') 
 
         # 3. THE GOLDEN PILLARS (TIANG EMAS GANDA)
-        # Tiang Emas 1 (Tebal)
         self.set_fill_color(*COLOR_GOLD)
         self.rect(60, 0, 2, 50, 'F') 
-        # Tiang Emas 2 (Tipis - Aksen Bayangan)
         self.rect(64, 0, 0.5, 50, 'F') 
 
         # 4. LOGO PLACEMENT
         if os.path.exists("logo.png"):
-            # Logo duduk manis di tengah area putih
             self.image("logo.png", 15, 12, 40) 
 
-        # 5. TYPOGRAPHY (TEXT YANG BIKIN TERPANAH)
+        # 5. TYPOGRAPHY (TEXT PERUSAHAAN)
         self.set_y(12)
-        self.set_x(70) # Mulai setelah tiang emas
+        self.set_x(70) 
         
-        # Nama PT Besar & Tegas
         self.set_font('Arial', 'B', 20) 
-        self.set_text_color(255, 255, 255) # Putih
+        self.set_text_color(255, 255, 255) 
         self.cell(0, 8, COMPANY_NAME, ln=1)
         
-        # Slogan (Gold & Spaced)
         self.set_x(70)
         self.set_font('Arial', 'B', 10)
-        self.set_text_color(184, 134, 11) # Gold
+        self.set_text_color(*COLOR_GOLD) 
+        slogan_spaced = "  ".join(SLOGAN.upper()) 
+        self.cell(0, 6, slogan_spaced, ln=1)
         
-        # Trik manual spacing biar elegan
-        slogan_text = SLOGAN.upper()
-        self.cell(0, 6, "  ".join(slogan_text), ln=1)
-        
-        # Garis Tipis Putih di bawah slogan
+        # Garis Tipis Putih
         self.set_fill_color(255, 255, 255)
         self.rect(70, 28, 120, 0.2, 'F')
 
-        # Info Kontak (Clean & Minimalis)
+        # Info Kontak
         self.set_y(32)
         self.set_x(70)
         self.set_font('Arial', '', 8)
-        self.set_text_color(220, 220, 220) # Silver
+        self.set_text_color(220, 220, 220) 
         self.cell(0, 4, ADDR, ln=1)
         self.set_x(70)
         self.cell(0, 4, f"Phone: {OFFICE_PHONE}  |  Email: {MARKETING_EMAIL}", ln=1)
-        
-        # Set margin atas baru supaya isi surat tidak naik ke header
-        self.set_top_margin(60)
 
     def footer(self):
-        # Footer "Heavy Bottom"
         self.set_y(-25)
         
-        # Blok Navy
+        # Blok Navy Bawah
         self.set_fill_color(*COLOR_NAVY)
         self.rect(0, 272, 210, 25, 'F')
         
-        # Aksen Emas di Bawah (Bottom Bar)
+        # Aksen Emas Bawah
         self.set_fill_color(*COLOR_GOLD)
         self.rect(0, 292, 210, 5, 'F') 
 
@@ -147,29 +156,28 @@ class PenawaranPDF(FPDF):
         self.set_font('Arial', 'B', 9); self.set_text_color(255, 255, 255)
         self.cell(0, 5, "THANK YOU FOR YOUR BUSINESS", 0, 1, 'C')
         
-        self.set_font('Arial', '', 7); self.set_text_color(184, 134, 11) 
+        self.set_font('Arial', '', 7); self.set_text_color(184, 134, 11)
         self.cell(0, 4, f"{COMPANY_NAME} - Premium Office Supplies Partner", 0, 0, 'C')
 
-# --- FUNGSI GENERATE ISI PDF ---
 def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
     pdf = PenawaranPDF()
-    pdf.set_auto_page_break(auto=True, margin=30)
+    # Atur margin bottom agar tidak menabrak footer 25mm
+    pdf.set_auto_page_break(auto=True, margin=35) 
     pdf.add_page()
     
-    # --- POSISI MULAI (PENTING AGAR TIDAK NABRAK HEADER) ---
+    # --- POSISI MULAI DITURUNKAN KE 65MM ---
     pdf.set_y(65) 
     
-    # Judul Quotation (Kanan)
+    # Judul Quotation
     pdf.set_font('Arial', 'B', 24); pdf.set_text_color(*COLOR_NAVY)
-    pdf.cell(0, 10, "QUOTATION", ln=1, align='R')
+    pdf.cell(0, 12, "QUOTATION", ln=1, align='R')
     pdf.set_font('Arial', '', 9); pdf.set_text_color(120, 120, 120)
     pdf.cell(0, 5, f"Reference: {no_surat}", ln=1, align='R')
-    # Waktu
     waktu_skrg = datetime.utcnow() + timedelta(hours=7)
     pdf.cell(0, 5, f"Date: {waktu_skrg.strftime('%d %B %Y')}", ln=1, align='R')
     
-    # Client Info (Kiri - Sejajar)
-    pdf.set_y(65) 
+    # Client Info (Sejajar dengan Quotation)
+    pdf.set_xy(10, 65)
     pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_GOLD)
     pdf.cell(0, 5, "PREPARED FOR:", ln=1)
     pdf.set_font('Arial', 'B', 13); pdf.set_text_color(*COLOR_TEXT)
@@ -189,7 +197,6 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.set_font('Arial', '', 9); pdf.set_text_color(*COLOR_TEXT)
     fill = False
     for i, row in df_order.iterrows():
-        # Zebra Striping
         pdf.set_fill_color(248, 249, 252) if fill else pdf.set_fill_color(255, 255, 255)
         pdf.cell(10, 8, str(i+1), 0, 0, 'C', True)
         pdf.cell(90, 8, f" {row['Nama Barang']}", 0, 0, 'L', True)
@@ -197,32 +204,29 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.cell(20, 8, str(row['Satuan']), 0, 0, 'C', True)
         pdf.cell(25, 8, f"{row['Harga']:,.0f} ", 0, 0, 'R', True)
         pdf.cell(25, 8, f"{row['Total_Row']:,.0f} ", 0, 1, 'R', True)
-        # Garis tipis antar baris
         pdf.set_draw_color(230, 230, 230); pdf.line(10, pdf.get_y(), 200, pdf.get_y())
         fill = not fill
 
-    # Summary Harga
+    # Summary
     pdf.ln(5)
     pdf.set_x(130)
     pdf.set_font('Arial', 'B', 10)
     pdf.cell(45, 8, "Sub Total", 0, 0, 'L'); pdf.cell(25, 8, f" {subtotal:,.0f}", 0, 1, 'R')
     pdf.set_x(130)
     pdf.cell(45, 8, "VAT (PPN 11%)", 0, 0, 'L'); pdf.cell(25, 8, f" {ppn:,.0f}", 0, 1, 'R')
-    
-    # Grand Total
     pdf.set_x(130); pdf.set_fill_color(*COLOR_NAVY); pdf.set_text_color(255, 255, 255)
     pdf.cell(70, 10, f" TOTAL IDR {grand_total:,.0f} ", 0, 1, 'R', True)
 
-    # Terms & Conditions
+    # TERMS & CONDITIONS
     pdf.ln(10); pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_NAVY); pdf.cell(0, 5, "TERMS & CONDITIONS:", ln=1)
     pdf.set_font('Arial', '', 8); pdf.set_text_color(100, 100, 100)
     pdf.multi_cell(0, 4, "1. Prices are subject to change with notice.\n2. Validity: 14 Days from the date of quotation.\n3. Delivery: Within 1 working day after PO confirmation.\n4. Payment: T/T or Bank Transfer.")
 
-    # Tanda Tangan
+    # Closing & Signature
     pdf.ln(10); pdf.set_font('Arial', '', 10); pdf.set_text_color(*COLOR_TEXT)
     pdf.cell(130, 5, "", 0, 0)
     pdf.cell(60, 5, "Yours Faithfully,", 0, 1, 'C')
-    pdf.ln(20) 
+    pdf.ln(18)
     pdf.set_font('Arial', 'B', 10); pdf.set_text_color(*COLOR_NAVY)
     pdf.cell(130, 5, "", 0, 0)
     pdf.cell(60, 5, MARKETING_NAME.upper(), 0, 1, 'C')
@@ -233,7 +237,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     return pdf.output(dest='S').encode('latin-1')
 
 # =========================================================
-# 4. UI UTAMA (STREAMLIT)
+# 4. UI UTAMA (SIDEBAR & MENU)
 # =========================================================
 st.sidebar.title(f"Portal {MARKETING_NAME}")
 menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Portal Customer", "👨‍💻 Admin Dashboard"])
@@ -242,58 +246,47 @@ if 'cart' not in st.session_state: st.session_state.cart = []
 
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.info(f"Marketing Aktif: {MARKETING_NAME} | {MARKETING_WA}")
+    st.info(f"Marketing Aktif: {MARKETING_NAME}")
 
 elif menu == "📝 Portal Customer":
-    st.subheader("Form Pengajuan Penawaran")
-    with st.container(border=True):
-        col1, col2 = st.columns(2)
-        nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko")
-        up_nama = col2.text_input("👤 Nama Penerima (UP)")
-        wa_nomor = col1.text_input("📞 Nomor WhatsApp Pembeli")
-        
-        # Multiselect Barang
-        picks = st.multiselect("📦 Pilih Barang:", options=df_barang['Nama Barang'].tolist())
-        if st.button("Tambahkan ke Keranjang"):
-            for p in picks:
-                if p not in st.session_state.cart: st.session_state.cart.append(p)
-            st.rerun()
+    tab_order, tab_pajak = st.tabs(["🛒 Buat Penawaran Baru", "📄 Ambil Faktur Pajak"])
+    with tab_order:
+        st.subheader("Form Pengajuan Penawaran")
+        with st.container(border=True):
+            col1, col2 = st.columns(2)
+            nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko")
+            up_nama = col2.text_input("👤 Nama Penerima (UP)")
+            wa_nomor = col1.text_input("📞 Nomor WhatsApp Pembeli")
+            picks = st.multiselect("📦 Pilih Barang:", options=df_barang['Nama Barang'].tolist())
+            if st.button("Tambahkan ke Keranjang"):
+                for p in picks:
+                    if p not in st.session_state.cart: st.session_state.cart.append(p)
+                st.rerun()
 
-    if st.session_state.cart:
-        st.markdown("### 📋 Daftar Pesanan")
-        list_pesanan = []
-        for item in st.session_state.cart:
-            row_b = df_barang[df_barang['Nama Barang'] == item].iloc[0]
-            with st.container(border=True):
-                c1, c2, c3, c4 = st.columns([3, 1.5, 1, 0.5])
-                c1.markdown(f"**{item}**")
-                c2.markdown(f"Rp {row_b['Harga']:,.0f} / {row_b['Satuan']}")
-                qty = c3.number_input(f"Jumlah", min_value=1, value=1, key=f"q_c_{item}")
-                if c4.button("❌", key=f"del_c_{item}"):
-                    st.session_state.cart.remove(item); st.rerun()
-                
-                list_pesanan.append({
-                    "Nama Barang": str(item),
-                    "Qty": int(qty),
-                    "Harga": float(row_b['Harga']),
-                    "Satuan": str(row_b['Satuan']),
-                    "Total_Row": float(qty * row_b['Harga'])
-                })
+        if st.session_state.cart:
+            st.markdown("### 📋 Daftar Pesanan")
+            list_pesanan = []
+            for item in st.session_state.cart:
+                row_b = df_barang[df_barang['Nama Barang'] == item].iloc[0]
+                with st.container(border=True):
+                    c1, c2, c3, c4 = st.columns([3, 1.5, 1, 0.5])
+                    c1.markdown(f"**{item}**")
+                    c2.markdown(f"Rp {row_b['Harga']:,.0f} / {row_b['Satuan']}")
+                    qty = c3.number_input(f"Jumlah", min_value=1, value=1, key=f"q_c_{item}")
+                    if c4.button("❌", key=f"del_c_{item}"):
+                        st.session_state.cart.remove(item); st.rerun()
+                    list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(row_b['Harga']), "Satuan": str(row_b['Satuan']), "Total_Row": float(qty * row_b['Harga'])})
 
-        if st.button(f"🚀 Kirim Pengajuan ke {MARKETING_NAME}", use_container_width=True):
-            sheet = connect_gsheet()
-            if sheet and nama_toko:
-                wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
-                # Simpan ke GSheet: Waktu, Customer, UP, WA, Pesanan(JSON), Status, Sales
-                sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending", MARKETING_NAME])
-                st.success("Terkirim! Terima kasih."); st.session_state.cart = []
-            elif not nama_toko:
-                st.warning("Mohon isi Nama Perusahaan dulu!")
+            if st.button(f"🚀 Kirim Pengajuan ke {MARKETING_NAME}", use_container_width=True):
+                sheet = connect_gsheet()
+                if sheet and nama_toko:
+                    wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
+                    sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending", MARKETING_NAME])
+                    st.success("Terkirim! Terima kasih."); st.session_state.cart = []
 
 elif menu == "👨‍💻 Admin Dashboard":
     st.title(f"Admin Dashboard - {MARKETING_NAME}")
     pwd = st.sidebar.text_input("Password:", type="password")
-    
     if pwd == ADMIN_PASSWORD:
         sheet = connect_gsheet()
         if sheet:
@@ -301,87 +294,46 @@ elif menu == "👨‍💻 Admin Dashboard":
                 all_vals = sheet.get_all_values()
                 if len(all_vals) > 1:
                     df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
-                    # Filter Status Pending & Sales Asin
                     pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == MARKETING_NAME)]
-                    
                     if not pending.empty:
                         for idx, row in pending.iterrows():
-                            # Cari index baris asli di Google Sheet (Header=1, jadi +2)
                             real_row_idx = df_gs.index[idx] + 2 
-                            
-                            with st.expander(f"🛠️ KELOLA: {row['Customer']} ({row['Waktu']})", expanded=True):
+                            with st.expander(f"🛠️ KELOLA: {row['Customer']}", expanded=True):
                                 items_list = ast.literal_eval(str(row['Pesanan']))
                                 edited_items = []
-                                
                                 st.write("### 1. Edit Barang & Harga")
                                 for i, r in enumerate(items_list):
                                     with st.container(border=True):
                                         ca, cb, cc, cd, ce = st.columns([3, 0.8, 1.2, 1.5, 0.5])
                                         ca.markdown(f"**{r['Nama Barang']}**")
-                                        
-                                        # Input Edit Qty & Harga
                                         nq = cb.number_input("Qty", value=int(r['Qty']), key=f"q_a_{idx}_{i}")
-                                        
-                                        # Input Edit Satuan (Smart Dropdown)
                                         opsi_satuan = ["Pcs", "Roll", "Dus", "Pack", "Rim", "Box", "Lusin", "Unit", "Set", "Lembar", "Botol"]
                                         satuan_awal = r.get('Satuan', 'Pcs')
                                         if satuan_awal not in opsi_satuan: opsi_satuan.insert(0, satuan_awal)
                                         ns = cc.selectbox("Satuan", options=opsi_satuan, index=opsi_satuan.index(satuan_awal), key=f"s_a_{idx}_{i}")
-                                        
                                         nh = cd.number_input("Harga/Unit", value=float(r['Harga']), key=f"h_a_{idx}_{i}")
-                                        
-                                        # Tombol Hapus per Item
                                         if not ce.checkbox("Hapus", key=f"d_a_{idx}_{i}"):
-                                            edited_items.append({
-                                                "Nama Barang": r['Nama Barang'],
-                                                "Qty": nq,
-                                                "Harga": nh,
-                                                "Satuan": ns,
-                                                "Total_Row": nq * nh
-                                            })
-                                
+                                            edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": ns, "Total_Row": nq * nh})
                                 st.divider()
-                                
-                                # Tambah Barang Baru Manual
                                 st.write("### 2. Tambah Barang Baru")
                                 new_items = st.multiselect("Cari Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_a_{idx}")
                                 for p in new_items:
                                     rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                    edited_items.append({
-                                        "Nama Barang": p, 
-                                        "Qty": 1, 
-                                        "Harga": float(rb['Harga']), 
-                                        "Satuan": str(rb['Satuan']), 
-                                        "Total_Row": float(1 * rb['Harga'])
-                                    })
-                                
-                                # Tombol Simpan Perubahan ke Excel/GSheet
+                                    edited_items.append({"Nama Barang": p, "Qty": 1, "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(1 * rb['Harga'])})
                                 if st.button("💾 Simpan Perubahan ke GSheet", key=f"s_a_{idx}"):
-                                    sheet.update_cell(real_row_idx, 5, str(edited_items)) # Kolom 5 = Pesanan
+                                    sheet.update_cell(real_row_idx, 5, str(edited_items))
                                     st.success("Data diupdate!"); st.rerun()
-                                
                                 st.divider()
-                                
-                                # Generate PDF
                                 final_df = pd.DataFrame(edited_items)
                                 if not final_df.empty:
-                                    subt = final_df['Total_Row'].sum()
-                                    tax = subt * 0.11
-                                    gtot = subt + tax
-                                    
+                                    subt = final_df['Total_Row'].sum(); tax = subt * 0.11; gtot = subt + tax
                                     c1, c2 = st.columns(2)
-                                    no_s = c1.text_input("No Surat:", value=f"001/S-TTS/II/{datetime.now().year}", key=f"no_a_{idx}")
+                                    waktu_skrg = datetime.utcnow() + timedelta(hours=7)
+                                    no_s = c1.text_input("No Surat:", value=f"..../S-TTS/{waktu_skrg.strftime('%m')}/{waktu_skrg.year}", key=f"no_a_{idx}")
                                     c2.metric("Total Baru (Inc. PPN)", f"Rp {gtot:,.0f}")
-                                    
-                                    # Panggil Fungsi PDF Presidential
                                     pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                    
-                                    st.download_button("📩 Download PDF Presidential", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
-                                    
+                                    st.download_button("📩 Download PDF Executive Luxury", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
                                     if st.button("✅ Selesai & Hapus dari Antrean", key=f"fin_a_{idx}"):
-                                        sheet.update_cell(real_row_idx, 6, "Processed") # Kolom 6 = Status
-                                        st.rerun()
-                    else:
-                        st.info(f"Tidak ada antrean pending untuk {MARKETING_NAME}.")
-            except Exception as e:
-                st.error(f"Error detail: {e}")
+                                        sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
+                    else: st.info(f"Antrean {MARKETING_NAME} kosong.")
+            except Exception as e: st.error(f"Error detail: {e}")
