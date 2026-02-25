@@ -25,11 +25,12 @@ ADDR            = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 OFFICE_PHONE    = "(021) 55780659"
 
 PAJAK_FOLDER_ID = "19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z"
-# Pastikan secrets sudah diatur di Streamlit Cloud
+
+# Proteksi Password Admin (Cek di Streamlit Secrets)
 if "ADMIN_PASSWORD" in st.secrets:
-    ADMIN_PASSWORD  = st.secrets["ADMIN_PASSWORD"]
+    ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
 else:
-    ADMIN_PASSWORD = "admin" # Fallback jika belum setting secrets
+    ADMIN_PASSWORD = "admin"
 
 # Warna Tema Luxury (Navy & Gold)
 COLOR_NAVY = (0, 40, 85)
@@ -97,94 +98,86 @@ class PenawaranPDF(FPDF):
     def header(self):
         # 1. SETUP BACKGROUND UTAMA (NAVY DEEP)
         self.set_fill_color(*COLOR_NAVY)
-        self.rect(0, 0, 210, 50, 'F') # Header lebih tinggi (50mm) biar gagah
+        self.rect(0, 0, 210, 50, 'F') 
 
-        # 2. WHITE CANVAS (AREA LOGO)
-        # Blok putih vertikal dari atas sampai bawah header di sebelah kiri
+        # 2. WHITE CANVAS (AREA KHUSUS LOGO)
         self.set_fill_color(255, 255, 255)
-        self.rect(10, 0, 50, 50, 'F') # Lebar 50mm, margin kiri 10mm
+        self.rect(10, 0, 50, 50, 'F') 
 
-        # 3. THE GOLDEN PILLARS (DETAIL KUNCI MEWAHNYA)
-        # Tiang Emas 1 (Tebal)
+        # 3. THE GOLDEN PILLARS (TIANG EMAS GANDA)
         self.set_fill_color(*COLOR_GOLD)
         self.rect(60, 0, 2, 50, 'F') 
-        # Tiang Emas 2 (Tipis - Aksen) -> Ini yang bikin kesan "Detail Mahal"
         self.rect(64, 0, 0.5, 50, 'F') 
 
         # 4. LOGO PLACEMENT
         if os.path.exists("logo.png"):
-            # Logo duduk manis di tengah area putih
-            # Koordinat X=15 (tengah-tengah blok putih 10-60)
             self.image("logo.png", 15, 12, 40) 
 
-        # 5. TYPOGRAPHY (TEXT YANG BIKIN TERPANAH)
+        # 5. TYPOGRAPHY (TEXT PERUSAHAAN)
         self.set_y(12)
-        self.set_x(70) # Mulai setelah tiang emas
+        self.set_x(70) 
         
-        # Nama PT Besar & Tegas
         self.set_font('Arial', 'B', 20) 
-        self.set_text_color(255, 255, 255) # Putih
+        self.set_text_color(255, 255, 255) 
         self.cell(0, 8, COMPANY_NAME, ln=1)
         
-        # Slogan (Gold & Spaced)
         self.set_x(70)
         self.set_font('Arial', 'B', 10)
-        self.set_text_color(184, 134, 11) # Gold
-        # Trik nambah spasi antar huruf biar elegan (manual spacing)
+        self.set_text_color(*COLOR_GOLD) 
         slogan_spaced = "  ".join(SLOGAN.upper()) 
         self.cell(0, 6, slogan_spaced, ln=1)
         
-        # Garis Tipis Putih di bawah slogan
+        # Garis Tipis Putih
         self.set_fill_color(255, 255, 255)
         self.rect(70, 28, 120, 0.2, 'F')
 
-        # Info Kontak (Clean & Minimalis)
+        # Info Kontak
         self.set_y(32)
         self.set_x(70)
         self.set_font('Arial', '', 8)
-        self.set_text_color(220, 220, 220) # Silver
+        self.set_text_color(220, 220, 220) 
         self.cell(0, 4, ADDR, ln=1)
         self.set_x(70)
         self.cell(0, 4, f"Phone: {OFFICE_PHONE}  |  Email: {MARKETING_EMAIL}", ln=1)
-        
-        # Jarak aman ke konten
-        self.ln(20)
 
     def footer(self):
-        # Footer yang "Mirroring" Header
         self.set_y(-25)
         
-        # Blok Navy
+        # Blok Navy Bawah
         self.set_fill_color(*COLOR_NAVY)
         self.rect(0, 272, 210, 25, 'F')
         
-        # Aksen Emas di Bawah (Bottom Bar)
+        # Aksen Emas Bawah
         self.set_fill_color(*COLOR_GOLD)
-        self.rect(0, 292, 210, 5, 'F') # Bar tebal di paling bawah
+        self.rect(0, 292, 210, 5, 'F') 
 
         # Teks Footer
         self.set_y(-18)
         self.set_font('Arial', 'B', 9); self.set_text_color(255, 255, 255)
         self.cell(0, 5, "THANK YOU FOR YOUR BUSINESS", 0, 1, 'C')
         
-        self.set_font('Arial', '', 7); self.set_text_color(184, 134, 11) # Gold Text
+        self.set_font('Arial', '', 7); self.set_text_color(184, 134, 11)
         self.cell(0, 4, f"{COMPANY_NAME} - Premium Office Supplies Partner", 0, 0, 'C')
 
 def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
     pdf = PenawaranPDF()
-    pdf.set_auto_page_break(auto=True, margin=40)
+    # Atur margin bottom agar tidak menabrak footer 25mm
+    pdf.set_auto_page_break(auto=True, margin=35) 
     pdf.add_page()
     
+    # --- POSISI MULAI DITURUNKAN KE 65MM ---
+    pdf.set_y(65) 
+    
     # Judul Quotation
-    pdf.set_y(45)
     pdf.set_font('Arial', 'B', 24); pdf.set_text_color(*COLOR_NAVY)
     pdf.cell(0, 12, "QUOTATION", ln=1, align='R')
     pdf.set_font('Arial', '', 9); pdf.set_text_color(120, 120, 120)
     pdf.cell(0, 5, f"Reference: {no_surat}", ln=1, align='R')
-    pdf.cell(0, 5, f"Date: {(datetime.utcnow() + timedelta(hours=7)).strftime('%d %B %Y')}", ln=1, align='R')
+    waktu_skrg = datetime.utcnow() + timedelta(hours=7)
+    pdf.cell(0, 5, f"Date: {waktu_skrg.strftime('%d %B %Y')}", ln=1, align='R')
     
-    # Client Info
-    pdf.set_xy(10, 45)
+    # Client Info (Sejajar dengan Quotation)
+    pdf.set_xy(10, 65)
     pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_GOLD)
     pdf.cell(0, 5, "PREPARED FOR:", ln=1)
     pdf.set_font('Arial', 'B', 13); pdf.set_text_color(*COLOR_TEXT)
@@ -335,7 +328,8 @@ elif menu == "👨‍💻 Admin Dashboard":
                                 if not final_df.empty:
                                     subt = final_df['Total_Row'].sum(); tax = subt * 0.11; gtot = subt + tax
                                     c1, c2 = st.columns(2)
-                                    no_s = c1.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_a_{idx}")
+                                    waktu_skrg = datetime.utcnow() + timedelta(hours=7)
+                                    no_s = c1.text_input("No Surat:", value=f"..../S-TTS/{waktu_skrg.strftime('%m')}/{waktu_skrg.year}", key=f"no_a_{idx}")
                                     c2.metric("Total Baru (Inc. PPN)", f"Rp {gtot:,.0f}")
                                     pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
                                     st.download_button("📩 Download PDF Executive Luxury", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
@@ -343,7 +337,3 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Antrean {MARKETING_NAME} kosong.")
             except Exception as e: st.error(f"Error detail: {e}")
-
-
-
-
