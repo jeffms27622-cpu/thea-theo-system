@@ -1,340 +1,313 @@
 import streamlit as st
 import pandas as pd
-import ast
-from datetime import datetime, timedelta
 from fpdf import FPDF
+from datetime import datetime
 import os
 import gspread
 from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
-import io
-import re
 
-# =========================================================
-# 1. KONFIGURASI UTAMA
-# =========================================================
-MARKETING_NAME  = "Asin"
-MARKETING_WA    = "08158199775"
-MARKETING_EMAIL = "alattulis.tts@gmail.com"
+# --- KONFIGURASI HALAMAN WEB ---
+st.set_page_config(page_title="Sistem Penawaran TTS", layout="wide")
 
-# --- DATA KANTOR ---
-COMPANY_NAME    = "PT. THEA THEO STATIONARY"
-SLOGAN          = "Office & School Supplies Solution"
-ADDR            = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
-OFFICE_PHONE    = "(021) 55780659"
-
-PAJAK_FOLDER_ID = "19i_mLcu4VtV85NLwZY67zZTGwxBgdG1z"
-ADMIN_PASSWORD  = st.secrets["ADMIN_PASSWORD"]
-
-# Warna Tema Luxury (Navy & Gold)
+# --- WARNA TEMA (NAVY & GOLD) ---
 COLOR_NAVY = (0, 40, 85)
 COLOR_GOLD = (184, 134, 11)
-COLOR_TEXT = (30, 30, 30)
+COLOR_TEXT = (40, 40, 40)
 
-st.set_page_config(page_title=f"{COMPANY_NAME} - {MARKETING_NAME}", layout="wide")
+# --- DATANYA PAK ASIN (PATEN) ---
+MARKETING_NAME = "ASIN"
+MARKETING_PHONE = "0815-8199-775"
+OFFICE_PHONE = "(021) 55780659"
+EMAIL_OFFICE = "alattullis.tts@gmail.com"
+OFFICE_ADDRESS = "Ruko Modernland Blok AR NO 27 Cipondoh Tangerang" # Sesuaikan jika perlu
 
-# =========================================================
-# 2. KONEKSI GOOGLE SERVICES
-# =========================================================
-def get_creds():
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    return Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-
-def connect_gsheet():
+# --- KONEKSI GOOGLE SHEETS (ANTREAN) ---
+def get_google_sheet():
     try:
-        client = gspread.authorize(get_creds())
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+        client = gspread.authorize(creds)
         return client.open("Antrean Penawaran TTS").sheet1
     except Exception as e:
-        st.error(f"Koneksi GSheets Gagal: {e}")
+        st.error(f"Koneksi GSheet Gagal: {e}")
         return None
 
-def search_pajak_file(inv_keyword, name_keyword):
-    try:
-        service = build('drive', 'v3', credentials=get_creds())
-        clean_inv = re.sub(r'[^A-Z0-9]', '', inv_keyword.upper())
-        clean_name = re.sub(r'[^A-Z0-9]', '', name_keyword.upper())
-        query = f"'{PAJAK_FOLDER_ID}' in parents and mimeType = 'application/pdf' and trashed = false"
-        results = service.files().list(q=query, fields="files(id, name)", pageSize=1000).execute()
-        files = results.get('files', [])
-        for f in files:
-            file_name_clean = re.sub(r'[^A-Z0-9]', '', f['name'].upper())
-            if clean_inv in file_name_clean and clean_name in file_name_clean:
-                return f 
-        return None
-    except: return None
-
-def download_drive_file(file_id):
-    service = build('drive', 'v3', credentials=get_creds())
-    request = service.files().get_media(fileId=file_id)
-    fh = io.BytesIO()
-    downloader = MediaIoBaseDownload(fh, request)
-    done = False
-    while not done: _, done = downloader.next_chunk()
-    return fh.getvalue()
-
+# --- FUNGSI BACA DATABASE (ANTI-ERROR) ---
 def load_db():
     if os.path.exists("database_barang.xlsx"):
         try:
             df = pd.read_excel("database_barang.xlsx")
-            df.columns = df.columns.str.strip()
-            if 'Harga' in df.columns:
-                df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce').fillna(0)
-            return df
-        except: pass
+            df.columns = df.columns.str.strip() # Bersihkan spasi nama kolom
+            
+            # Kita hanya ambil kolom penting agar tidak error kalau ada kolom 'Kategori'
+            needed_cols = ['Nama Barang', 'Harga', 'Satuan']
+            if all(col in df.columns for col in needed_cols):
+                # Ambil hanya kolom yang dibutuhkan, abaikan sisanya
+                df_final = df[needed_cols].copy()
+                df_final['Harga'] = pd.to_numeric(df_final['Harga'], errors='coerce').fillna(0)
+                return df_final
+            else:
+                st.error("Kolom di Excel tidak lengkap! Wajib ada: Nama Barang, Harga, Satuan")
+        except Exception as e:
+            st.error(f"Error membaca database: {e}")
     return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
 
-df_barang = load_db()
-
-# =========================================================
-# 3. PDF ENGINE (MNC LUXURY VERSION - SYMMETRICAL)
-# =========================================================
+# --- KELAS PDF (FORMAT SURAT PENAWARAN) ---
 class PenawaranPDF(FPDF):
-   def header(self):
-        # 1. Logo di Kiri (Warna asli logo aman di atas putih)
+    def header(self):
+        # 1. LOGO (Kiri Atas)
         if os.path.exists("logo.png"):
-            self.image("logo.png", 10, 10, 28)
-            
-        # 2. Nama Perusahaan & Slogan (Di samping logo)
-        self.set_y(12)
-        self.set_x(42)
-        self.set_font('Arial', 'B', 15)
-        self.set_text_color(0, 40, 85) # Navy
+            self.image("logo.png", 10, 8, 25)
+        
+        # 2. NAMA PERUSAHAAN (Navy Besar)
+        self.set_y(10)
+        self.set_x(38)
+        self.set_font('Arial', 'B', 16)
+        self.set_text_color(*COLOR_NAVY)
         self.cell(0, 8, 'PT. THEA THEO STATIONARY', ln=1)
         
-        self.set_x(42)
+        # 3. SLOGAN (Gold Miring)
+        self.set_x(38)
         self.set_font('Arial', 'I', 9)
-        self.set_text_color(184, 134, 11) # Gold
-        self.cell(0, 5, 'Office & School Supplies Solution', ln=1)
+        self.set_text_color(*COLOR_GOLD)
+        self.cell(0, 5, 'Premium Office & School Supplies Solution', ln=1)
         
-        # 3. Info Kontak (Alamat, WA, Email di Kanan Atas)
-        self.set_y(10)
-        self.set_font('Arial', '', 8)
-        self.set_text_color(50, 50, 50)
-        self.cell(0, 4, 'Ruko Modernland Blok AR NO 27 Cipondoh Tangerang', ln=1, align='R')
-        self.cell(0, 4, 'Telp: (021) 55780659', ln=1, align='R')
-        self.cell(0, 4, 'Email: allatullis.tis@gmail.com', ln=1, align='R')
+        # 4. KONTAK INFO (Kanan Atas - Rapi)
+        self.set_y(9)
+        self.set_font('Arial', '', 7)
+        self.set_text_color(80, 80, 80)
+        self.cell(0, 4, OFFICE_ADDRESS, ln=1, align='R')
+        self.cell(0, 4, f'Telp: {OFFICE_PHONE} | Email: {EMAIL_OFFICE}', ln=1, align='R')
+        
+        # Info Marketing (Pak Asin) - Bold Navy
         self.set_font('Arial', 'B', 8)
-        self.set_text_color(0, 40, 85)
-        self.cell(0, 4, 'WA: 0815-8199-775 (Asin)', ln=1, align='R')
-        
-        # 4. Garis Aksen Luxury (Navy & Gold tebal)
-        # Ini yang memberikan kesan mahal tanpa menutupi logo
-        self.ln(12)
-        y_garis = self.get_y()
-        self.set_fill_color(0, 40, 85) # Navy
-        self.rect(10, y_garis, 190, 2, 'F')
-        self.set_fill_color(184, 134, 11) # Gold
-        self.rect(10, y_garis + 2, 190, 0.6, 'F')
-        self.ln(8)
-       
-    def footer(self):
-        # Footer Navy Bar (Senada dengan Atas)
-        self.set_y(-20)
-        self.set_fill_color(*COLOR_NAVY)
-        self.rect(0, 277, 210, 20, 'F')
-        # Aksen Garis Emas Footer
-        self.set_fill_color(*COLOR_GOLD)
-        self.rect(0, 277, 210, 1, 'F')
-        
-        self.set_y(-15)
-        self.set_font('Arial', 'B', 8); self.set_text_color(255, 255, 255)
-        self.cell(0, 5, f"{COMPANY_NAME} Official Quotation", 0, 0, 'C')
-        self.set_font('Arial', '', 7); self.set_text_color(200, 200, 200)
-        self.set_y(-11)
-        self.cell(0, 5, f"Page {self.page_no()} | Generated by TTS Secure System", 0, 0, 'C')
+        self.set_text_color(*COLOR_NAVY)
+        self.cell(0, 4, f'Contact Person: {MARKETING_NAME} ({MARKETING_PHONE})', ln=1, align='R')
 
-def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
-    pdf = PenawaranPDF()
-    pdf.set_auto_page_break(auto=True, margin=40)
+        # 5. GARIS MEWAH (Pemisah Header)
+        self.ln(3)
+        y_now = self.get_y()
+        self.set_fill_color(*COLOR_NAVY) # Garis Tebal Navy
+        self.rect(10, y_now, 190, 1.5, 'F')
+        self.set_fill_color(*COLOR_GOLD) # Garis Tipis Gold
+        self.rect(10, y_now + 1.5, 190, 0.5, 'F')
+        self.ln(5)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 7)
+        self.set_text_color(150, 150, 150)
+        self.cell(0, 10, f'Halaman {self.page_no()} | PT. THEA THEO STATIONARY - Official Document', 0, 0, 'C')
+
+# --- FUNGSI GENERATE PDF ---
+def generate_pdf(customer_name, items_df, perihal):
+    pdf = PenawaranPDF(orientation='P', unit='mm', format='A4')
+    pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
     
-    # 1. Judul Quotation
-    pdf.set_y(45)
-    pdf.set_font('Arial', 'B', 24); pdf.set_text_color(*COLOR_NAVY)
-    pdf.cell(0, 12, "QUOTATION", ln=1, align='R')
-    pdf.set_font('Arial', '', 9); pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 5, f"Reference: {no_surat}", ln=1, align='R')
-    pdf.cell(0, 5, f"Date: {(datetime.utcnow() + timedelta(hours=7)).strftime('%d %B %Y')}", ln=1, align='R')
+    # Tanggal & Info Customer
+    pdf.set_y(40)
+    pdf.set_font('Arial', '', 10); pdf.set_text_color(0, 0, 0)
+    tanggal = datetime.now().strftime("%d %B %Y")
+    pdf.cell(0, 5, f"Tangerang, {tanggal}", ln=1, align='R')
     
-    # 2. Client Info
-    pdf.set_xy(10, 45)
-    pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_GOLD)
-    pdf.cell(0, 5, "PREPARED FOR:", ln=1)
-    pdf.set_font('Arial', 'B', 13); pdf.set_text_color(*COLOR_TEXT)
-    pdf.cell(0, 7, str(nama_cust).upper(), ln=1)
+    pdf.ln(5)
+    pdf.cell(0, 5, "Kepada Yth,", ln=1)
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 5, customer_name.upper(), ln=1)
     pdf.set_font('Arial', '', 10)
-    pdf.cell(0, 5, f"Attention: {pic}", ln=1)
+    pdf.cell(0, 5, "Di Tempat", ln=1)
     
-    pdf.ln(15)
-    
-    # 3. Header Tabel
-    pdf.set_font('Arial', 'B', 9); pdf.set_text_color(255, 255, 255); pdf.set_fill_color(*COLOR_NAVY)
-    pdf.cell(10, 10, 'NO', 0, 0, 'C', True); pdf.cell(90, 10, 'DESCRIPTION', 0, 0, 'L', True)
-    pdf.cell(20, 10, 'QTY', 0, 0, 'C', True); pdf.cell(20, 10, 'UNIT', 0, 0, 'C', True)
-    pdf.cell(25, 10, 'PRICE', 0, 0, 'R', True); pdf.cell(25, 10, 'TOTAL', 0, 1, 'R', True)
-
-    # 4. Isi Tabel
-    pdf.set_font('Arial', '', 9); pdf.set_text_color(*COLOR_TEXT)
-    fill = False
-    for i, row in df_order.iterrows():
-        pdf.set_fill_color(248, 249, 252) if fill else pdf.set_fill_color(255, 255, 255)
-        pdf.cell(10, 8, str(i+1), 0, 0, 'C', True)
-        pdf.cell(90, 8, f" {row['Nama Barang']}", 0, 0, 'L', True)
-        pdf.cell(20, 8, str(int(row['Qty'])), 0, 0, 'C', True)
-        pdf.cell(20, 8, str(row['Satuan']), 0, 0, 'C', True)
-        pdf.cell(25, 8, f"{row['Harga']:,.0f} ", 0, 0, 'R', True)
-        pdf.cell(25, 8, f"{row['Total_Row']:,.0f} ", 0, 1, 'R', True)
-        pdf.set_draw_color(230, 230, 230); pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-        fill = not fill
-
-    # 5. Summary Section
-    pdf.ln(5); pdf.set_x(130)
+    pdf.ln(5)
     pdf.set_font('Arial', 'B', 10)
-    pdf.cell(45, 8, "Sub Total", 0, 0, 'L'); pdf.cell(25, 8, f" {subtotal:,.0f}", 0, 1, 'R')
-    pdf.set_x(130)
-    pdf.cell(45, 8, "VAT (PPN 11%)", 0, 0, 'L'); pdf.cell(25, 8, f" {ppn:,.0f}", 0, 1, 'R')
-    pdf.set_x(130); pdf.set_fill_color(*COLOR_NAVY); pdf.set_text_color(255, 255, 255)
-    pdf.cell(70, 10, f" TOTAL IDR {grand_total:,.0f} ", 0, 1, 'R', True)
-
-    # 6. TERMS & CONDITIONS (Input Rekening di Sini)
-    pdf.ln(10); pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_NAVY); pdf.cell(0, 5, "TERMS & CONDITIONS:", ln=1)
-    pdf.set_font('Arial', '', 8); pdf.set_text_color(100, 100, 100)
+    pdf.cell(20, 5, "Perihal:", 0, 0)
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(0, 5, perihal, ln=1)
     
-    rekening_info = (
-        "1. Prices are subject to change with notice.\n"
-        "2. Validity: 14 Days from the date of quotation.\n"
-        "3. Delivery: Within 1 working day after PO confirmation.\n"
-        "4. Payment via Bank Transfer to:\n"
-        "   Bank Name      : Bank Mandiri\n"
-        "   Account No.    : 1550010174996\n"
-        "   Beneficiary    : PT. THEA THEO STATIONARY"
-    )
-    pdf.multi_cell(0, 4, rekening_info)
-
-    # 7. Closing & Signature
-    pdf.ln(10); pdf.set_font('Arial', '', 10); pdf.set_text_color(*COLOR_TEXT)
-    pdf.cell(130, 5, "", 0, 0)
-    pdf.cell(60, 5, "Yours Faithfully,", 0, 1, 'C')
-    pdf.ln(18)
-    pdf.set_font('Arial', 'B', 10); pdf.set_text_color(*COLOR_NAVY)
-    pdf.cell(130, 5, "", 0, 0)
-    pdf.cell(60, 5, MARKETING_NAME.upper(), 0, 1, 'C')
-    pdf.set_font('Arial', '', 9); pdf.set_text_color(100, 100, 100)
-    pdf.cell(130, 5, "", 0, 0)
-    pdf.cell(60, 5, "Sales Consultant", 0, 1, 'C')
+    pdf.ln(5)
+    pdf.multi_cell(0, 5, "Dengan hormat,\nBersama ini kami sampaikan penawaran harga untuk kebutuhan ATK & Perlengkapan Kantor sebagai berikut:")
+    pdf.ln(5)
     
+    # --- TABEL HARGA (Style Navy) ---
+    pdf.set_font('Arial', 'B', 9)
+    pdf.set_fill_color(*COLOR_NAVY)
+    pdf.set_text_color(255, 255, 255)
+    
+    # Header Tabel
+    pdf.cell(10, 8, "NO", 1, 0, 'C', True)
+    pdf.cell(90, 8, "NAMA BARANG", 1, 0, 'L', True)
+    pdf.cell(25, 8, "SATUAN", 1, 0, 'C', True)
+    pdf.cell(35, 8, "HARGA", 1, 0, 'C', True)
+    pdf.cell(30, 8, "TOTAL", 1, 1, 'C', True)
+    
+    # Isi Tabel
+    pdf.set_font('Arial', '', 9)
+    pdf.set_text_color(0, 0, 0)
+    
+    total_grand = 0
+    no = 1
+    
+    for _, row in items_df.iterrows():
+        nama = row['Nama Barang']
+        satuan = row['Satuan']
+        qty = row['Qty']
+        harga = row['Harga']
+        subtotal = qty * harga
+        total_grand += subtotal
+        
+        # Zebra Striping (Baris selang seling)
+        bg_color = (245, 245, 245) if no % 2 == 0 else (255, 255, 255)
+        pdf.set_fill_color(*bg_color)
+        
+        pdf.cell(10, 7, str(no), 1, 0, 'C', True)
+        pdf.cell(90, 7, f" {nama}", 1, 0, 'L', True) # Spasi dikit biar ga nempel garis
+        pdf.cell(25, 7, f"{qty} {satuan}", 1, 0, 'C', True)
+        pdf.cell(35, 7, f"Rp {harga:,.0f}", 1, 0, 'R', True)
+        pdf.cell(30, 7, f"Rp {subtotal:,.0f}", 1, 1, 'R', True)
+        no += 1
+        
+    # Total Grand
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(160, 8, "GRAND TOTAL", 1, 0, 'R')
+    pdf.set_text_color(*COLOR_NAVY)
+    pdf.cell(30, 8, f"Rp {total_grand:,.0f}", 1, 1, 'R')
+    
+    # Penutup & Tanda Tangan
+    pdf.ln(10)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Arial', '', 10)
+    pdf.multi_cell(0, 5, "Demikian penawaran ini kami sampaikan. Harga dapat berubah sewaktu-waktu tanpa pemberitahuan sebelumnya. Atas perhatian dan kerjasamanya kami ucapkan terima kasih.")
+    
+    pdf.ln(10)
+    pdf.cell(0, 5, "Hormat Kami,", ln=1)
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(0, 5, "PT. THEA THEO STATIONARY", ln=1)
+    pdf.ln(25) # Spasi Tanda Tangan
+    
+    pdf.set_font('Arial', 'B', 10); pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 5, f"({MARKETING_NAME})", ln=1)
+    pdf.set_font('Arial', '', 9)
+    pdf.cell(0, 4, "Executive Sales Consultant", ln=1)
+    pdf.cell(0, 4, f"WA: {MARKETING_PHONE}", ln=1)
+
     return pdf.output(dest='S').encode('latin-1')
 
-# =========================================================
-# 4. UI UTAMA (SIDEBAR & MENU)
-# =========================================================
-st.sidebar.title(f"Portal {MARKETING_NAME}")
-menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Portal Customer", "👨‍💻 Admin Dashboard"])
-
-if 'cart' not in st.session_state: st.session_state.cart = []
-
-if menu == "🏠 Home":
-    st.title(f"Selamat Datang di {COMPANY_NAME}")
-    st.info(f"Marketing Aktif: {MARKETING_NAME}")
-
-elif menu == "📝 Portal Customer":
-    tab_order, tab_pajak = st.tabs(["🛒 Buat Penawaran Baru", "📄 Ambil Faktur Pajak"])
-    with tab_order:
-        st.subheader("Form Pengajuan Penawaran")
-        with st.container(border=True):
-            col1, col2 = st.columns(2)
-            nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko")
-            up_nama = col2.text_input("👤 Nama Penerima (UP)")
-            wa_nomor = col1.text_input("📞 Nomor WhatsApp Pembeli")
-            picks = st.multiselect("📦 Pilih Barang:", options=df_barang['Nama Barang'].tolist())
-            if st.button("Tambahkan ke Keranjang"):
-                for p in picks:
-                    if p not in st.session_state.cart: st.session_state.cart.append(p)
+# --- MAIN PROGRAM (STREAMLIT) ---
+def main():
+    st.title("💼 Sistem Penawaran TTS")
+    st.caption(f"Logged in as: {MARKETING_NAME} | Mode: Executive Luxury")
+    
+    # Load Database
+    df_barang = load_db()
+    
+    # Tabs Menu
+    tab1, tab2 = st.tabs(["📝 Buat Penawaran", "📋 Antrean Admin"])
+    
+    # --- TAB 1: INPUT PENAWARAN ---
+    with tab1:
+        col1, col2 = st.columns(2)
+        with col1:
+            customer = st.text_input("Nama Customer / PT")
+        with col2:
+            perihal = st.text_input("Perihal", value="Penawaran Harga ATK")
+            
+        st.divider()
+        
+        # Keranjang Belanja (Session State)
+        if 'keranjang' not in st.session_state:
+            st.session_state.keranjang = []
+            
+        # Pilih Barang
+        pilih_barang = st.selectbox("Pilih Barang", df_barang['Nama Barang'].unique())
+        
+        # Ambil detail barang yg dipilih
+        detail = df_barang[df_barang['Nama Barang'] == pilih_barang].iloc[0]
+        
+        c1, c2, c3 = st.columns([2, 1, 1])
+        with c1:
+            st.info(f"Harga: Rp {detail['Harga']:,.0f} / {detail['Satuan']}")
+        with c2:
+            qty = st.number_input("Jumlah (Qty)", min_value=1, value=1)
+        with c3:
+            if st.button("➕ Tambah"):
+                st.session_state.keranjang.append({
+                    'Nama Barang': pilih_barang,
+                    'Harga': detail['Harga'],
+                    'Satuan': detail['Satuan'],
+                    'Qty': qty
+                })
+                st.success("Masuk keranjang!")
+                
+        # Tabel Keranjang
+        if st.session_state.keranjang:
+            df_cart = pd.DataFrame(st.session_state.keranjang)
+            st.dataframe(df_cart, use_container_width=True)
+            
+            if st.button("🖨️ GENERATE PDF & SIMPAN KE ANTREAN"):
+                if customer:
+                    # 1. Buat PDF
+                    pdf_bytes = generate_pdf(customer, df_cart, perihal)
+                    
+                    # 2. Simpan ke GSheet
+                    sheet = get_google_sheet()
+                    if sheet:
+                        waktu = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        data_row = [waktu, customer, perihal, MARKETING_NAME, str(len(df_cart)) + " Item", "Pending"]
+                        sheet.append_row(data_row)
+                    
+                    # 3. Tombol Download
+                    st.download_button(
+                        label=f"📥 Download Penawaran_{customer}.pdf",
+                        data=pdf_bytes,
+                        file_name=f"Penawaran_TTS_{customer}.pdf",
+                        mime='application/pdf'
+                    )
+                    
+                    # 4. Reset
+                    if st.button("Buat Baru (Reset)"):
+                        st.session_state.keranjang = []
+                        st.rerun()
+                else:
+                    st.warning("Isi nama customer dulu!")
+            
+            if st.button("Hapus Keranjang"):
+                st.session_state.keranjang = []
                 st.rerun()
 
-        if st.session_state.cart:
-            st.markdown("### 📋 Daftar Pesanan")
-            list_pesanan = []
-            for item in st.session_state.cart:
-                row_b = df_barang[df_barang['Nama Barang'] == item].iloc[0]
-                with st.container(border=True):
-                    c1, c2, c3, c4 = st.columns([3, 1.5, 1, 0.5])
-                    c1.markdown(f"**{item}**")
-                    c2.markdown(f"Rp {row_b['Harga']:,.0f} / {row_b['Satuan']}")
-                    qty = c3.number_input(f"Jumlah", min_value=1, value=1, key=f"q_c_{item}")
-                    if c4.button("❌", key=f"del_c_{item}"):
-                        st.session_state.cart.remove(item); st.rerun()
-                    list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(row_b['Harga']), "Satuan": str(row_b['Satuan']), "Total_Row": float(qty * row_b['Harga'])})
-
-            if st.button(f"🚀 Kirim Pengajuan ke {MARKETING_NAME}", use_container_width=True):
-                sheet = connect_gsheet()
-                if sheet and nama_toko:
-                    wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
-                    sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending", MARKETING_NAME])
-                    st.success("Terkirim! Terima kasih."); st.session_state.cart = []
-
-elif menu == "👨‍💻 Admin Dashboard":
-    st.title(f"Admin Dashboard - {MARKETING_NAME}")
-    pwd = st.sidebar.text_input("Password:", type="password")
-    if pwd == ADMIN_PASSWORD:
-        sheet = connect_gsheet()
+    # --- TAB 2: DASHBOARD ADMIN (ANTREAN) ---
+    with tab2:
+        st.header("Monitor Antrean Pesanan")
+        sheet = get_google_sheet()
         if sheet:
             try:
-                all_vals = sheet.get_all_values()
-                if len(all_vals) > 1:
-                    df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
-                    pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == MARKETING_NAME)]
-                    if not pending.empty:
-                        for idx, row in pending.iterrows():
-                            real_row_idx = df_gs.index[idx] + 2 
-                            with st.expander(f"🛠️ KELOLA: {row['Customer']}", expanded=True):
-                                items_list = ast.literal_eval(str(row['Pesanan']))
-                                edited_items = []
-                                st.write("### 1. Edit Barang & Harga")
-                                for i, r in enumerate(items_list):
-                                    with st.container(border=True):
-                                        ca, cb, cc, cd, ce = st.columns([3, 0.8, 1.2, 1.5, 0.5])
-                                        ca.markdown(f"**{r['Nama Barang']}**")
-                                        nq = cb.number_input("Qty", value=int(r['Qty']), key=f"q_a_{idx}_{i}")
-                                        opsi_satuan = ["Pcs", "Roll", "Dus", "Pack", "Rim", "Box", "Lusin", "Unit", "Set", "Lembar", "Botol"]
-                                        satuan_awal = r.get('Satuan', 'Pcs')
-                                        if satuan_awal not in opsi_satuan: opsi_satuan.insert(0, satuan_awal)
-                                        ns = cc.selectbox("Satuan", options=opsi_satuan, index=opsi_satuan.index(satuan_awal), key=f"s_a_{idx}_{i}")
-                                        nh = cd.number_input("Harga/Unit", value=float(r['Harga']), key=f"h_a_{idx}_{i}")
-                                        if not ce.checkbox("Hapus", key=f"d_a_{idx}_{i}"):
-                                            edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": ns, "Total_Row": nq * nh})
-                                st.divider()
-                                st.write("### 2. Tambah Barang Baru")
-                                new_items = st.multiselect("Cari Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_a_{idx}")
-                                for p in new_items:
-                                    rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                    edited_items.append({"Nama Barang": p, "Qty": 1, "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(1 * rb['Harga'])})
-                                if st.button("💾 Simpan Perubahan ke GSheet", key=f"s_a_{idx}"):
-                                    sheet.update_cell(real_row_idx, 5, str(edited_items))
-                                    st.success("Data diupdate!"); st.rerun()
-                                st.divider()
-                                final_df = pd.DataFrame(edited_items)
-                                if not final_df.empty:
-                                    subt = final_df['Total_Row'].sum(); tax = subt * 0.11; gtot = subt + tax
-                                    c1, c2 = st.columns(2)
-                                    no_s = c1.text_input("No Surat:", value=f"..../S-TTS/II/{datetime.now().year}", key=f"no_a_{idx}")
-                                    c2.metric("Total Baru (Inc. PPN)", f"Rp {gtot:,.0f}")
-                                    pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                    st.download_button("📩 Download PDF Luxury Professional", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
-                                    # CARI BAGIAN INI DI KODE ADMIN DASHBOARD:
-                                    # Pastikan baris if ini menonjol ke dalam, dan baris di bawahnya lebih masuk lagi
-                                    if st.button("✅ Selesai & Hapus dari Antrean", key=f"fin_a_{idx}"):
-                                        sheet.update_cell(real_row_idx, 6, "Processed")
-                                        st.rerun()
-                                else: st.info(f"Antrean {MARKETING_NAME} kosong.")
-            except Exception as e: st.error(f"Error detail: {e}")
+                data = sheet.get_all_records()
+                if data:
+                    df_antrean = pd.DataFrame(data)
+                    st.dataframe(df_antrean)
+                    
+                    # Fitur Selesai (Update Status)
+                    st.divider()
+                    st.subheader("Update Status")
+                    
+                    # Trik agar index sesuai baris asli di GSheet (mulai baris 2 karena header)
+                    for idx, row in df_antrean.iterrows():
+                        if row['Status'] == "Pending":
+                            col_a, col_b = st.columns([3, 1])
+                            with col_a:
+                                st.text(f"{row['Customer']} - {row['Waktu']}")
+                            with col_b:
+                                # Hitung nomor baris asli di Google Sheet
+                                # idx mulai dari 0, header baris 1, jadi data pertama baris 2
+                                real_row_idx = idx + 2 
+                                
+                                if st.button("✅ Selesai", key=f"done_{idx}"):
+                                    sheet.update_cell(real_row_idx, 6, "Processed")
+                                    st.success("Status diupdate!")
+                                    st.rerun()
+                else:
+                    st.info("Belum ada antrean.")
+            except Exception as e:
+                st.error(f"Error memuat data: {e}")
 
-
-
-
-
-
-
-
-
+if __name__ == "__main__":
+    main()
