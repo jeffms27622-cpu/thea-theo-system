@@ -308,7 +308,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                 if not final_df.empty:
                                     subt = final_df['Total_Row'].sum(); tax = subt * 0.11; gtot = subt + tax
                                     c1, c2 = st.columns(2)
-                                    no_s = c1.text_input("No Surat:", value=f"001/S-TTS/II/{datetime.now().year}", key=f"no_a_{idx}")
+                                    no_s = c1.text_input("No Surat:", value=f"/S-TTS/III/{datetime.now().year}", key=f"no_a_{idx}")
                                     c2.metric("Total Baru (Inc. PPN)", f"Rp {gtot:,.0f}")
                                     pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
                                     st.download_button("📩 Download PDF Presidential", data=pdf_b, file_name=f"TTS_{row['Customer']}.pdf", key=f"dl_a_{idx}")
@@ -316,5 +316,6 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Tidak ada antrean pending untuk {MARKETING_NAME}.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
 
