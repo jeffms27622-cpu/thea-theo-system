@@ -277,15 +277,16 @@ elif menu == "👨‍💻 Admin Dashboard":
                             
                             with st.expander(f"🛠️ KELOLA: {row['Customer']} ({waktu_str})", expanded=True):
                                 items_list = ast.literal_eval(str(row['Pesanan']))
-                                edited_items = []
                                 
-                                st.write("### 1. Edit Barang, Harga & Urutan")
-                                st.caption("💡 *Tips: Simpan dulu perubahan Qty/Harga sebelum mengklik tombol urutan (🔼/🔽)*")
+                                st.write("### 1. Edit Barang, Harga & Posisi")
+                                st.info("💡 **Trik Cepat Pindah Urutan:** Ketik angka desimal. Misal ingin memindah barang ke urutan ke-2, ganti angkanya jadi **1.5** lalu klik Simpan. Barang otomatis nyelip!")
+                                
+                                temp_items = []
                                 
                                 for i, r in enumerate(items_list):
                                     with st.container(border=True):
-                                        # --- KOLOM DITAMBAH UNTUK TOMBOL NAIK TURUN ---
-                                        ca, cb, cc, cd, c_up, c_dw, ce = st.columns([2.5, 0.8, 1.2, 1.5, 0.4, 0.4, 0.6])
+                                        # Kolom disesuaikan: Nama, Qty, Satuan, Harga, Posisi, Hapus
+                                        ca, cb, cc, cd, cp, ce = st.columns([2.5, 0.8, 1.2, 1.5, 0.8, 0.6])
                                         
                                         ca.markdown(f"**{r['Nama Barang']}**")
                                         nq = cb.number_input("Qty", value=int(r['Qty']), key=f"q_a_{idx}_{i}")
@@ -297,36 +298,51 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         
                                         nh = cd.number_input("Harga/Unit", value=float(r['Harga']), key=f"h_a_{idx}_{i}")
                                         
-                                        # --- FITUR UBAH URUTAN ---
-                                        if c_up.button("🔼", key=f"up_{idx}_{i}", help="Naikkan Urutan"):
-                                            if i > 0:
-                                                # Tukar posisi dengan item di atasnya
-                                                items_list[i], items_list[i-1] = items_list[i-1], items_list[i]
-                                                sheet.update_cell(real_row_idx, 5, str(items_list))
-                                                st.rerun()
-                                                
-                                        if c_dw.button("🔽", key=f"dw_{idx}_{i}", help="Turunkan Urutan"):
-                                            if i < len(items_list) - 1:
-                                                # Tukar posisi dengan item di bawahnya
-                                                items_list[i], items_list[i+1] = items_list[i+1], items_list[i]
-                                                sheet.update_cell(real_row_idx, 5, str(items_list))
-                                                st.rerun()
-
-                                        # Fitur Hapus
+                                        # Input Posisi pakai FLOAT (Bisa desimal)
+                                        n_pos = cp.number_input("Posisi", value=float(i+1), step=0.5, format="%.1f", key=f"pos_{idx}_{i}")
+                                        
                                         if not ce.checkbox("Hapus", key=f"d_a_{idx}_{i}"):
-                                            edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": ns, "Total_Row": nq * nh})
+                                            temp_items.append({
+                                                "pos_index": n_pos,
+                                                "Nama Barang": r['Nama Barang'], 
+                                                "Qty": nq, 
+                                                "Harga": nh, 
+                                                "Satuan": ns, 
+                                                "Total_Row": nq * nh
+                                            })
                                 
                                 st.divider()
                                 st.write("### 2. Tambah Barang Baru")
                                 new_items = st.multiselect("Cari Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_a_{idx}")
                                 for p in new_items:
                                     rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                    edited_items.append({"Nama Barang": p, "Qty": 1, "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), "Total_Row": float(1 * rb['Harga'])})
+                                    temp_items.append({
+                                        "pos_index": 999.0, # Default angka besar agar ditaruh di paling bawah
+                                        "Nama Barang": p, 
+                                        "Qty": 1, 
+                                        "Harga": float(rb['Harga']), 
+                                        "Satuan": str(rb['Satuan']), 
+                                        "Total_Row": float(1 * rb['Harga'])
+                                    })
                                 
-                                if st.button("💾 Simpan Perubahan ke GSheet", key=f"s_a_{idx}"):
+                                # Proses mengurutkan barang berdasarkan angka yang diketik
+                                temp_items_sorted = sorted(temp_items, key=lambda x: x["pos_index"])
+                                
+                                # Memasukkan kembali ke format asli tanpa variabel 'pos_index'
+                                edited_items = []
+                                for item in temp_items_sorted:
+                                    edited_items.append({
+                                        "Nama Barang": item["Nama Barang"],
+                                        "Qty": item["Qty"],
+                                        "Harga": item["Harga"],
+                                        "Satuan": item["Satuan"],
+                                        "Total_Row": item["Total_Row"]
+                                    })
+
+                                if st.button("💾 Simpan Perubahan & Urutan", key=f"s_a_{idx}"):
                                     sheet.update_cell(real_row_idx, 5, str(edited_items))
-                                    st.success("Data diupdate!"); st.rerun()
-                                
+                                    st.success("Data & Urutan berhasil diperbarui!"); st.rerun()
+                                    
                                 st.divider()
                                 final_df = pd.DataFrame(edited_items)
                                 if not final_df.empty:
@@ -340,6 +356,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Tidak ada antrean pending untuk {MARKETING_NAME}.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
 
 
