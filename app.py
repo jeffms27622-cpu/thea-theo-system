@@ -278,17 +278,41 @@ elif menu == "👨‍💻 Admin Dashboard":
                             with st.expander(f"🛠️ KELOLA: {row['Customer']} ({waktu_str})", expanded=True):
                                 items_list = ast.literal_eval(str(row['Pesanan']))
                                 edited_items = []
-                                st.write("### 1. Edit Barang & Harga")
+                                
+                                st.write("### 1. Edit Barang, Harga & Urutan")
+                                st.caption("💡 *Tips: Simpan dulu perubahan Qty/Harga sebelum mengklik tombol urutan (🔼/🔽)*")
+                                
                                 for i, r in enumerate(items_list):
                                     with st.container(border=True):
-                                        ca, cb, cc, cd, ce = st.columns([3, 0.8, 1.2, 1.5, 0.5])
+                                        # --- KOLOM DITAMBAH UNTUK TOMBOL NAIK TURUN ---
+                                        ca, cb, cc, cd, c_up, c_dw, ce = st.columns([2.5, 0.8, 1.2, 1.5, 0.4, 0.4, 0.6])
+                                        
                                         ca.markdown(f"**{r['Nama Barang']}**")
                                         nq = cb.number_input("Qty", value=int(r['Qty']), key=f"q_a_{idx}_{i}")
+                                        
                                         opsi_satuan = ["Pcs", "Roll", "Dus", "Pack", "Rim", "Box", "Lusin", "Unit", "Set", "Lembar", "Botol"]
                                         satuan_awal = r.get('Satuan', 'Pcs')
                                         if satuan_awal not in opsi_satuan: opsi_satuan.insert(0, satuan_awal)
                                         ns = cc.selectbox("Satuan", options=opsi_satuan, index=opsi_satuan.index(satuan_awal), key=f"s_a_{idx}_{i}")
+                                        
                                         nh = cd.number_input("Harga/Unit", value=float(r['Harga']), key=f"h_a_{idx}_{i}")
+                                        
+                                        # --- FITUR UBAH URUTAN ---
+                                        if c_up.button("🔼", key=f"up_{idx}_{i}", help="Naikkan Urutan"):
+                                            if i > 0:
+                                                # Tukar posisi dengan item di atasnya
+                                                items_list[i], items_list[i-1] = items_list[i-1], items_list[i]
+                                                sheet.update_cell(real_row_idx, 5, str(items_list))
+                                                st.rerun()
+                                                
+                                        if c_dw.button("🔽", key=f"dw_{idx}_{i}", help="Turunkan Urutan"):
+                                            if i < len(items_list) - 1:
+                                                # Tukar posisi dengan item di bawahnya
+                                                items_list[i], items_list[i+1] = items_list[i+1], items_list[i]
+                                                sheet.update_cell(real_row_idx, 5, str(items_list))
+                                                st.rerun()
+
+                                        # Fitur Hapus
                                         if not ce.checkbox("Hapus", key=f"d_a_{idx}_{i}"):
                                             edited_items.append({"Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": ns, "Total_Row": nq * nh})
                                 
@@ -316,6 +340,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Tidak ada antrean pending untuk {MARKETING_NAME}.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
 
 
