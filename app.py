@@ -278,9 +278,6 @@ elif menu == "👨‍💻 Admin Dashboard":
                             with st.expander(f"🛠️ KELOLA: {row['Customer']} ({waktu_str})", expanded=True):
                                 items_list = ast.literal_eval(str(row['Pesanan']))
                                 
-                                # ======================================================
-                                # MENGGUNAKAN ST.FORM AGAR INPUT 100% TERBACA SISTEM
-                                # ======================================================
                                 with st.form(key=f"form_edit_{idx}"):
                                     st.write("### 1. Edit Barang, Harga & Posisi")
                                     st.info("💡 **Trik Cepat:** Ubah angka di kolom **Pos** (misal 1.5) untuk menyelipkan barang. Klik Simpan, urutan otomatis rapi!")
@@ -291,19 +288,23 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         ca, cb, cc, cd, cp, ce = st.columns([2.5, 0.8, 1.2, 1.5, 0.8, 0.6])
                                         
                                         ca.markdown(f"**{r['Nama Barang']}**")
-                                        nq = cb.number_input("Qty", value=int(r['Qty']), key=f"q_{idx}_{i}")
+                                        
+                                        # KUNCI PERBAIKAN: Menggunakan Nama Barang sebagai ID memori (Bukan nomor urut i lagi)
+                                        # Ini mencegah harga/qty tertukar ke barang lain saat urutan digeser
+                                        safe_name = str(r['Nama Barang']).replace(" ", "_").replace(".", "")
+                                        
+                                        nq = cb.number_input("Qty", value=int(r['Qty']), key=f"q_{idx}_{safe_name}")
                                         
                                         opsi_satuan = ["Pcs", "Roll", "Dus", "Pack", "Rim", "Box", "Lusin", "Unit", "Set", "Lembar", "Botol"]
                                         satuan_awal = r.get('Satuan', 'Pcs')
                                         if satuan_awal not in opsi_satuan: opsi_satuan.insert(0, satuan_awal)
-                                        ns = cc.selectbox("Satuan", options=opsi_satuan, index=opsi_satuan.index(satuan_awal), key=f"s_{idx}_{i}")
+                                        ns = cc.selectbox("Satuan", options=opsi_satuan, index=opsi_satuan.index(satuan_awal), key=f"s_{idx}_{safe_name}")
                                         
-                                        nh = cd.number_input("Harga/Unit", value=float(r['Harga']), key=f"h_{idx}_{i}")
+                                        nh = cd.number_input("Harga/Unit", value=float(r['Harga']), key=f"h_{idx}_{safe_name}")
                                         
-                                        # Input Posisi pakai FLOAT (Bisa desimal)
-                                        n_pos = cp.number_input("Pos", value=float(i+1), step=0.5, format="%.1f", key=f"p_{idx}_{i}")
+                                        n_pos = cp.number_input("Pos", value=float(i+1), step=0.5, format="%.1f", key=f"p_{idx}_{safe_name}")
                                         
-                                        to_delete = ce.checkbox("Hapus", key=f"d_{idx}_{i}")
+                                        to_delete = ce.checkbox("Hapus", key=f"d_{idx}_{safe_name}")
                                         
                                         temp_items.append({
                                             "delete": to_delete,
@@ -319,12 +320,10 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     
                                     new_items = st.multiselect("Cari Barang Tambahan:", options=df_barang['Nama Barang'].tolist(), key=f"add_{idx}")
                                     
-                                    # FITUR BARU: Tentukan posisi sisipan barang baru sejak awal!
                                     insert_pos = st.number_input("Masukan Barang Baru Ke Urutan:", value=float(len(items_list)+1), step=1.0, key=f"inspos_{idx}")
                                     st.caption("Contoh: Ketik angka 2, maka semua barang baru di atas akan langsung melompat ke posisi nomor 2.")
                                     
                                     st.divider()
-                                    # Tombol Submit Form (Warna Biru)
                                     submitted = st.form_submit_button("💾 Simpan Perubahan & Urutan", use_container_width=True)
                                     
                                     if submitted:
@@ -332,13 +331,11 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         
                                         edited_items = []
                                         
-                                        # 1. Masukkan barang lama yang tidak dihapus
                                         for item in temp_items:
                                             if not item["delete"]:
                                                 item["Total_Row"] = item["Qty"] * item["Harga"]
                                                 edited_items.append(item)
                                         
-                                        # 2. Masukkan barang baru ke posisi yang ditentukan
                                         for p in new_items:
                                             rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
                                             edited_items.append({
@@ -349,12 +346,12 @@ elif menu == "👨‍💻 Admin Dashboard":
                                                 "Satuan": str(rb['Satuan']), 
                                                 "Total_Row": float(1 * rb['Harga'])
                                             })
-                                            insert_pos += 0.1 # Ditambah 0.1 agar jika nambah 3 barang, tidak numpuk di angka yang sama
+                                            insert_pos += 0.1 
                                             
-                                        # 3. Urutkan semuanya berdasarkan angka pos_index
+                                        # Urutkan berdasarkan angka pos_index
                                         edited_items = sorted(edited_items, key=lambda x: x["pos_index"])
                                         
-                                        # 4. Bersihkan data (Buang variabel teknis)
+                                        # Bersihkan data
                                         final_list = []
                                         for item in edited_items:
                                             final_list.append({
@@ -365,26 +362,20 @@ elif menu == "👨‍💻 Admin Dashboard":
                                                 "Total_Row": item["Total_Row"]
                                             })
                                             
-                                        # 5. Simpan ke Google Sheet
+                                        # Simpan ke Google Sheet
                                         sheet.update_cell(real_row_idx, 5, str(final_list))
                                         
-                                        # 6. Cuci Otak Streamlit (Bersihkan memori form secara paksa)
-                                        keys_to_delete = [
-                                            k for k in st.session_state.keys() 
-                                            if k.startswith(f"q_{idx}_") or k.startswith(f"h_{idx}_") 
-                                            or k.startswith(f"s_{idx}_") or k.startswith(f"p_{idx}_") 
-                                            or k.startswith(f"d_{idx}_") or k.startswith(f"add_{idx}") 
-                                            or k.startswith(f"inspos_{idx}")
-                                        ]
-                                        for k in keys_to_delete:
-                                            del st.session_state[k]
+                                        # Cuci Otak Streamlit (Clear Cache agar form benar-benar segar)
+                                        for k in list(st.session_state.keys()):
+                                            if k.startswith(f"q_{idx}_") or k.startswith(f"h_{idx}_") or k.startswith(f"s_{idx}_") or k.startswith(f"p_{idx}_") or k.startswith(f"d_{idx}_") or k.startswith(f"add_{idx}") or k.startswith(f"inspos_{idx}"):
+                                                del st.session_state[k]
                                                 
-                                        st.success("Tersimpan! Mengatur ulang PDF...")
+                                        st.success("Tersimpan! Urutan berhasil diubah dan harga sudah diikat dengan benar.")
                                         time.sleep(1.5)
                                         st.rerun()
 
                                 # Bagian Pembuatan PDF
-                                final_df = pd.DataFrame(items_list) # Render PDF based on current items
+                                final_df = pd.DataFrame(items_list) 
                                 if not final_df.empty:
                                     subt = final_df['Total_Row'].sum(); tax = subt * 0.11; gtot = subt + tax
                                     c1, c2 = st.columns(2)
@@ -398,5 +389,4 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Tidak ada antrean pending untuk {MARKETING_NAME}.")
             except Exception as e: st.error(f"Error detail: {e}")
-
 
