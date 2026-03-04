@@ -289,22 +289,23 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         
                                         ca.markdown(f"**{r['Nama Barang']}**")
                                         
-                                        # KUNCI PERBAIKAN: Menggunakan Nama Barang sebagai ID memori (Bukan nomor urut i lagi)
-                                        # Ini mencegah harga/qty tertukar ke barang lain saat urutan digeser
+                                        # KUNCI PERBAIKAN: Gabungan ID Unik (Index + Nama Barang)
+                                        # Supaya kalau ada 2 barang kembar di keranjang, tidak error!
                                         safe_name = str(r['Nama Barang']).replace(" ", "_").replace(".", "")
+                                        unique_key = f"{idx}_{i}_{safe_name}" 
                                         
-                                        nq = cb.number_input("Qty", value=int(r['Qty']), key=f"q_{idx}_{safe_name}")
+                                        nq = cb.number_input("Qty", value=int(r['Qty']), key=f"q_{unique_key}")
                                         
                                         opsi_satuan = ["Pcs", "Roll", "Dus", "Pack", "Rim", "Box", "Lusin", "Unit", "Set", "Lembar", "Botol"]
                                         satuan_awal = r.get('Satuan', 'Pcs')
                                         if satuan_awal not in opsi_satuan: opsi_satuan.insert(0, satuan_awal)
-                                        ns = cc.selectbox("Satuan", options=opsi_satuan, index=opsi_satuan.index(satuan_awal), key=f"s_{idx}_{safe_name}")
+                                        ns = cc.selectbox("Satuan", options=opsi_satuan, index=opsi_satuan.index(satuan_awal), key=f"s_{unique_key}")
                                         
-                                        nh = cd.number_input("Harga/Unit", value=float(r['Harga']), key=f"h_{idx}_{safe_name}")
+                                        nh = cd.number_input("Harga/Unit", value=float(r['Harga']), key=f"h_{unique_key}")
                                         
-                                        n_pos = cp.number_input("Pos", value=float(i+1), step=0.5, format="%.1f", key=f"p_{idx}_{safe_name}")
+                                        n_pos = cp.number_input("Pos", value=float(i+1), step=0.5, format="%.1f", key=f"p_{unique_key}")
                                         
-                                        to_delete = ce.checkbox("Hapus", key=f"d_{idx}_{safe_name}")
+                                        to_delete = ce.checkbox("Hapus", key=f"d_{unique_key}")
                                         
                                         temp_items.append({
                                             "delete": to_delete,
@@ -324,6 +325,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     st.caption("Contoh: Ketik angka 2, maka semua barang baru di atas akan langsung melompat ke posisi nomor 2.")
                                     
                                     st.divider()
+                                    # Tombol Submit Form (Ini yang dibilang hilang gara-gara error kembar tadi)
                                     submitted = st.form_submit_button("💾 Simpan Perubahan & Urutan", use_container_width=True)
                                     
                                     if submitted:
@@ -389,4 +391,5 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Tidak ada antrean pending untuk {MARKETING_NAME}.")
             except Exception as e: st.error(f"Error detail: {e}")
+
 
