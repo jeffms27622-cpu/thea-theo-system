@@ -324,7 +324,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         "Total_Row": float(1 * rb['Harga'])
                                     })
                                 
-                                # Sort berdasarkan angka pos_index
+                                # Sort berdasarkan angka pos_index yang diketik Bapak
                                 temp_items_sorted = sorted(temp_items, key=lambda x: x["pos_index"])
                                 
                                 # Buat edited_items yang bersih dari pos_index untuk disimpan ke GSheet
@@ -339,9 +339,11 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     })
 
                                 # ==========================================
-                                # BLOK PERBAIKAN: TOMBOL SIMPAN ANTI-BENTROK
+                                # BLOK PERBAIKAN: TOMBOL SIMPAN & JEDA WAKTU
                                 # ==========================================
                                 if st.button("💾 Simpan Perubahan & Urutan", key=f"s_a_{idx}"):
+                                    import time # Import fungsi waktu untuk memberi jeda pada Google Sheets
+                                    
                                     # 1. Update ke Google Sheet
                                     sheet.update_cell(real_row_idx, 5, str(edited_items))
                                     
@@ -358,7 +360,12 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     for k in keys_to_delete:
                                         del st.session_state[k]
                                             
-                                    st.success("Data & Urutan berhasil diperbarui! Harga sudah menyesuaikan barangnya.")
+                                    st.success("Menyimpan dan menyusun ulang urutan... Mohon tunggu ⏳")
+                                    
+                                    # 3. JEDA 1.5 DETIK (Agar GSheet selesai menyimpan sebelum halaman di-refresh)
+                                    time.sleep(1.5)
+                                    
+                                    # 4. Refresh Otomatis
                                     st.rerun()
                                 # ==========================================
                                     
@@ -378,9 +385,5 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Tidak ada antrean pending untuk {MARKETING_NAME}.")
             except Exception as e: st.error(f"Error detail: {e}")
-
-
-
-
 
 
