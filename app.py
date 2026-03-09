@@ -11,8 +11,8 @@ import io
 # =========================================================
 # 1. KONFIGURASI UTAMA & DATA KANTOR
 # =========================================================
-MARKETING_NAME  = "Asin"
-MARKETING_WA    = "0815-8199-775"
+MARKETING_NAME = "Asin"
+MARKETING_WA = "0815-8199-775"
 MARKETING_EMAIL = "alattulis.tts@gmail.com"
 
 COMPANY_NAME    = "PT. THEA THEO STATIONARY"
@@ -411,3 +411,4 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error: {e}")
+
