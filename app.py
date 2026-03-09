@@ -22,10 +22,10 @@ OFFICE_PHONE = "(021) 55780659"
 
 # Password Admin
 if "ADMIN_PASSWORD" in st.secrets:
-    ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
+    ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
 else:
-    ADMIN_PASSWORD = "admin" 
-
+    ADMIN_PASSWORD = "admin"
+  
 # Warna Tema Luxury (Navy & Gold)
 COLOR_NAVY = (0, 40, 85)
 COLOR_GOLD = (184, 134, 11)
@@ -411,5 +411,6 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error: {e}")
+
 
 
