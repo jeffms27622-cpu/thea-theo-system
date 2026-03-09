@@ -53,6 +53,7 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
+@st.cache_data(ttl=300) # Data barang disimpan di memori 5 menit
 def load_db():
     if os.path.exists("database_barang.xlsx"):
         try:
@@ -65,6 +66,7 @@ def load_db():
     return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
 
 df_barang = load_db()
+
 
 # =========================================================
 # 3. PDF ENGINE (PRESIDENTIAL SUITE - MULTIPAGE BULLETPROOF)
@@ -411,4 +413,5 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
                     else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error: {e}")
+
 
