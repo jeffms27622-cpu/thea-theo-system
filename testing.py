@@ -263,7 +263,7 @@ elif menu == "👨‍💻 Admin Dashboard":
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         
-        # --- 1. FITUR UPLOAD DATABASE (SIDEBAR) ---
+        # --- 1. UPLOAD DATABASE (SIDEBAR) ---
         with st.sidebar.expander("📁 Update Database (.csv)", expanded=False):
             up_f = st.file_uploader("Pilih file CSV", type=["csv"], key="admin_csv_up")
             if up_f and st.button("🚀 Update Sekarang"):
@@ -271,11 +271,10 @@ elif menu == "👨‍💻 Admin Dashboard":
                 st.cache_data.clear()
                 st.success("Database Terupdate!"); time.sleep(1); st.rerun()
 
-        # --- 2. KELOLA ANTREAN (PRINT MENU KEMBALI) ---
+        # --- 2. KELOLA ANTREAN (SATUAN SUDAH KEMBALI) ---
         sheet = connect_gsheet()
         if sheet:
             try:
-                # Ambil data FRESH dari Google Sheet
                 all_vals = sheet.get_all_values()
                 if len(all_vals) > 1:
                     df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
@@ -283,38 +282,43 @@ elif menu == "👨‍💻 Admin Dashboard":
                     
                     if not pending.empty:
                         for idx, row in pending.iterrows():
-                            # Cari index baris asli (Header + 1)
                             real_row_idx = df_gs.index[idx] + 2 
                             
                             with st.expander(f"🛠️ KELOLA: {row['Customer']}", expanded=True):
-                                # Load data pesanan
                                 try:
                                     items_list = ast.literal_eval(str(row['Pesanan']))
                                 except:
                                     items_list = []
 
-                                # --- FORM EDIT (HANYA UNTUK EDIT & SIMPAN) ---
+                                # --- FORM EDIT (DENGAN KOLOM SATUAN) ---
                                 with st.form(key=f"f_edit_{real_row_idx}"):
                                     st.write("### 📝 Edit Daftar Barang")
                                     temp_up = []
                                     for i, r in enumerate(items_list):
-                                        c1, c2, c3, c4, c5 = st.columns([2.5, 0.8, 1.2, 1, 0.5])
+                                        # Kita bagi jadi 6 kolom supaya Satuan muat
+                                        c1, c2, c3, c4, c5, c6 = st.columns([2.5, 0.7, 1, 1.2, 0.7, 0.5])
                                         c1.markdown(f"**{r['Nama Barang']}**")
                                         
                                         u_k = f"r{real_row_idx}_i{i}"
                                         nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
-                                        nh = c3.number_input("Harga", value=float(r['Harga']), key=f"h_{u_k}")
-                                        np = c4.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
-                                        td = c5.checkbox("🗑️", key=f"d_{u_k}")
                                         
-                                        temp_up.append({"del": td, "pos": np, "Nama": r['Nama Barang'], "Qty": nq, "Harga": nh, "Sat": r.get('Satuan','Pcs')})
+                                        # INI DIA KOLOM SATUAN YANG TADI HILANG:
+                                        ns = c3.text_input("Unit", value=r.get('Satuan','Pcs'), key=f"s_{u_k}")
+                                        
+                                        nh = c4.number_input("Harga", value=float(r['Harga']), key=f"h_{u_k}")
+                                        np = c5.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
+                                        td = c6.checkbox("🗑️", key=f"d_{u_k}")
+                                        
+                                        temp_up.append({
+                                            "del": td, "pos": np, "Nama": r['Nama Barang'], 
+                                            "Qty": nq, "Harga": nh, "Sat": ns
+                                        })
                                     
                                     st.write("---")
                                     add_b = st.multiselect("Tambah Barang Baru:", options=df_barang['Nama Barang'].tolist(), key=f"add_{real_row_idx}")
                                     ins_pos = st.number_input("Taruh di No:", value=float(len(items_list)+1), key=f"ins_{real_row_idx}")
 
                                     if st.form_submit_button("💾 SIMPAN SEMUA PERUBAHAN", use_container_width=True):
-                                        # Gabung, Sort & Hitung
                                         final = sorted([x for x in temp_up if not x['del']], key=lambda x: x['pos'])
                                         for p in add_b:
                                             rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
@@ -322,12 +326,11 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         
                                         save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty']*x['Harga']} for x in final]
                                         
-                                        # Update GSheet & Bersihkan Memori
                                         sheet.update_cell(real_row_idx, 5, str(save_data))
                                         st.cache_data.clear()
-                                        st.success("Tersimpan! Silakan Download di bawah."); time.sleep(1); st.rerun()
+                                        st.success("Tersimpan!"); time.sleep(1); st.rerun()
 
-                                # --- 3. MENU PRINT / DOWNLOAD (DI LUAR FORM - BIAR GAK SEMBUNYI) ---
+                                # --- 3. MENU PRINT / DOWNLOAD ---
                                 if items_list:
                                     f_df = pd.DataFrame(items_list)
                                     subt = f_df['Total_Row'].sum()
@@ -339,37 +342,20 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     no_s = c_no.text_input("No Surat:", value=f"/S-TTS/III/2026", key=f"ns_{real_row_idx}")
                                     c_met.metric("Total Quotation", f"Rp {gtot:,.0f}")
                                     
-                                    # Logika Nama File Otomatis
                                     nama_toko = str(row['Customer']).replace(" ","_")
                                     tgl = datetime.now().strftime('%d%m%y')
                                     n_pdf = f"{nama_toko}_{tgl}.pdf"
                                     
                                     b1, b2 = st.columns(2)
-                                    # Tombol Print PDF
                                     pdf_data = generate_pdf(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
-                                    b1.download_button(
-                                        label=f"📩 DOWNLOAD PDF ({nama_toko})", 
-                                        data=pdf_data, 
-                                        file_name=n_pdf, 
-                                        key=f"btn_p_{real_row_idx}", 
-                                        use_container_width=True
-                                    )
+                                    b1.download_button(label=f"📩 DOWNLOAD PDF ({nama_toko})", data=pdf_data, file_name=n_pdf, key=f"btn_p_{real_row_idx}", use_container_width=True)
                                     
-                                    # Tombol Print Excel
                                     xls_data = generate_excel(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
-                                    b2.download_button(
-                                        label=f"📊 DOWNLOAD EXCEL ({nama_toko})", 
-                                        data=xls_data, 
-                                        file_name=f"{nama_toko}.xlsx", 
-                                        key=f"btn_x_{real_row_idx}", 
-                                        use_container_width=True
-                                    )
+                                    b2.download_button(label=f"📊 DOWNLOAD EXCEL ({nama_toko})", data=xls_data, file_name=f"{nama_toko}.xlsx", key=f"btn_x_{real_row_idx}", use_container_width=True)
 
-                                    st.write("")
                                     if st.button("✅ PENAWARAN SELESAI (HAPUS)", key=f"done_{real_row_idx}", type="primary", use_container_width=True):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
                                         st.rerun()
-                    else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error Sistem: {e}")
 
 
