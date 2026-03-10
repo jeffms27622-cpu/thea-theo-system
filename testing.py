@@ -271,7 +271,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                 st.cache_data.clear()
                 st.success("Database Terupdate!"); time.sleep(1); st.rerun()
 
-        # --- 2. KELOLA ANTREAN (SATUAN SUDAH KEMBALI) ---
+        # --- 2. KELOLA ANTREAN ---
         sheet = connect_gsheet()
         if sheet:
             try:
@@ -290,21 +290,20 @@ elif menu == "👨‍💻 Admin Dashboard":
                                 except:
                                     items_list = []
 
-                                # --- FORM EDIT (DENGAN KOLOM SATUAN) ---
+                                # --- FORM EDIT ---
                                 with st.form(key=f"f_edit_{real_row_idx}"):
                                     st.write("### 📝 Edit Daftar Barang")
                                     temp_up = []
                                     for i, r in enumerate(items_list):
-                                        # Kita bagi jadi 6 kolom supaya Satuan muat
-                                        c1, c2, c3, c4, c5, c6 = st.columns([2.5, 0.7, 1, 1.2, 0.7, 0.5])
+                                        # PERBAIKAN: Kolom Harga (c4) sekarang dibikin SANGAT LEBAR (2.0)
+                                        c1, c2, c3, c4, c5, c6 = st.columns([2.5, 0.7, 0.8, 2.0, 0.6, 0.4])
                                         c1.markdown(f"**{r['Nama Barang']}**")
                                         
                                         u_k = f"r{real_row_idx}_i{i}"
                                         nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
-                                        
-                                        # INI DIA KOLOM SATUAN YANG TADI HILANG:
                                         ns = c3.text_input("Unit", value=r.get('Satuan','Pcs'), key=f"s_{u_k}")
                                         
+                                        # KOLOM HARGA SEKARANG LEGA
                                         nh = c4.number_input("Harga", value=float(r['Harga']), key=f"h_{u_k}")
                                         np = c5.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
                                         td = c6.checkbox("🗑️", key=f"d_{u_k}")
@@ -315,8 +314,8 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         })
                                     
                                     st.write("---")
-                                    add_b = st.multiselect("Tambah Barang Baru:", options=df_barang['Nama Barang'].tolist(), key=f"add_{real_row_idx}")
-                                    ins_pos = st.number_input("Taruh di No:", value=float(len(items_list)+1), key=f"ins_{real_row_idx}")
+                                    add_b = st.multiselect("Tambah Barang Baru:", options=df_barang['Nama Barang'].tolist(), key=f"add_new_{real_row_idx}")
+                                    ins_pos = st.number_input("Taruh di No:", value=float(len(items_list)+1), key=f"ins_pos_{real_row_idx}")
 
                                     if st.form_submit_button("💾 SIMPAN SEMUA PERUBAHAN", use_container_width=True):
                                         final = sorted([x for x in temp_up if not x['del']], key=lambda x: x['pos'])
@@ -326,11 +325,18 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         
                                         save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty']*x['Harga']} for x in final]
                                         
+                                        # 1. Simpan ke Database Google
                                         sheet.update_cell(real_row_idx, 5, str(save_data))
+                                        
+                                        # 2. SOLUSI MUTLAK ANTI NYANGKUT (HAPUS MEMORI STREAMLIT)
+                                        keys_to_delete = [k for k in st.session_state.keys() if f"r{real_row_idx}_" in k or f"_{real_row_idx}" in k]
+                                        for k in keys_to_delete:
+                                            del st.session_state[k]
+                                            
                                         st.cache_data.clear()
-                                        st.success("Tersimpan!"); time.sleep(1); st.rerun()
+                                        st.success("Tersimpan Sempurna!"); time.sleep(1); st.rerun()
 
-                                # --- 3. MENU PRINT / DOWNLOAD ---
+                                # --- MENU PRINT / DOWNLOAD ---
                                 if items_list:
                                     f_df = pd.DataFrame(items_list)
                                     subt = f_df['Total_Row'].sum()
@@ -339,7 +345,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     
                                     st.markdown("### 🖨️ Menu Print & Download")
                                     c_no, c_met = st.columns([2, 1])
-                                    no_s = c_no.text_input("No Surat:", value=f"/S-TTS/III/2026", key=f"ns_{real_row_idx}")
+                                    no_s = c_no.text_input("No Surat:", value=f"/S-TTS/III/2026", key=f"ns_print_{real_row_idx}")
                                     c_met.metric("Total Quotation", f"Rp {gtot:,.0f}")
                                     
                                     nama_toko = str(row['Customer']).replace(" ","_")
@@ -353,9 +359,10 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     xls_data = generate_excel(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
                                     b2.download_button(label=f"📊 DOWNLOAD EXCEL ({nama_toko})", data=xls_data, file_name=f"{nama_toko}.xlsx", key=f"btn_x_{real_row_idx}", use_container_width=True)
 
-                                    if st.button("✅ PENAWARAN SELESAI (HAPUS)", key=f"done_{real_row_idx}", type="primary", use_container_width=True):
+                                    st.write("")
+                                    if st.button("✅ PENAWARAN SELESAI (HAPUS)", key=f"done_btn_{real_row_idx}", type="primary", use_container_width=True):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
                                         st.rerun()
+                        else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error Sistem: {e}")
-
 
