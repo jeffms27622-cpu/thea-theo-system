@@ -52,19 +52,28 @@ def connect_gsheet():
 
 @st.cache_data(ttl=600)
 def load_db():
-    # Ganti dari .xlsx ke .csv
     if os.path.exists("database_barang.csv"):
         try:
-            # Membaca file CSV jauh lebih ringan bagi sistem
-            df = pd.read_csv("database_barang.csv")
+            # PAKE VERSI SAKTI:
+            # sep=None & engine='python' biar otomatis deteksi koma/titik koma
+            # on_bad_lines='skip' biar kalau ada baris rusak (seperti baris 73), aplikasi GAK MATI
+            df = pd.read_csv("database_barang.csv", sep=None, engine='python', on_bad_lines='skip')
+            
+            # Bersihkan nama kolom dari spasi hantu
             df.columns = df.columns.str.strip()
+            
+            # Pastikan kolom "Harga" jadi angka, kalau gagal jadi 0
             if 'Harga' in df.columns:
                 df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce').fillna(0)
+            
             return df
         except Exception as e:
             st.error(f"Gagal membaca CSV: {e}")
+    
+    # Kalau CSV gagal total, aplikasi tetep jalan dengan tabel kosong
     return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
 
+# BARIS WAJIB: Jangan lupa panggil fungsinya di luar
 df_barang = load_db()
 
 # =========================================================
@@ -379,6 +388,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         st.rerun()
                     else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error: {e}")
+
 
 
 
