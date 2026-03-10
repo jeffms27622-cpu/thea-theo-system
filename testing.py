@@ -295,15 +295,20 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     st.write("### 📝 Edit Daftar Barang")
                                     temp_up = []
                                     for i, r in enumerate(items_list):
-                                        # PERBAIKAN: Kolom Harga (c4) sekarang dibikin SANGAT LEBAR (2.0)
-                                        c1, c2, c3, c4, c5, c6 = st.columns([2.5, 0.7, 0.8, 2.0, 0.6, 0.4])
+                                        
+                                        # PERBAIKAN: Kolom Harga (c4) sekarang SANGAT LEBAR (2.5)
+                                        c1, c2, c3, c4, c5, c6 = st.columns([2.5, 0.7, 0.7, 2.5, 0.6, 0.4])
                                         c1.markdown(f"**{r['Nama Barang']}**")
                                         
-                                        u_k = f"r{real_row_idx}_i{i}"
+                                        # PERBAIKAN UTAMA: ID Kotak Harga diikat ke NAMA BARANG.
+                                        # Ini yang bikin urutan dan harga tidak akan tertukar atau nyangkut lagi!
+                                        safe_name = str(r['Nama Barang']).replace(" ", "_").replace(".", "")
+                                        u_k = f"r{real_row_idx}_{safe_name}"
+                                        
                                         nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
                                         ns = c3.text_input("Unit", value=r.get('Satuan','Pcs'), key=f"s_{u_k}")
                                         
-                                        # KOLOM HARGA SEKARANG LEGA
+                                        # Kolom Harga Dijamin Lega
                                         nh = c4.number_input("Harga", value=float(r['Harga']), key=f"h_{u_k}")
                                         np = c5.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
                                         td = c6.checkbox("🗑️", key=f"d_{u_k}")
@@ -325,12 +330,12 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         
                                         save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty']*x['Harga']} for x in final]
                                         
-                                        # 1. Simpan ke Database Google
+                                        # 1. Update ke Google Sheets
                                         sheet.update_cell(real_row_idx, 5, str(save_data))
                                         
-                                        # 2. SOLUSI MUTLAK ANTI NYANGKUT (HAPUS MEMORI STREAMLIT)
-                                        keys_to_delete = [k for k in st.session_state.keys() if f"r{real_row_idx}_" in k or f"_{real_row_idx}" in k]
-                                        for k in keys_to_delete:
+                                        # 2. CUCI OTAK MEMORI SECARA TOTAL
+                                        keys_del = [k for k in st.session_state.keys() if f"r{real_row_idx}_" in k or f"_{real_row_idx}" in k]
+                                        for k in keys_del:
                                             del st.session_state[k]
                                             
                                         st.cache_data.clear()
