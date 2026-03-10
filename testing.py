@@ -65,6 +65,8 @@ def load_db():
             st.error(f"Gagal membaca CSV: {e}")
     return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
 
+df_barang = load_db()
+
 # =========================================================
 # 3. PDF ENGINE (PRESIDENTIAL CLEAN)
 # =========================================================
@@ -377,6 +379,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         st.rerun()
                     else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error: {e}")
+
 
 
 
