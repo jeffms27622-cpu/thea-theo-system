@@ -50,19 +50,20 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
-@st.cache_data(ttl=600) # CACHE: Memori disimpan 10 menit agar tidak lemot
+@st.cache_data(ttl=600)
 def load_db():
+    # Ganti dari .xlsx ke .csv
     if os.path.exists("database_barang.csv"):
         try:
+            # Membaca file CSV jauh lebih ringan bagi sistem
             df = pd.read_csv("database_barang.csv")
             df.columns = df.columns.str.strip()
             if 'Harga' in df.columns:
                 df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce').fillna(0)
             return df
-        except: pass
+        except Exception as e:
+            st.error(f"Gagal membaca CSV: {e}")
     return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
-
-df_barang = load_db()
 
 # =========================================================
 # 3. PDF ENGINE (PRESIDENTIAL CLEAN)
@@ -376,6 +377,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         st.rerun()
                     else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error: {e}")
+
 
 
 
