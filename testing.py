@@ -145,7 +145,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
 
     pdf.ln(10); pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_NAVY); pdf.cell(0, 5, "TERMS & CONDITIONS:", ln=1)
     pdf.set_font('Arial', '', 8); pdf.set_text_color(100, 100, 100)
-    pdf.multi_cell(0, 4, "1. Prices are subject to change with notice.\n2. Validity: 14 Days from date of quotation.\n3. Delivery: Within 1 working day after PO confirmation.")
+    pdf.multi_cell(0, 4, "1. Prices are subject to change with notice.\n2. Validity: 7 Days from date of quotation.\n3. Delivery: Within 1 working day after PO confirmation.")
 
     pdf.ln(10); pdf.set_font('Arial', '', 10); pdf.set_text_color(*COLOR_TEXT)
     pdf.cell(130, 5, "", 0, 0); pdf.cell(60, 5, "Yours Faithfully,", 0, 1, 'C')
@@ -374,3 +374,4 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         st.rerun()
                         else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error Sistem: {e}")
+
