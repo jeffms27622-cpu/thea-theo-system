@@ -296,8 +296,9 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     temp_up = []
                                     for i, r in enumerate(items_list):
                                         
-                                        # Penyesuaian lebar kolom agar Dropdown Unit muat sempurna
-                                        c1, c2, c3, c4, c5, c6 = st.columns([2.5, 0.7, 1.0, 2.3, 0.6, 0.4])
+                                        # PERBAIKAN PROPORSI KOLOM: 
+                                        # c3 (Unit) dan c5 (Pos) dibesarkan, c4 (Harga) dikecilkan
+                                        c1, c2, c3, c4, c5, c6 = st.columns([2.5, 0.7, 1.2, 1.5, 0.8, 0.4])
                                         c1.markdown(f"**{r['Nama Barang']}**")
                                         
                                         safe_name = str(r['Nama Barang']).replace(" ", "_").replace(".", "")
@@ -305,17 +306,16 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         
                                         nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
                                         
-                                        # --- FITUR BARU: DROPDOWN MENU SATUAN ---
                                         opsi_satuan = ["Pcs", "Lusin", "Box", "Pack", "Rim", "Dus", "Set", "Roll", "Lembar", "Botol", "Buku", "Unit"]
                                         satuan_sekarang = str(r.get('Satuan','Pcs')).strip()
-                                        
-                                        # Jika satuan di GSheet belum ada di daftar, tambahkan otomatis
                                         if satuan_sekarang not in opsi_satuan:
                                             opsi_satuan.insert(0, satuan_sekarang)
                                             
                                         ns = c3.selectbox("Unit", options=opsi_satuan, index=opsi_satuan.index(satuan_sekarang), key=f"s_{u_k}")
                                         
-                                        nh = c4.number_input("Harga", value=float(r['Harga']), key=f"h_{u_k}")
+                                        # HARGA DIBUAT TANPA KOMA DESIMAL BIAR RAPI (format="%d")
+                                        nh = c4.number_input("Harga", value=int(float(r['Harga'])), step=500, format="%d", key=f"h_{u_k}")
+                                        
                                         np = c5.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
                                         td = c6.checkbox("🗑️", key=f"d_{u_k}")
                                         
