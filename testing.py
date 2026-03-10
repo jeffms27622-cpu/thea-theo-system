@@ -54,7 +54,7 @@ def connect_gsheet():
 def load_db():
     if os.path.exists("database_barang.csv"):
         try:
-            df = pd.read_excel("database_barang.csv")
+            df = pd.read_csv("database_barang.csv")
             df.columns = df.columns.str.strip()
             if 'Harga' in df.columns:
                 df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce').fillna(0)
@@ -376,5 +376,6 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         st.rerun()
                     else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error: {e}")
+
 
 
