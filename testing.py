@@ -253,7 +253,6 @@ elif menu == "👨‍💻 Admin Dashboard":
         sheet = connect_gsheet()
         if sheet:
             try:
-                # Ambil data terbaru langsung dari sheet
                 all_vals = sheet.get_all_values()
                 if len(all_vals) > 1:
                     df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
@@ -261,72 +260,120 @@ elif menu == "👨‍💻 Admin Dashboard":
                     
                     if not pending.empty:
                         for idx, row in pending.iterrows():
-                            # Mencari posisi baris asli di Sheet (Index asli dari df_gs)
-                            real_row_idx = idx + 2 
+                            # Mencari posisi baris asli di GSheet
+                            real_row_idx = df_gs.index[idx] + 2 
+                            waktu_str = row.get('Waktu', 'Tanpa Tanggal')
                             
-                            with st.expander(f"🛠️ KELOLA: {row['Customer']}", expanded=True):
+                            with st.expander(f"🛠️ KELOLA: {row['Customer']} ({waktu_str})", expanded=True):
+                                # Load data pesanan dari kolom ke-5
                                 items_list = ast.literal_eval(str(row['Pesanan']))
                                 
-                                # Gunakan form agar input tidak terkirim sebelum klik Simpan
+                                # --- 1. FORM EDIT & URUTAN ---
                                 with st.form(key=f"form_edit_{real_row_idx}"):
-                                    st.write("### 1. Edit Barang & Posisi")
+                                    st.write("### 1. Edit Barang, Harga & Posisi")
                                     temp_items = []
                                     for i, r in enumerate(items_list):
-                                        c1, c2, c3, c4, c5, c6 = st.columns([2.5, 0.8, 1, 1.2, 0.8, 0.5])
-                                        c1.markdown(f"**{r['Nama Barang']}**")
+                                        ca, cb, cc, cd, cp, ce = st.columns([2.5, 0.8, 1.2, 1.5, 0.8, 0.6])
+                                        ca.markdown(f"**{r['Nama Barang']}**")
                                         
-                                        # Key Unik menggunakan kombinasi row_idx dan index barang
-                                        u_key = f"{real_row_idx}_{i}"
+                                        # Key Unik agar tidak tertukar
+                                        safe_name = str(r['Nama Barang']).replace(" ", "_").replace(".", "")
+                                        unique_key = f"{real_row_idx}_{i}_{safe_name}"
                                         
-                                        nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_key}")
-                                        ns = c3.text_input("Unit", value=r['Satuan'], key=f"s_{u_key}")
-                                        nh = c4.number_input("Harga", value=float(r['Harga']), key=f"h_{u_key}")
-                                        n_pos = c5.number_input("Pos", value=float(i+1), step=0.5, key=f"p_{u_key}")
-                                        to_del = c6.checkbox("Hapus", key=f"d_{u_key}")
+                                        nq = cb.number_input("Qty", value=int(r['Qty']), key=f"q_{unique_key}")
                                         
-                                        temp_items.append({"delete": to_del, "pos_index": n_pos, "Nama Barang": r['Nama Barang'], "Qty": nq, "Harga": nh, "Satuan": ns})
+                                        opsi_satuan = ["Pcs", "Roll", "Dus", "Pack", "Rim", "Box", "Lusin", "Unit", "Set", "Lembar", "Botol"]
+                                        satuan_awal = r.get('Satuan', 'Pcs')
+                                        if satuan_awal not in opsi_satuan: opsi_satuan.insert(0, satuan_awal)
+                                        ns = cc.selectbox("Satuan", options=opsi_satuan, index=opsi_satuan.index(satuan_awal), key=f"s_{unique_key}")
+                                        
+                                        nh = cd.number_input("Harga", value=float(r['Harga']), key=f"h_{unique_key}")
+                                        n_pos = cp.number_input("Pos", value=float(i+1), step=0.5, key=f"p_{unique_key}")
+                                        to_delete = ce.checkbox("Hapus", key=f"d_{unique_key}")
+                                        
+                                        temp_items.append({
+                                            "delete": to_delete, 
+                                            "pos_index": n_pos, 
+                                            "Nama Barang": r['Nama Barang'], 
+                                            "Qty": nq, 
+                                            "Harga": nh, 
+                                            "Satuan": ns
+                                        })
                                     
-                                    st.write("---")
-                                    st.write("### 2. Tambah Barang")
-                                    add_new = st.multiselect("Pilih Barang:", options=df_barang['Nama Barang'].tolist(), key=f"add_{real_row_idx}")
-                                    ins_pos = st.number_input("Sisip di No:", value=float(len(items_list)+1), key=f"insp_{real_row_idx}")
+                                    st.write("### 2. Tambah Barang Baru")
+                                    new_items = st.multiselect("Pilih Barang:", options=df_barang['Nama Barang'].tolist(), key=f"add_{real_row_idx}")
+                                    ins_pos = st.number_input("Sisipkan di urutan ke:", value=float(len(items_list)+1), key=f"inspos_{real_row_idx}")
                                     
-                                    submitted = st.form_submit_button("💾 Simpan Perubahan & Urutan")
-                                    
-                                    if submitted:
-                                        # Logika penggabungan data
-                                        for p in add_new:
+                                    if st.form_submit_button("💾 Simpan Perubahan & Urutan", use_container_width=True):
+                                        import time
+                                        edited_items = []
+                                        # Gabungkan barang lama yang tidak dihapus
+                                        for item in temp_items:
+                                            if not item["delete"]:
+                                                item["Total_Row"] = item["Qty"] * item["Harga"]
+                                                edited_items.append(item)
+                                        
+                                        # Tambahkan barang baru
+                                        for p in new_items:
                                             rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                            temp_items.append({"delete": False, "pos_index": ins_pos, "Nama Barang": p, "Qty": 1, "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan'])})
+                                            edited_items.append({
+                                                "pos_index": ins_pos, 
+                                                "Nama Barang": p, 
+                                                "Qty": 1, 
+                                                "Harga": float(rb['Harga']), 
+                                                "Satuan": str(rb['Satuan']), 
+                                                "Total_Row": float(rb['Harga'])
+                                            })
                                             ins_pos += 0.1
                                         
-                                        # Hapus yang dicentang
-                                        filtered = [x for x in temp_items if not x['delete']]
-                                        # Sort berdasarkan posisi
-                                        sorted_items = sorted(filtered, key=lambda x: x['pos_index'])
+                                        # SORTING BERDASARKAN POSISI
+                                        final_list = sorted(edited_items, key=lambda x: x["pos_index"])
                                         
-                                        # Siapkan data untuk Sheet
-                                        save_ready = [{"Nama Barang": x['Nama Barang'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Satuan'], "Total_Row": x['Qty']*x['Harga']} for x in sorted_items]
+                                        # Bersihkan data (hapus key pos_index) sebelum simpan
+                                        save_data = [{
+                                            "Nama Barang": x["Nama Barang"], 
+                                            "Qty": x["Qty"], 
+                                            "Harga": x["Harga"], 
+                                            "Satuan": x["Satuan"], 
+                                            "Total_Row": x["Total_Row"]
+                                        } for x in final_list]
                                         
-                                        # Update ke Google Sheet
-                                        sheet.update_cell(real_row_idx, 5, str(save_ready))
-                                        st.success("Berhasil Update!")
-                                        time.sleep(1)
-                                        st.rerun()
+                                        # Update GSheet
+                                        sheet.update_cell(real_row_idx, 5, str(save_data))
+                                        st.success("Tersimpan!"); time.sleep(1.5); st.rerun()
 
-                                # Download Area
-                                final_df = pd.DataFrame(items_list)
-                                subt = final_df['Total_Row'].sum(); tax = subt*0.11; gtot = subt+tax
-                                
-                                b1, b2 = st.columns(2)
-                                tgl_skrg = datetime.now().strftime('%d%m%y')
-                                
-                                pdf_data = generate_pdf(f"QTN/{real_row_idx}", row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                b1.download_button("📩 PDF", data=pdf_data, file_name=f"{row['Customer']} - {tgl_skrg}.pdf", use_container_width=True)
-                                
-                                xls_data = generate_excel(f"QTN/{real_row_idx}", row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                b2.download_button("📊 Excel", data=xls_data, file_name=f"{row['Customer']} - {tgl_skrg}.xlsx", use_container_width=True)
-                                
-                                if st.button("✅ Selesai", key=f"fin_{real_row_idx}", type="primary"):
-                                    sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
+                                # --- 2. AREA DOWNLOAD & NO SURAT (DI LUAR FORM) ---
+                                final_df = pd.DataFrame(items_list) 
+                                if not final_df.empty:
+                                    subt = final_df['Total_Row'].sum()
+                                    tax = subt * 0.11
+                                    gtot = subt + tax
+                                    
+                                    st.divider()
+                                    c_no, c_met = st.columns([2, 1])
+                                    
+                                    # INPUT NOMOR SURAT KEMBALI
+                                    no_s = c_no.text_input("No Surat:", value=f"/S-TTS/III/{datetime.now().year}", key=f"no_{real_row_idx}")
+                                    c_met.metric("Total", f"Rp {gtot:,.0f}")
+                                    
+                                    # Nama file otomatis
+                                    tgl_file = datetime.now().strftime('%d%m%y')
+                                    nama_pdf = f"{row['Customer']} - {tgl_file}.pdf"
+                                    nama_xls = f"{row['Customer']} - {tgl_file}.xlsx"
+                                    
+                                    b_pdf, b_xls = st.columns(2)
+                                    
+                                    # Generate & Download PDF
+                                    pdf_data = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
+                                    b_pdf.download_button("📩 PDF Presidential", data=pdf_data, file_name=nama_pdf, key=f"dlp_{real_row_idx}", use_container_width=True)
+                                    
+                                    # Generate & Download Excel
+                                    xls_data = generate_excel(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
+                                    b_xls.download_button("📊 Excel Presidential", data=xls_data, file_name=nama_xls, key=f"dlx_{real_row_idx}", use_container_width=True)
+                                    
+                                    if st.button("✅ Selesai & Hapus Antrean", key=f"fin_{real_row_idx}", type="primary", use_container_width=True):
+                                        sheet.update_cell(real_row_idx, 6, "Processed")
+                                        st.rerun()
+                    else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error: {e}")
+
