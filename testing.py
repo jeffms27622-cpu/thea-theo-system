@@ -263,28 +263,19 @@ elif menu == "👨‍💻 Admin Dashboard":
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         
-        # --- 1. FITUR UPLOAD DATABASE (SIDEBAR) ---
-        with st.sidebar.expander("📁 Update Database Barang (.csv)", expanded=False):
-            st.write("Upload file .csv terbaru untuk update harga atau daftar barang.")
-            up_f = st.file_uploader("Pilih file CSV", type=["csv"], key="uploader_db_admin")
-            if up_f is not None:
-                if st.button("🚀 Proses Update Database", use_container_width=True):
-                    try:
-                        with open("database_barang.csv", "wb") as f:
-                            f.write(up_f.getbuffer())
-                        # Bersihkan memori agar data baru langsung terbaca
-                        st.cache_data.clear()
-                        st.success("Database Berhasil Diperbarui!")
-                        time.sleep(1)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Gagal update: {e}")
+        # --- 1. UPLOAD DATABASE (SIDEBAR) ---
+        with st.sidebar.expander("📁 Update Database (.csv)", expanded=False):
+            up_f = st.file_uploader("Pilih file CSV", type=["csv"], key="up_db_admin")
+            if up_f and st.button("🚀 Update Sekarang"):
+                with open("database_barang.csv", "wb") as f: f.write(up_f.getbuffer())
+                st.cache_data.clear()
+                st.success("Database Terupdate!"); time.sleep(1); st.rerun()
 
-        # --- 2. KELOLA ANTREAN PENAWARAN ---
+        # --- 2. KELOLA ANTREAN (ANTI NYANGKUT) ---
         sheet = connect_gsheet()
         if sheet:
             try:
-                # Ambil data mentah langsung dari Google Sheets (Tanpa Cache)
+                # Paksa ambil data mentah dari Google Sheets
                 all_vals = sheet.get_all_values()
                 if len(all_vals) > 1:
                     df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
@@ -292,94 +283,78 @@ elif menu == "👨‍💻 Admin Dashboard":
                     
                     if not pending.empty:
                         for idx, row in pending.iterrows():
-                            # Cari index baris asli di GSheet
                             real_row_idx = df_gs.index[idx] + 2 
                             
                             with st.expander(f"🛠️ KELOLA: {row['Customer']}", expanded=True):
-                                # Load data pesanan dari kolom ke-5
-                                items_list = ast.literal_eval(str(row['Pesanan']))
-                                
-                                # --- FORM EDIT & URUTAN ---
-                                with st.form(key=f"form_manage_{real_row_idx}"):
-                                    st.write("### 1. Edit Barang, Harga & Posisi")
-                                    temp_items = []
+                                # Load list barang
+                                try:
+                                    items_list = ast.literal_eval(str(row['Pesanan']))
+                                except:
+                                    items_list = []
+
+                                with st.form(key=f"f_man_{real_row_idx}"):
+                                    st.write("### Edit Barang & Harga")
+                                    temp_up = []
                                     for i, r in enumerate(items_list):
-                                        ca, cb, cc, cd, cp, ce = st.columns([2.5, 0.8, 1.2, 1.5, 0.8, 0.6])
-                                        ca.markdown(f"**{r['Nama Barang']}**")
+                                        c1, c2, c3, c4, c5 = st.columns([2.5, 0.8, 1.2, 1, 0.5])
+                                        c1.markdown(f"**{r['Nama Barang']}**")
                                         
-                                        # Key unik agar tidak tertukar antar baris
-                                        u_key = f"{real_row_idx}_{i}"
+                                        # Key sangat unik agar tidak nyangkut antar antrean
+                                        u_k = f"r{real_row_idx}_i{i}"
                                         
-                                        nq = cb.number_input("Qty", value=int(r['Qty']), key=f"q_{u_key}")
-                                        ns = cc.text_input("Unit", value=r.get('Satuan','Pcs'), key=f"s_{u_key}")
-                                        nh = cd.number_input("Harga", value=float(r['Harga']), key=f"h_{u_key}")
-                                        n_pos = cp.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_key}")
-                                        to_del = ce.checkbox("🗑️", key=f"d_{u_key}")
+                                        nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
+                                        nh = c3.number_input("Harga", value=float(r['Harga']), key=f"h_{u_k}")
+                                        np = c4.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
+                                        td = c5.checkbox("🗑️", key=f"d_{u_k}")
                                         
-                                        temp_items.append({
-                                            "delete": to_del, "pos_index": n_pos, "Nama Barang": r['Nama Barang'], 
-                                            "Qty": nq, "Harga": nh, "Satuan": ns
-                                        })
+                                        temp_up.append({"del": td, "pos": np, "Nama": r['Nama Barang'], "Qty": nq, "Harga": nh, "Sat": r.get('Satuan','Pcs')})
                                     
-                                    st.write("### 2. Tambah Barang Baru")
-                                    add_new = st.multiselect("Pilih dari Database:", options=df_barang['Nama Barang'].tolist(), key=f"add_item_{real_row_idx}")
-                                    ins_at = st.number_input("Sisipkan di Urutan ke:", value=float(len(items_list)+1), key=f"ins_pos_{real_row_idx}")
+                                    st.write("---")
+                                    add_b = st.multiselect("Tambah Barang:", options=df_barang['Nama Barang'].tolist(), key=f"add_{real_row_idx}")
+                                    ins_at = st.number_input("Sisip No:", value=float(len(items_list)+1), key=f"ins_{real_row_idx}")
 
-                                    if st.form_submit_button("💾 Simpan Perubahan & Urutan", use_container_width=True):
-                                        # Gabung data lama & baru
-                                        edited_items = []
-                                        for x in temp_items:
-                                            if not x["delete"]:
-                                                x["Total_Row"] = x["Qty"] * x["Harga"]
-                                                edited_items.append(x)
-                                        
-                                        # Sisipkan barang baru
-                                        current_pos = ins_at
-                                        for p in add_new:
+                                    if st.form_submit_button("💾 SIMPAN & BERSIHKAN MEMORI", use_container_width=True):
+                                        # Gabung & Sort
+                                        final = sorted([x for x in temp_up if not x['del']], key=lambda x: x['pos'])
+                                        for p in add_b:
                                             rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                            edited_items.append({
-                                                "pos_index": current_pos, "Nama Barang": p, "Qty": 1, 
-                                                "Harga": float(rb['Harga']), "Satuan": str(rb['Satuan']), 
-                                                "Total_Row": float(rb['Harga'])
-                                            })
-                                            current_pos += 0.01
+                                            final.append({"Nama": p, "Qty": 1, "Harga": float(rb['Harga']), "Sat": str(rb['Satuan'])})
                                         
-                                        # Sort & Bersihkan data
-                                        final_sorted = sorted(edited_items, key=lambda x: x["pos_index"])
-                                        save_data = [{"Nama Barang": x["Nama Barang"], "Qty": x["Qty"], "Harga": x["Harga"], "Satuan": x["Satuan"], "Total_Row": x["Total_Row"]} for x in final_sorted]
+                                        # Siapkan data simpan
+                                        save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty']*x['Harga']} for x in final]
                                         
-                                        # Update ke Google Sheet
+                                        # 1. Update ke GSheet
                                         sheet.update_cell(real_row_idx, 5, str(save_data))
+                                        
+                                        # 2. ANTI NYANGKUT: Hapus semua memori input browser
                                         st.cache_data.clear()
-                                        st.success("Data Berhasil Diperbarui!"); time.sleep(1); st.rerun()
+                                        for k in st.session_state.keys():
+                                            if k.startswith(f"q_r{real_row_idx}") or k.startswith(f"h_r{real_row_idx}"):
+                                                del st.session_state[k]
+                                        
+                                        st.success("Tersimpan!"); time.sleep(1); st.rerun()
 
-                                # --- AREA DOWNLOAD (NAMA FILE OTOMATIS) ---
+                                # --- AREA DOWNLOAD ---
                                 if items_list:
-                                    final_df = pd.DataFrame(items_list)
-                                    subt = final_df['Total_Row'].sum(); tax = subt * 0.11; gtot = subt + tax
+                                    f_df = pd.DataFrame(items_list)
+                                    subt = f_df['Total_Row'].sum(); tax = subt*0.11; gtot = subt+tax
                                     
                                     st.divider()
-                                    c1, c2 = st.columns([2, 1])
-                                    no_s = c1.text_input("No Surat:", value=f"/S-TTS/III/2026", key=f"no_s_{real_row_idx}")
-                                    c2.metric("Total Quotation", f"Rp {gtot:,.0f}")
+                                    c_no, c_met = st.columns([2, 1])
+                                    no_s = c_no.text_input("No Surat:", value=f"/S-TTS/III/2026", key=f"ns_{real_row_idx}")
+                                    c_met.metric("Total", f"Rp {gtot:,.0f}")
                                     
-                                    # Logika Nama File Otomatis
-                                    nama_toko_file = str(row['Customer']).replace(" ", "_").strip()
-                                    tgl_f = datetime.now().strftime('%d%m%y')
-                                    nama_pdf = f"{nama_toko_file}_{tgl_f}.pdf"
+                                    # Nama File Otomatis
+                                    nama_toko = str(row['Customer']).replace(" ","_")
+                                    tgl = datetime.now().strftime('%d%m%y')
+                                    n_pdf = f"{nama_toko}_{tgl}.pdf"
                                     
-                                    btn_p, btn_x = st.columns(2)
+                                    b1, b2 = st.columns(2)
+                                    pdf_d = generate_pdf(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
+                                    b1.download_button(f"📩 PDF: {n_pdf}", data=pdf_d, file_name=n_pdf, key=f"dp_{real_row_idx}", use_container_width=True)
                                     
-                                    # Download PDF
-                                    pdf_b = generate_pdf(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                    btn_p.download_button(f"📩 PDF: {nama_pdf}", data=pdf_b, file_name=nama_pdf, key=f"dl_p_{real_row_idx}", use_container_width=True)
-                                    
-                                    # Download Excel
-                                    xls_b = generate_excel(no_s, row['Customer'], row['UP'], final_df, subt, tax, gtot)
-                                    btn_x.download_button(f"📊 Excel: {nama_toko_file}.xlsx", data=xls_b, file_name=f"{nama_toko_file}.xlsx", key=f"dl_x_{real_row_idx}", use_container_width=True)
-
-                                    if st.button("✅ Selesaikan Antrean", key=f"done_{real_row_idx}", type="primary", use_container_width=True):
+                                    if st.button("✅ Selesai", key=f"ok_{real_row_idx}", type="primary", use_container_width=True):
                                         sheet.update_cell(real_row_idx, 6, "Processed"); st.rerun()
-                    else: st.info("Antrean bersih, Pak Asin!")
-            except Exception as e: st.error(f"Error Sistem: {e}")
+                    else: st.info("Antrean bersih!")
+            except Exception as e: st.error(f"Error: {e}")
 
