@@ -273,32 +273,41 @@ elif menu == "👨‍💻 Admin Dashboard":
         # --- 1. DOWNLOAD & UPLOAD DATABASE (SIDEBAR) ---
         st.sidebar.markdown("### 🗄️ Database Management")
         
-        # Fitur Download agar data tidak tertimpa percuma
-        if os.path.exists("database_barang.csv"):
-            with open("database_barang.csv", "rb") as file:
-                st.sidebar.download_button(
-                    label="📥 Download Database Master",
-                    data=file,
-                    file_name=f"database_tts_update_{datetime.now().strftime('%d%m%y')}.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    help="Download dulu sebelum upload baru agar barang yang ditambah manual tidak hilang."
-                )
+        # FUNGSI BARU: Memastikan data dibaca langsung dari disk saat diklik
+        def get_current_csv():
+            if os.path.exists("database_barang.csv"):
+                with open("database_barang.csv", "rb") as f:
+                    return f.read()
+            return None
+
+        # Tombol Download Master (Sekarang dipaksa baca file terbaru)
+        csv_data = get_current_csv()
+        if csv_data:
+            st.sidebar.download_button(
+                label="📥 Download Database Master",
+                data=csv_data,
+                file_name=f"database_tts_{datetime.now().strftime('%d%m%y_%H%M')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key="btn_download_master"
+            )
         
-        with st.sidebar.expander("📁 Update Database via CSV", expanded=False):
-            up_f = st.file_uploader("Pilih file CSV baru", type=["csv"], key="admin_csv_up")
-            if up_f and st.button("🚀 Replace Database Sekarang"):
+        st.sidebar.divider()
+
+        with st.sidebar.expander("📁 Replace Database via CSV", expanded=False):
+            up_f = st.file_uploader("Upload file master baru", type=["csv"], key="admin_csv_up")
+            if up_f and st.button("🚀 Ganti Master Sekarang"):
                 try:
                     with open("database_barang.csv", "wb") as f: 
                         f.write(up_f.getbuffer())
                     st.cache_data.clear()
                     st.success("Database Utama Diganti!"); time.sleep(1); st.rerun()
                 except Exception as e:
-                    st.error(f"Gagal update: {e}")
+                    st.error(f"Gagal: {e}")
 
         # --- 1.B TAMBAH 1 BARANG CEPAT (SIDEBAR) ---
         with st.sidebar.expander("➕ Tambah 1 Barang Baru", expanded=False):
-            with st.form("form_tambah_cepat"):
+            with st.form("form_tambah_cepat", clear_on_submit=True):
                 b_nama = st.text_input("Nama Barang Baru:")
                 b_satuan = st.selectbox("Satuan:", ["Pcs", "Lusin", "Box", "Pack", "Rim", "Dus", "Set", "Roll", "Lembar", "Botol", "Buku", "Unit"])
                 b_harga = st.number_input("Harga Satuan (Rp):", min_value=0, step=500, format="%d")
@@ -308,27 +317,32 @@ elif menu == "👨‍💻 Admin Dashboard":
                         st.error("Nama barang wajib diisi!")
                     else:
                         try:
+                            # 1. Baca data lama
                             if os.path.exists("database_barang.csv"):
                                 df_lama = pd.read_csv("database_barang.csv", sep=None, engine='python', on_bad_lines='skip')
                             else:
                                 df_lama = pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
                             
-                            data_baru = pd.DataFrame([{'Nama Barang': b_nama, 'Harga': b_harga, 'Satuan': b_satuan}])
-                            df_update = pd.concat([df_lama, data_baru], ignore_index=True)
-                            df_update.to_csv("database_barang.csv", index=False)
+                            # 2. Tambahkan baris baru
+                            new_row = pd.DataFrame([{'Nama Barang': b_nama, 'Harga': b_harga, 'Satuan': b_satuan}])
+                            df_final = pd.concat([df_lama, new_row], ignore_index=True)
                             
+                            # 3. Simpan permanen ke CSV (Wajib pake encoding utf-8)
+                            df_final.to_csv("database_barang.csv", index=False, encoding='utf-8')
+                            
+                            # 4. Paksa aplikasi lupakan cache lama
                             st.cache_data.clear()
-                            st.success(f"Berhasil! {b_nama} sudah terdaftar.")
-                            time.sleep(1); st.rerun()
+                            st.success(f"Berhasil! {b_nama} tersimpan.")
+                            time.sleep(1)
+                            st.rerun() # Refresh agar tombol download update datanya
                         except Exception as e:
-                            st.error(f"Gagal menambah: {e}")
+                            st.error(f"Gagal Simpan: {e}")
 
-        # --- 2. KELOLA ANTREAN (OPTIMIZED) ---
+        # --- 2. KELOLA ANTREAN ---
         sheet = connect_gsheet()
         if sheet:
             try:
                 all_vals = fetch_antrean_data()
-                
                 if len(all_vals) > 1:
                     df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
                     pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == MARKETING_NAME)]
@@ -336,43 +350,34 @@ elif menu == "👨‍💻 Admin Dashboard":
                     if not pending.empty:
                         for idx, row in pending.iterrows():
                             real_row_idx = df_gs.index[idx] + 2 
-                            
                             with st.expander(f"🛠️ PESANAN: {row['Customer']}", expanded=True):
                                 try:
                                     items_list = ast.literal_eval(str(row['Pesanan']))
                                 except:
                                     items_list = []
 
-                                # --- FORM EDIT BARANG DALAM ANTREAN ---
                                 with st.form(key=f"f_edit_{real_row_idx}"):
                                     st.write("### 📝 Penyesuaian Harga & Qty")
                                     temp_up = []
                                     for i, r in enumerate(items_list):
                                         c1, c2, c3, c4, c5, c6 = st.columns([2.5, 0.7, 1.2, 1.5, 0.8, 0.4])
                                         c1.markdown(f"**{r['Nama Barang']}**")
-                                        
-                                        safe_name = str(r['Nama Barang']).replace(" ", "_").replace(".", "")
-                                        u_k = f"r{real_row_idx}_{safe_name}"
-                                        
+                                        u_k = f"r{real_row_idx}_{i}" # Key unik per baris
                                         nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
                                         
                                         opsi_satuan = ["Pcs", "Lusin", "Box", "Pack", "Rim", "Dus", "Set", "Roll", "Lembar", "Botol", "Buku", "Unit"]
-                                        satuan_sekarang = str(r.get('Satuan','Pcs')).strip()
-                                        if satuan_sekarang not in opsi_satuan:
-                                            opsi_satuan.insert(0, satuan_sekarang)
+                                        satuan_skrg = str(r.get('Satuan','Pcs')).strip()
+                                        if satuan_skrg not in opsi_satuan: opsi_satuan.insert(0, satuan_skrg)
                                             
-                                        ns = c3.selectbox("Unit", options=opsi_satuan, index=opsi_satuan.index(satuan_sekarang), key=f"s_{u_k}")
+                                        ns = c3.selectbox("Unit", options=opsi_satuan, index=opsi_satuan.index(satuan_skrg), key=f"s_{u_k}")
                                         nh = c4.number_input("Harga", value=int(float(r['Harga'])), step=500, format="%d", key=f"h_{u_k}")
                                         np = c5.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
                                         td = c6.checkbox("🗑️", key=f"d_{u_k}")
                                         
-                                        temp_up.append({
-                                            "del": td, "pos": np, "Nama": r['Nama Barang'], 
-                                            "Qty": nq, "Harga": nh, "Sat": ns
-                                        })
+                                        temp_up.append({"del": td, "pos": np, "Nama": r['Nama Barang'], "Qty": nq, "Harga": nh, "Sat": ns})
                                     
                                     st.write("---")
-                                    add_b = st.multiselect("Tambah Barang Lain ke Penawaran Ini:", options=df_barang['Nama Barang'].tolist(), key=f"add_new_{real_row_idx}")
+                                    add_b = st.multiselect("Tambah Barang Lain:", options=df_barang['Nama Barang'].tolist(), key=f"add_{real_row_idx}")
 
                                     if st.form_submit_button("💾 SIMPAN PERUBAHAN ANTREAN", use_container_width=True):
                                         final = sorted([x for x in temp_up if not x['del']], key=lambda x: x['pos'])
@@ -383,12 +388,8 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty']*x['Harga']} for x in final]
                                         sheet.update_cell(real_row_idx, 5, str(save_data))
                                         
-                                        # Hapus state agar tidak berat
-                                        keys_del = [k for k in st.session_state.keys() if f"r{real_row_idx}_" in k or f"_{real_row_idx}" in k]
-                                        for k in keys_del: del st.session_state[k]
-                                            
                                         st.cache_data.clear()
-                                        st.success("Data Antrean Diperbarui!"); time.sleep(1); st.rerun()
+                                        st.success("Berhasil Disimpan!"); time.sleep(1); st.rerun()
 
                                 # --- DOWNLOAD AREA ---
                                 if items_list:
@@ -397,22 +398,20 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     
                                     st.markdown("### 🖨️ Cetak Dokumen")
                                     c_no, c_met = st.columns([2, 1])
-                                    no_s = c_no.text_input("No Surat:", value=f"/S-TTS/III/{datetime.utcnow().year}", key=f"ns_print_{real_row_idx}")
+                                    no_s = c_no.text_input("No Surat:", value=f"/S-TTS/III/{datetime.utcnow().year}", key=f"ns_{real_row_idx}")
                                     c_met.metric("Grand Total", f"Rp {gtot:,.0f}")
                                     
-                                    nama_toko_clean = str(row['Customer']).replace(" ","_")
                                     pdf_data = generate_pdf(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
                                     xls_data = generate_excel(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
                                     
                                     b1, b2 = st.columns(2)
-                                    b1.download_button(f"📩 PDF: {row['Customer']}", pdf_data, f"Quotation_{nama_toko_clean}.pdf", use_container_width=True, key=f"pdf_{real_row_idx}")
-                                    b2.download_button(f"📊 EXCEL: {row['Customer']}", xls_data, f"Quotation_{nama_toko_clean}.xlsx", use_container_width=True, key=f"xls_{real_row_idx}")
+                                    b1.download_button(f"📩 PDF: {row['Customer']}", pdf_data, f"Quotation_{row['Customer']}.pdf", use_container_width=True, key=f"btn_p_{real_row_idx}")
+                                    b2.download_button(f"📊 EXCEL: {row['Customer']}", xls_data, f"Quotation_{row['Customer']}.xlsx", use_container_width=True, key=f"btn_x_{real_row_idx}")
 
                                     st.write("")
-                                    if st.button("✅ SELESAI & ARSIPKAN", key=f"done_btn_{real_row_idx}", type="primary", use_container_width=True):
+                                    if st.button("✅ SELESAI & ARSIPKAN", key=f"done_{real_row_idx}", type="primary", use_container_width=True):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
                                         st.cache_data.clear(); st.rerun()
-                    else: st.info(f"Belum ada antrean masuk untuk {MARKETING_NAME}.")
-            except Exception as e: st.error(f"Terjadi kesalahan teknis: {e}")
-    else:
-        st.warning("Silakan masukkan password admin di sidebar untuk mengakses fitur ini.")
+                    else: st.info(f"Belum ada antrean untuk {MARKETING_NAME}.")
+            except Exception as e: st.error(f"Sistem Error: {e}")
+
