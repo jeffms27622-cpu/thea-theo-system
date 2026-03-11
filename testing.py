@@ -274,12 +274,48 @@ elif menu == "👨‍💻 Admin Dashboard":
         with st.sidebar.expander("📁 Update Database (.csv)", expanded=False):
             up_f = st.file_uploader("Pilih file CSV", type=["csv"], key="admin_csv_up")
             if up_f and st.button("🚀 Update Sekarang"):
-                with open("database_barang.csv", "wb") as f: f.write(up_f.getbuffer())
-                st.cache_data.clear()
-                st.success("Database Terupdate!"); time.sleep(1); st.rerun()
+                try:
+                    with open("database_barang.csv", "wb") as f: 
+                        f.write(up_f.getbuffer())
+                    st.cache_data.clear()
+                    st.success("Database Terupdate!")
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Gagal update: {e}")
+
+        # --- 1.B TAMBAH 1 BARANG CEPAT (SIDEBAR) ---
+        with st.sidebar.expander("➕ Tambah 1 Barang Baru", expanded=False):
+            with st.form("form_tambah_cepat"):
+                b_nama = st.text_input("Nama Barang Baru:")
+                b_satuan = st.selectbox("Satuan:", ["Pcs", "Lusin", "Box", "Pack", "Rim", "Dus", "Set", "Roll", "Lembar", "Botol", "Buku", "Unit"])
+                b_harga = st.number_input("Harga Satuan (Rp):", min_value=0, step=500, format="%d")
+                
+                if st.form_submit_button("💾 Simpan Barang", use_container_width=True):
+                    if b_nama.strip() == "":
+                        st.error("Nama barang tidak boleh kosong!")
+                    else:
+                        try:
+                            # Baca database lama
+                            if os.path.exists("database_barang.csv"):
+                                df_lama = pd.read_csv("database_barang.csv", sep=None, engine='python', on_bad_lines='skip')
+                            else:
+                                df_lama = pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
+                            
+                            # Gabung dan simpan data baru
+                            data_baru = pd.DataFrame([{'Nama Barang': b_nama, 'Harga': b_harga, 'Satuan': b_satuan}])
+                            df_update = pd.concat([df_lama, data_baru], ignore_index=True)
+                            df_update.to_csv("database_barang.csv", index=False)
+                            
+                            st.cache_data.clear() # Refresh memori database
+                            st.success(f"Berhasil! {b_nama} ditambahkan.")
+                            time.sleep(1)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Gagal menambah: {e}")
 
         # --- 2. KELOLA ANTREAN (MENGGUNAKAN CACHE MEMORI) ---
-        sheet = connect_gsheet() # Tetap dipanggil untuk menyimpan (update_cell)
+        sheet = connect_gsheet() # Tetap dipanggil untuk fungsi simpan (update_cell)
         if sheet:
             try:
                 # BUKAN LAGI sheet.get_all_values(), TAPI PAKAI FUNGSI CACHE:
@@ -305,6 +341,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     temp_up = []
                                     for i, r in enumerate(items_list):
                                         
+                                        # Proporsi Kolom Ideal
                                         c1, c2, c3, c4, c5, c6 = st.columns([2.5, 0.7, 1.2, 1.5, 0.8, 0.4])
                                         c1.markdown(f"**{r['Nama Barang']}**")
                                         
@@ -314,6 +351,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         
                                         nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
                                         
+                                        # Dropdown Satuan
                                         opsi_satuan = ["Pcs", "Lusin", "Box", "Pack", "Rim", "Dus", "Set", "Roll", "Lembar", "Botol", "Buku", "Unit"]
                                         satuan_sekarang = str(r.get('Satuan','Pcs')).strip()
                                         if satuan_sekarang not in opsi_satuan:
@@ -321,9 +359,8 @@ elif menu == "👨‍💻 Admin Dashboard":
                                             
                                         ns = c3.selectbox("Unit", options=opsi_satuan, index=opsi_satuan.index(satuan_sekarang), key=f"s_{u_k}")
                                         
-                                        # Harga dibulatkan (format="%d") tanpa desimal
+                                        # Harga dibulatkan tanpa koma desimal
                                         nh = c4.number_input("Harga", value=int(float(r['Harga'])), step=500, format="%d", key=f"h_{u_k}")
-                                        
                                         np = c5.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
                                         td = c6.checkbox("🗑️", key=f"d_{u_k}")
                                         
@@ -347,7 +384,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         # Update ke Google Sheet
                                         sheet.update_cell(real_row_idx, 5, str(save_data))
                                         
-                                        # Cuci otak memori
+                                        # Cuci otak memori untuk mencegah nyangkut
                                         keys_del = [k for k in st.session_state.keys() if f"r{real_row_idx}_" in k or f"_{real_row_idx}" in k]
                                         for k in keys_del:
                                             del st.session_state[k]
@@ -367,6 +404,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     no_s = c_no.text_input("No Surat:", value=f"/S-TTS/III/{datetime.utcnow().year}", key=f"ns_print_{real_row_idx}")
                                     c_met.metric("Total Quotation", f"Rp {gtot:,.0f}")
                                     
+                                    # Nama File Otomatis
                                     nama_toko = str(row['Customer']).replace(" ","_")
                                     tgl = datetime.now().strftime('%d%m%y')
                                     n_pdf = f"{nama_toko}_{tgl}.pdf"
@@ -385,3 +423,4 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         st.rerun()
                     else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error Sistem: {e}")
+
