@@ -39,6 +39,8 @@ def get_creds():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     return Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
 
+# cache_resource: Biar tidak login Google berulang-ulang
+@st.cache_resource
 def connect_gsheet():
     try:
         client = gspread.authorize(get_creds())
@@ -50,30 +52,27 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
+# cache_data: Biar aplikasi tidak loading terus pas ngetik harga
+@st.cache_data(ttl=60)
+def fetch_antrean_data():
+    sheet = connect_gsheet()
+    if sheet:
+        return sheet.get_all_values()
+    return []
+
 @st.cache_data(ttl=600)
 def load_db():
     if os.path.exists("database_barang.csv"):
         try:
-            # PAKE VERSI SAKTI:
-            # sep=None & engine='python' biar otomatis deteksi koma/titik koma
-            # on_bad_lines='skip' biar kalau ada baris rusak (seperti baris 73), aplikasi GAK MATI
             df = pd.read_csv("database_barang.csv", sep=None, engine='python', on_bad_lines='skip')
-            
-            # Bersihkan nama kolom dari spasi hantu
             df.columns = df.columns.str.strip()
-            
-            # Pastikan kolom "Harga" jadi angka, kalau gagal jadi 0
             if 'Harga' in df.columns:
                 df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce').fillna(0)
-            
             return df
         except Exception as e:
             st.error(f"Gagal membaca CSV: {e}")
-    
-    # Kalau CSV gagal total, aplikasi tetep jalan dengan tabel kosong
     return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
 
-# BARIS WAJIB: Jangan lupa panggil fungsinya di luar
 df_barang = load_db()
 
 # =========================================================
@@ -262,6 +261,7 @@ elif menu == "📝 Portal Customer":
             if sheet and nama_toko:
                 wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
                 sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending", MARKETING_NAME])
+                st.cache_data.clear() # Bersihkan cache agar antrean langsung muncul di Admin
                 st.success("Terkirim! Terima kasih."); st.session_state.cart = []
 
 elif menu == "👨‍💻 Admin Dashboard":
@@ -278,11 +278,13 @@ elif menu == "👨‍💻 Admin Dashboard":
                 st.cache_data.clear()
                 st.success("Database Terupdate!"); time.sleep(1); st.rerun()
 
-        # --- 2. KELOLA ANTREAN ---
-        sheet = connect_gsheet()
+        # --- 2. KELOLA ANTREAN (MENGGUNAKAN CACHE MEMORI) ---
+        sheet = connect_gsheet() # Tetap dipanggil untuk menyimpan (update_cell)
         if sheet:
             try:
-                all_vals = sheet.get_all_values()
+                # BUKAN LAGI sheet.get_all_values(), TAPI PAKAI FUNGSI CACHE:
+                all_vals = fetch_antrean_data()
+                
                 if len(all_vals) > 1:
                     df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
                     pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == MARKETING_NAME)]
@@ -303,11 +305,10 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     temp_up = []
                                     for i, r in enumerate(items_list):
                                         
-                                        # PERBAIKAN PROPORSI KOLOM: 
-                                        # c3 (Unit) dan c5 (Pos) dibesarkan, c4 (Harga) dikecilkan
                                         c1, c2, c3, c4, c5, c6 = st.columns([2.5, 0.7, 1.2, 1.5, 0.8, 0.4])
                                         c1.markdown(f"**{r['Nama Barang']}**")
                                         
+                                        # Key aman yang diikat ke nama barang (Anti-Nyangkut)
                                         safe_name = str(r['Nama Barang']).replace(" ", "_").replace(".", "")
                                         u_k = f"r{real_row_idx}_{safe_name}"
                                         
@@ -320,7 +321,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                             
                                         ns = c3.selectbox("Unit", options=opsi_satuan, index=opsi_satuan.index(satuan_sekarang), key=f"s_{u_k}")
                                         
-                                        # HARGA DIBUAT TANPA KOMA DESIMAL BIAR RAPI (format="%d")
+                                        # Harga dibulatkan (format="%d") tanpa desimal
                                         nh = c4.number_input("Harga", value=int(float(r['Harga'])), step=500, format="%d", key=f"h_{u_k}")
                                         
                                         np = c5.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
@@ -343,13 +344,15 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         
                                         save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty']*x['Harga']} for x in final]
                                         
+                                        # Update ke Google Sheet
                                         sheet.update_cell(real_row_idx, 5, str(save_data))
                                         
+                                        # Cuci otak memori
                                         keys_del = [k for k in st.session_state.keys() if f"r{real_row_idx}_" in k or f"_{real_row_idx}" in k]
                                         for k in keys_del:
                                             del st.session_state[k]
                                             
-                                        st.cache_data.clear()
+                                        st.cache_data.clear() # Paksa refresh antrean baru
                                         st.success("Tersimpan Sempurna!"); time.sleep(1); st.rerun()
 
                                 # --- MENU PRINT / DOWNLOAD ---
@@ -361,7 +364,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     
                                     st.markdown("### 🖨️ Menu Print & Download")
                                     c_no, c_met = st.columns([2, 1])
-                                    no_s = c_no.text_input("No Surat:", value=f"/S-TTS/III/2026", key=f"ns_print_{real_row_idx}")
+                                    no_s = c_no.text_input("No Surat:", value=f"/S-TTS/III/{datetime.utcnow().year}", key=f"ns_print_{real_row_idx}")
                                     c_met.metric("Total Quotation", f"Rp {gtot:,.0f}")
                                     
                                     nama_toko = str(row['Customer']).replace(" ","_")
@@ -378,8 +381,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     st.write("")
                                     if st.button("✅ PENAWARAN SELESAI (HAPUS)", key=f"done_btn_{real_row_idx}", type="primary", use_container_width=True):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
+                                        st.cache_data.clear() # Paksa antrean bersih
                                         st.rerun()
-                        else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
+                    else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error Sistem: {e}")
-
-
