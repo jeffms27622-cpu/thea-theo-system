@@ -221,7 +221,7 @@ def generate_excel(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_tota
 # 5. UI UTAMA (STREAMLIT)
 # =========================================================
 st.sidebar.title(f"Portal {MARKETING_NAME}")
-menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Portal Customer", "👨‍💻 Admin Dashboard"])
+menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Portal Customer", "📦 Portal Staff (Download Only)", "👨‍💻 Admin Dashboard"])
 
 if 'cart' not in st.session_state: st.session_state.cart = []
 
@@ -451,4 +451,5 @@ elif menu == "👨‍💻 Admin Dashboard":
             except Exception as e: st.error(f"Sistem Error: {e}")
     else:
         st.warning("Silakan masukkan password admin di sidebar untuk mengakses fitur ini.")
+
 
