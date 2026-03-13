@@ -313,7 +313,7 @@ elif menu == "👨‍💻 Admin Dashboard":
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
         
-        # --- 1. DOWNLOAD & UPLOAD DATABASE (SIDEBAR) ---
+        # --- 1. DOWNLOAD & UPLOAD DATABASE (IDEBAR) ---
         st.sidebar.markdown("### 🗄️ Database Management")
         
         def get_current_csv():
@@ -451,3 +451,4 @@ elif menu == "👨‍💻 Admin Dashboard":
             except Exception as e: st.error(f"Sistem Error: {e}")
     else:
         st.warning("Silakan masukkan password admin di sidebar untuk mengakses fitur ini.")
+
