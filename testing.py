@@ -264,6 +264,49 @@ elif menu == "📝 Portal Customer":
                 st.cache_data.clear() # Bersihkan cache agar antrean langsung muncul di Admin
                 st.success("Terkirim! Terima kasih."); st.session_state.cart = []
 
+elif menu == "📦 Portal Staff (Download Only)":
+    st.title("📦 Portal Staff TTS")
+    st.info("Halaman khusus staff untuk mendownload file Excel penawaran yang sudah masuk.")
+    
+    all_vals = fetch_antrean_data()
+    if len(all_vals) > 1:
+        df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
+        pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == MARKETING_NAME)]
+        
+        if not pending.empty:
+            for idx, row in pending.iterrows():
+                with st.container(border=True):
+                    col_info, col_btn = st.columns([3, 1])
+                    col_info.markdown(f"**🏢 {row['Customer']}** (UP: {row['UP']})")
+                    col_info.caption(f"📅 Masuk pada: {row['Waktu']} | 📞 WA: {row['WA']}")
+                    
+                    try:
+                        items_list = ast.literal_eval(str(row['Pesanan']))
+                        if items_list:
+                            f_df = pd.DataFrame(items_list)
+                            subt = f_df['Total_Row'].sum()
+                            tax = subt * 0.11
+                            gtot = subt + tax
+                            
+                            # Tombol Download Excel untuk Staff
+                            xls_data = generate_excel(f"/S-TTS/III/{datetime.utcnow().year}", row['Customer'], row['UP'], f_df, subt, tax, gtot)
+                            nama_file_xls = f"Quotation_{str(row['Customer']).replace(' ','_')}.xlsx"
+                            
+                            col_btn.download_button(
+                                label="📊 Download Excel",
+                                data=xls_data,
+                                file_name=nama_file_xls,
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key=f"staff_xls_{idx}",
+                                use_container_width=True
+                            )
+                    except Exception as e:
+                        col_info.error("Data sedang diproses Admin.")
+        else:
+            st.success("🎉 Tidak ada antrean penawaran saat ini. Pekerjaan beres!")
+    else:
+        st.info("Database antrean masih kosong.")
+
 elif menu == "👨‍💻 Admin Dashboard":
     st.title(f"Admin Dashboard - {MARKETING_NAME}")
     
@@ -273,14 +316,12 @@ elif menu == "👨‍💻 Admin Dashboard":
         # --- 1. DOWNLOAD & UPLOAD DATABASE (SIDEBAR) ---
         st.sidebar.markdown("### 🗄️ Database Management")
         
-        # FUNGSI BARU: Memastikan data dibaca langsung dari disk saat diklik
         def get_current_csv():
             if os.path.exists("database_barang.csv"):
                 with open("database_barang.csv", "rb") as f:
                     return f.read()
             return None
 
-        # Tombol Download Master (Sekarang dipaksa baca file terbaru)
         csv_data = get_current_csv()
         if csv_data:
             st.sidebar.download_button(
@@ -317,24 +358,18 @@ elif menu == "👨‍💻 Admin Dashboard":
                         st.error("Nama barang wajib diisi!")
                     else:
                         try:
-                            # 1. Baca data lama
                             if os.path.exists("database_barang.csv"):
                                 df_lama = pd.read_csv("database_barang.csv", sep=None, engine='python', on_bad_lines='skip')
                             else:
                                 df_lama = pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
                             
-                            # 2. Tambahkan baris baru
                             new_row = pd.DataFrame([{'Nama Barang': b_nama, 'Harga': b_harga, 'Satuan': b_satuan}])
                             df_final = pd.concat([df_lama, new_row], ignore_index=True)
-                            
-                            # 3. Simpan permanen ke CSV (Wajib pake encoding utf-8)
                             df_final.to_csv("database_barang.csv", index=False, encoding='utf-8')
                             
-                            # 4. Paksa aplikasi lupakan cache lama
                             st.cache_data.clear()
                             st.success(f"Berhasil! {b_nama} tersimpan.")
-                            time.sleep(1)
-                            st.rerun() # Refresh agar tombol download update datanya
+                            time.sleep(1); st.rerun()
                         except Exception as e:
                             st.error(f"Gagal Simpan: {e}")
 
@@ -362,7 +397,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     for i, r in enumerate(items_list):
                                         c1, c2, c3, c4, c5, c6 = st.columns([2.5, 0.7, 1.2, 1.5, 0.8, 0.4])
                                         c1.markdown(f"**{r['Nama Barang']}**")
-                                        u_k = f"r{real_row_idx}_{i}" # Key unik per baris
+                                        u_k = f"r{real_row_idx}_{i}" 
                                         nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
                                         
                                         opsi_satuan = ["Pcs", "Lusin", "Box", "Pack", "Rim", "Dus", "Set", "Roll", "Lembar", "Botol", "Buku", "Unit"]
@@ -405,8 +440,8 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     xls_data = generate_excel(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
                                     
                                     b1, b2 = st.columns(2)
-                                    b1.download_button(f"📩 PDF: {row['Customer']}", pdf_data, f"Quotation_{row['Customer']}.pdf", use_container_width=True, key=f"btn_p_{real_row_idx}")
-                                    b2.download_button(f"📊 EXCEL: {row['Customer']}", xls_data, f"Quotation_{row['Customer']}.xlsx", use_container_width=True, key=f"btn_x_{real_row_idx}")
+                                    b1.download_button(f"📩 PDF: {row['Customer']}", pdf_data, f"Quotation_{row['Customer'].replace(' ','_')}.pdf", use_container_width=True, key=f"btn_p_{real_row_idx}")
+                                    b2.download_button(f"📊 EXCEL: {row['Customer']}", xls_data, f"Quotation_{row['Customer'].replace(' ','_')}.xlsx", use_container_width=True, key=f"btn_x_{real_row_idx}")
 
                                     st.write("")
                                     if st.button("✅ SELESAI & ARSIPKAN", key=f"done_{real_row_idx}", type="primary", use_container_width=True):
@@ -414,4 +449,5 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         st.cache_data.clear(); st.rerun()
                     else: st.info(f"Belum ada antrean untuk {MARKETING_NAME}.")
             except Exception as e: st.error(f"Sistem Error: {e}")
-
+    else:
+        st.warning("Silakan masukkan password admin di sidebar untuk mengakses fitur ini.")
