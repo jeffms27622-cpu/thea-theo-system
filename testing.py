@@ -266,47 +266,65 @@ elif menu == "📝 Portal Customer":
 
 elif menu == "📦 Portal Staff (Download Only)":
     st.title("📦 Portal Staff TTS")
-    st.info("Halaman khusus staff untuk mendownload file Excel penawaran yang sudah masuk.")
+    st.info("Halaman khusus staff untuk mendownload file Excel penawaran.")
     
     all_vals = fetch_antrean_data()
     if len(all_vals) > 1:
+        # 1. Buat DataFrame dari GSheet
         df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
-        pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == MARKETING_NAME)]
         
-        if not pending.empty:
-            for idx, row in pending.iterrows():
-                with st.container(border=True):
-                    col_info, col_btn = st.columns([3, 1])
-                    col_info.markdown(f"**🏢 {row['Customer']}** (UP: {row['UP']})")
-                    col_info.caption(f"📅 Masuk pada: {row['Waktu']} | 📞 WA: {row['WA']}")
-                    
-                    try:
-                        items_list = ast.literal_eval(str(row['Pesanan']))
-                        if items_list:
-                            f_df = pd.DataFrame(items_list)
-                            subt = f_df['Total_Row'].sum()
-                            tax = subt * 0.11
-                            gtot = subt + tax
+        # 2. Bersihkan spasi hantu di nama kolom agar tidak KeyError
+        df_gs.columns = df_gs.columns.str.strip()
+        
+        # 3. Filter data yang statusnya 'Pending'
+        # Pastikan kolom 'Status' dan 'Sales' ada di GSheet Bapak
+        if 'Status' in df_gs.columns and 'Sales' in df_gs.columns:
+            pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == MARKETING_NAME)]
+            
+            if not pending.empty:
+                for idx, row in pending.iterrows():
+                    with st.container(border=True):
+                        col_info, col_btn = st.columns([3, 1])
+                        
+                        # Ambil data utama tanpa menyentuh kolom 'Waktu'
+                        cust_name = row.get('Customer', 'Tanpa Nama')
+                        up_name = row.get('UP', '-')
+                        wa_cust = row.get('WA', '-')
+                        
+                        col_info.markdown(f"**🏢 {cust_name}** (UP: {up_name})")
+                        col_info.caption(f"📞 WhatsApp: {wa_cust} | 📋 Status: Antrean")
+                        
+                        try:
+                            # Ambil daftar pesanan
+                            pesanan_raw = row.get('Pesanan', '[]')
+                            items_list = ast.literal_eval(str(pesanan_raw))
                             
-                            # Tombol Download Excel untuk Staff
-                            xls_data = generate_excel(f"/S-TTS/III/{datetime.utcnow().year}", row['Customer'], row['UP'], f_df, subt, tax, gtot)
-                            nama_file_xls = f"Quotation_{str(row['Customer']).replace(' ','_')}.xlsx"
-                            
-                            col_btn.download_button(
-                                label="📊 Download Excel",
-                                data=xls_data,
-                                file_name=nama_file_xls,
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                key=f"staff_xls_{idx}",
-                                use_container_width=True
-                            )
-                    except Exception as e:
-                        col_info.error("Data sedang diproses Admin.")
+                            if items_list:
+                                f_df = pd.DataFrame(items_list)
+                                subt = f_df['Total_Row'].sum()
+                                tax = subt * 0.11
+                                gtot = subt + tax
+                                
+                                # Buat File Excel secara instan
+                                xls_data = generate_excel("QUO-STAFF", cust_name, up_name, f_df, subt, tax, gtot)
+                                
+                                col_btn.download_button(
+                                    label="📊 Download Excel",
+                                    data=xls_data,
+                                    file_name=f"Quotation_{str(cust_name).replace(' ','_')}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    key=f"staff_xls_{idx}",
+                                    use_container_width=True
+                                )
+                        except:
+                            col_info.error("Data barang sedang disiapkan Admin.")
+            else:
+                st.success("🎉 Tidak ada antrean. Semua pesanan sudah diproses!")
         else:
-            st.success("🎉 Tidak ada antrean penawaran saat ini. Pekerjaan beres!")
+            st.error("Struktur GSheet salah. Pastikan ada kolom 'Status' dan 'Sales'.")
     else:
-        st.info("Database antrean masih kosong.")
-
+        st.info("Belum ada data penawaran yang masuk.")
+        
 elif menu == "👨‍💻 Admin Dashboard":
     st.title(f"Admin Dashboard - {MARKETING_NAME}")
     
@@ -451,5 +469,6 @@ elif menu == "👨‍💻 Admin Dashboard":
             except Exception as e: st.error(f"Sistem Error: {e}")
     else:
         st.warning("Silakan masukkan password admin di sidebar untuk mengakses fitur ini.")
+
 
 
