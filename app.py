@@ -147,7 +147,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.set_font('Arial', '', 8); pdf.set_text_color(100, 100, 100)
     pdf.multi_cell(0, 5, "Notes & Payment Terms:\n"
                          "1. Prices are subject to change without notice.\n"
-                         "2. Validity: 14 Days from date of quotation.\n"
+                         "2. Validity: 7 Days from date of quotation.\n"
                          "3. Delivery: Within 1 working day after PO confirmation.\n"
                          "4. Payments must be transferred ONLY to the following account:\n"
                          "   Bank Name     : Bank Mandiri\n"
@@ -361,7 +361,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     
                                     st.markdown("### 🖨️ Menu Print & Download")
                                     c_no, c_met = st.columns([2, 1])
-                                    no_s = c_no.text_input("No Surat:", value=f"/S-TTS/III/2026", key=f"ns_print_{real_row_idx}")
+                                    no_s = c_no.text_input("No Surat:", value=f"/S-TTS/IV/2026", key=f"ns_print_{real_row_idx}")
                                     c_met.metric("Total Quotation", f"Rp {gtot:,.0f}")
                                     
                                     nama_toko = str(row['Customer']).replace(" ","_")
