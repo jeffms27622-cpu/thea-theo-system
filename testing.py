@@ -311,9 +311,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         
                                         if mode == "Lusin (12)":
                                             mult = 12
-                                        elif mode == "Rim (500)":
-                                            mult = 500
-                                        elif mode in ["Dus", "Box", "Pack", "Set", "Buku"]:
+                                        elif mode in ["Dus", "Box", "Pack", "Set", "Buku", "Rim"]:
                                             isi_manual = c3.number_input("Isi per...", min_value=1, value=10, key=f"isi_{u_k}")
                                             mult = isi_manual
                                         
