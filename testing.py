@@ -346,6 +346,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                             
                             with st.expander(f"🛠️ KELOLA: {row['Customer']}", expanded=True):
                                 try:
+                                    # MENGAMBIL DATA ASLI DARI PORTAL CUSTOMER
                                     items_list = ast.literal_eval(str(row['Pesanan']))
                                 except:
                                     items_list = []
@@ -354,41 +355,45 @@ elif menu == "👨‍💻 Admin Dashboard":
                                 temp_up = []
                                 
                                 for i, r in enumerate(items_list):
-                                    # Ambil Harga Master Dasar
+                                    # Ambil Harga Master (hanya untuk referensi caption)
                                     row_master = df_barang[df_barang['Nama Barang'] == r['Nama Barang']]
-                                    harga_master = float(row_master['Harga'].values[0]) if not row_master.empty else float(r['Harga'])
+                                    harga_master_asli = float(row_master['Harga'].values[0]) if not row_master.empty else float(r['Harga'])
                                     
                                     u_k = f"r{real_row_idx}_i{i}"
                                     
                                     with st.container(border=True):
                                         c1, c2, c3, c4, c5, c6 = st.columns([2.0, 1.1, 1.2, 1.3, 0.8, 0.4])
                                         c1.markdown(f"**{r['Nama Barang']}**")
-                                        c1.caption(f"Master: Rp {harga_master:,.0f}/Pcs")
+                                        # Caption menunjukkan harga master asli biar Bapak gak bingung
+                                        c1.caption(f"Master CSV: Rp {harga_master_asli:,.0f}")
 
-                                        # --- PILIHAN MODE LENGKAP ---
-                                        list_mode = ["Pcs", "Lusin (12)", "Dus", "Box", "Pack", "Set", "Buku", "Rim"]
-                                        mode = c2.selectbox("Mode", list_mode, key=f"m_{u_k}")
+                                        # --- PILIHAN MODE ---
+                                        # Default mode adalah "Pcs/Tetap" agar mengikuti input Customer
+                                        list_mode = ["Pcs/Tetap", "Lusin (12)", "Dus", "Box", "Pack", "Set", "Rim"]
+                                        mode = c2.selectbox("Ubah Satuan?", list_mode, key=f"m_{u_k}")
                                         
-                                        # Logika Pengali Otomatis
-                                        mult = 1
-                                        sat_final = mode.split(" ")[0] # Ambil kata pertamanya saja (misal "Lusin")
-                                        
-                                        if mode == "Lusin (12)":
-                                            mult = 12
-                                        elif mode in ["Dus", "Box", "Pack", "Set", "Buku", "Rim"]:
-                                            isi_manual = c3.number_input("Isi per...", min_value=1, value=10, key=f"isi_{u_k}")
-                                            mult = isi_manual
-                                        
-                                        # --- HITUNG HARGA LIVE ---
-                                        h_suggest = int(harga_master * mult)
-                                        
-                                        # SINKRONISASI SESSION STATE (Biar berubah pas 'Isi' atau 'Mode' diganti)
-                                        # Kita buat trigger gabungan antara Mode + Multiplier
-                                        trigger_key = f"{mode}_{mult}"
-                                        if st.session_state.get(f"trig_{u_k}") != trigger_key:
-                                            st.session_state[f"h_{u_k}"] = h_suggest
-                                            st.session_state[f"s_{u_k}"] = sat_final
-                                            st.session_state[f"trig_{u_k}"] = trigger_key
+                                        # LOGIKA: Jika Bapak pilih "Pcs/Tetap", maka pakai Harga & Satuan dari Customer
+                                        if mode == "Pcs/Tetap":
+                                            mult = 1
+                                            # Ambil satuan dan harga yang dikirim customer
+                                            sat_init = str(r.get('Satuan', 'Pcs'))
+                                            harga_init = int(float(r.get('Harga', harga_master_asli)))
+                                        else:
+                                            # Jika Bapak pilih mode lain (Lusin/Dus), baru kalkulator bekerja
+                                            sat_init = mode
+                                            if mode == "Lusin (12)": mult = 12
+                                            elif mode == "Rim": mult = 1 # Rim tetap harga master (sesuai request)
+                                            else:
+                                                isi_m = c3.number_input("Isi per...", min_value=1, value=10, key=f"isi_{u_k}")
+                                                mult = isi_m
+                                            harga_init = int(harga_master_asli * mult)
+
+                                        # SINKRONISASI LIVE KE INPUT
+                                        trigger_val = f"{mode}_{mult}"
+                                        if st.session_state.get(f"trig_{u_k}") != trigger_val:
+                                            st.session_state[f"h_{u_k}"] = harga_init
+                                            st.session_state[f"s_{u_k}"] = sat_init
+                                            st.session_state[f"trig_{u_k}"] = trigger_val
 
                                         nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
                                         ns = c3.text_input("Unit", key=f"s_{u_k}")
@@ -416,8 +421,9 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     st.cache_data.clear()
                                     st.success("Tersimpan!"); time.sleep(1); st.rerun()
 
-                                # --- DOWNLOAD AREA ---
+                                # --- DOWNLOAD AREA (PDF & EXCEL) ---
                                 if items_list:
+                                    # Pakai data terbaru hasil simpan untuk hitung total di UI
                                     f_df = pd.DataFrame(items_list)
                                     subt = f_df['Total_Row'].sum()
                                     tax = subt * 0.11
@@ -428,16 +434,12 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     no_s = c_no.text_input("No Surat:", value=f"/S-TTS/IV/2026", key=f"ns_print_{real_row_idx}")
                                     c_met.metric("Total Quotation", f"Rp {gtot:,.0f}")
                                     
-                                    nama_toko = str(row['Customer']).replace(" ","_")
-                                    tgl = datetime.now().strftime('%d%m%y')
-                                    n_pdf = f"{nama_toko}_{tgl}.pdf"
-                                    
                                     b1, b2 = st.columns(2)
                                     pdf_data = generate_pdf(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
-                                    b1.download_button(label=f"📩 DOWNLOAD PDF ({nama_toko})", data=pdf_data, file_name=n_pdf, key=f"btn_p_{real_row_idx}", use_container_width=True)
+                                    b1.download_button(label=f"📩 DOWNLOAD PDF", data=pdf_data, file_name=f"Quo_{row['Customer']}.pdf", key=f"btn_p_{real_row_idx}", use_container_width=True)
                                     
                                     xls_data = generate_excel(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
-                                    b2.download_button(label=f"📊 DOWNLOAD EXCEL ({nama_toko})", data=xls_data, file_name=f"{nama_toko}.xlsx", key=f"btn_x_{real_row_idx}", use_container_width=True)
+                                    b2.download_button(label=f"📊 DOWNLOAD EXCEL", data=xls_data, file_name=f"{row['Customer']}.xlsx", key=f"btn_x_{real_row_idx}", use_container_width=True)
 
                                     if st.button("✅ PENAWARAN SELESAI (HAPUS)", key=f"done_btn_{real_row_idx}", type="primary", use_container_width=True):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
