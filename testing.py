@@ -226,32 +226,80 @@ elif menu == "📝 Portal Customer":
         nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko")
         up_nama = col2.text_input("👤 Nama Penerima (UP)")
         wa_nomor = col1.text_input("📞 Nomor WhatsApp Pembeli")
-        picks = st.multiselect("📦 Pilih Barang:", options=df_barang['Nama Barang'].tolist())
-        if st.button("Tambahkan ke Keranjang"):
-            for p in picks:
-                if p not in st.session_state.cart: st.session_state.cart.append(p)
+        
+        st.write("---")
+        st.markdown("### 📦 Pilih Barang & Satuan")
+        # Pilih barang utama
+        pilihan_barang = st.selectbox("Cari Barang:", options=df_barang['Nama Barang'].tolist())
+        
+        # Ambil data harga master
+        row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
+        h_master = float(row_m['Harga'])
+        
+        c1, c2, c3 = st.columns([1, 1, 1])
+        # Pilihan Mode untuk Customer
+        mode_cust = c1.selectbox("Ingin beli per:", ["Pcs", "Lusin (12)", "Dus", "Box", "Pack", "Set"], key="mode_cust")
+        
+        mult_cust = 1
+        sat_cust = mode_cust.split(" ")[0]
+        
+        if mode_cust == "Lusin (12)":
+            mult_cust = 12
+        elif mode_cust in ["Dus", "Box", "Pack", "Set"]:
+            # Kita kasih default isi 1, nanti Bapak bisa koreksi di Admin jika isinya beda
+            isi_cust = c2.number_input("Isi per " + sat_cust, min_value=1, value=1, help="Berapa isi pcs dalam 1 " + sat_cust)
+            mult_cust = isi_cust
+        
+        qty_cust = c2.number_input(f"Jumlah {sat_cust}", min_value=1, value=1)
+        
+        # Hitung estimasi harga (untuk info saja ke customer)
+        h_estimasi = int(h_master * mult_cust)
+        c3.metric("Estimasi Harga", f"Rp {h_estimasi:,.0f} / {sat_cust}")
+
+        if st.button("➕ Tambahkan ke Keranjang"):
+            # Masukkan ke keranjang dengan data lengkap
+            data_item = {
+                "Nama Barang": pilihan_barang,
+                "Qty": int(qty_cust),
+                "Harga": float(h_estimasi),
+                "Satuan": sat_cust,
+                "Total_Row": float(qty_cust * h_estimasi)
+            }
+            # Cek jika barang sudah ada di keranjang, hapus dulu yang lama (update)
+            st.session_state.cart = [item for item in st.session_state.cart if item['Nama Barang'] != pilihan_barang]
+            st.session_state.cart.append(data_item)
+            st.success(f"{pilihan_barang} ({qty_cust} {sat_cust}) berhasil ditambah!")
             st.rerun()
 
+    # TAMPILAN KERANJANG BELANJA
     if st.session_state.cart:
-        st.markdown("### 📋 Daftar Pesanan")
-        list_pesanan = []
-        for item in st.session_state.cart:
-            row_b = df_barang[df_barang['Nama Barang'] == item].iloc[0]
+        st.markdown("### 📋 Daftar Pesanan Anda")
+        total_pengajuan = 0
+        
+        for i, item in enumerate(st.session_state.cart):
             with st.container(border=True):
-                c1, c2, c3, c4 = st.columns([3, 1.5, 1, 0.5])
-                c1.markdown(f"**{item}**")
-                c2.markdown(f"Rp {row_b['Harga']:,.0f} / {row_b['Satuan']}")
-                qty = c3.number_input(f"Jumlah", min_value=1, value=1, key=f"q_c_{item}")
-                if c4.button("❌", key=f"del_c_{item}"):
-                    st.session_state.cart.remove(item); st.rerun()
-                list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(row_b['Harga']), "Satuan": str(row_b['Satuan']), "Total_Row": float(qty * row_b['Harga'])})
+                ca, cb, cc, cd = st.columns([3, 1.5, 1.5, 0.5])
+                ca.markdown(f"**{item['Nama Barang']}**")
+                cb.markdown(f"{item['Qty']} {item['Satuan']}")
+                cc.markdown(f"Rp {item['Total_Row']:,.0f}")
+                if cd.button("❌", key=f"del_cart_{i}"):
+                    st.session_state.cart.pop(i)
+                    st.rerun()
+                total_pengajuan += item['Total_Row']
 
-        if st.button(f"🚀 Kirim Pengajuan ke {MARKETING_NAME}", use_container_width=True):
+        st.divider()
+        st.markdown(f"#### Estimasi Subtotal: Rp {total_pengajuan:,.0f}")
+        
+        if st.button(f"🚀 Kirim Pengajuan ke {MARKETING_NAME}", use_container_width=True, type="primary"):
             sheet = connect_gsheet()
             if sheet and nama_toko:
                 wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
-                sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending", MARKETING_NAME])
-                st.success("Terkirim! Terima kasih."); st.session_state.cart = []
+                # Kita kirim list_pesanan yang sudah rapi
+                sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(st.session_state.cart), "Pending", MARKETING_NAME])
+                st.balloons()
+                st.success("Terkirim! Pesanan Anda akan segera kami proses."); st.session_state.cart = []
+                time.sleep(2)
+                st.rerun()
 
 elif menu == "👨‍💻 Admin Dashboard":
     st.title(f"Admin Dashboard - {MARKETING_NAME}")
