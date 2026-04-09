@@ -297,38 +297,39 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     u_k = f"r{real_row_idx}_i{i}"
                                     
                                     with st.container(border=True):
-                                        c1, c2, c3, c4, c5, c6 = st.columns([2.2, 0.9, 1.2, 1.3, 0.8, 0.4])
+                                        c1, c2, c3, c4, c5, c6 = st.columns([2.0, 1.1, 1.2, 1.3, 0.8, 0.4])
                                         c1.markdown(f"**{r['Nama Barang']}**")
                                         c1.caption(f"Master: Rp {harga_master:,.0f}/Pcs")
 
-                                        # --- LOGIKA KALKULATOR SAKTI ---
-                                        # 1. Pilih Mode
-                                        mode = c2.selectbox("Mode", ["Pcs", "Lusin", "Pack"], key=f"m_{u_k}")
+                                        # --- PILIHAN MODE LENGKAP ---
+                                        list_mode = ["Pcs", "Lusin (12)", "Dus", "Box", "Pack", "Set", "Buku", "Rim (500)"]
+                                        mode = c2.selectbox("Mode", list_mode, key=f"m_{u_k}")
                                         
+                                        # Logika Pengali Otomatis
                                         mult = 1
-                                        sat_auto = "Pcs"
+                                        sat_final = mode.split(" ")[0] # Ambil kata pertamanya saja (misal "Lusin")
                                         
-                                        if mode == "Lusin":
+                                        if mode == "Lusin (12)":
                                             mult = 12
-                                            sat_auto = "Lusin"
-                                        elif mode == "Pack":
-                                            isi_p = c3.number_input("Isi/Pack", min_value=1, value=10, key=f"isi_{u_k}")
-                                            mult = isi_p
-                                            sat_auto = "Pack"
+                                        elif mode == "Rim (500)":
+                                            mult = 500
+                                        elif mode in ["Dus", "Box", "Pack", "Set", "Buku"]:
+                                            isi_manual = c3.number_input("Isi per...", min_value=1, value=10, key=f"isi_{u_k}")
+                                            mult = isi_manual
                                         
-                                        # 2. Hitung Harga Jual yang seharusnya
-                                        h_otomatis = int(harga_master * mult)
-
-                                        # --- KUNCI: Pakai session_state agar Harga Jual berubah seketika ---
-                                        if f"h_{u_k}" not in st.session_state or st.session_state.get(f"prev_m_{u_k}") != mode:
-                                            st.session_state[f"h_{u_k}"] = h_otomatis
-                                            st.session_state[f"s_{u_k}"] = sat_auto
-                                            st.session_state[f"prev_m_{u_k}"] = mode
+                                        # --- HITUNG HARGA LIVE ---
+                                        h_suggest = int(harga_master * mult)
+                                        
+                                        # SINKRONISASI SESSION STATE (Biar berubah pas 'Isi' atau 'Mode' diganti)
+                                        # Kita buat trigger gabungan antara Mode + Multiplier
+                                        trigger_key = f"{mode}_{mult}"
+                                        if st.session_state.get(f"trig_{u_k}") != trigger_key:
+                                            st.session_state[f"h_{u_k}"] = h_suggest
+                                            st.session_state[f"s_{u_k}"] = sat_final
+                                            st.session_state[f"trig_{u_k}"] = trigger_key
 
                                         nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
                                         ns = c3.text_input("Unit", key=f"s_{u_k}")
-                                        
-                                        # Input Harga Jual yang nilainya nempel ke session_state
                                         nh = c4.number_input("Harga Jual", step=500, format="%d", key=f"h_{u_k}")
                                         
                                         np = c5.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
