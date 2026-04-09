@@ -286,65 +286,61 @@ elif menu == "👨‍💻 Admin Dashboard":
                                 except:
                                     items_list = []
 
-                                # --- FORM EDIT ---
-                                with st.form(key=f"f_edit_{real_row_idx}"):
-                                    st.write("### 📝 Edit Daftar Barang")
-                                    temp_up = []
-                                    for i, r in enumerate(items_list):
-                                        # Ambil Harga Master Dasar dari Database
-                                        row_master = df_barang[df_barang['Nama Barang'] == r['Nama Barang']]
-                                        harga_dasar = float(row_master['Harga'].values[0]) if not row_master.empty else float(r['Harga'])
-                                        
-                                        u_k = f"r{real_row_idx}_i{i}"
-                                        
-                                        with st.container(border=True):
-                                            c1, c2, c3, c4, c5, c6 = st.columns([2.2, 0.9, 1.2, 1.3, 0.8, 0.4])
-                                            c1.markdown(f"**{r['Nama Barang']}**")
-                                            c1.caption(f"Master: Rp {harga_dasar:,.0f}/Pcs")
-
-                                            # Kalkulator Konversi
-                                            mode = c2.selectbox("Mode", ["Pcs", "Lusin", "Pack"], key=f"m_{u_k}")
-                                            mult = 1
-                                            sat_auto = "Pcs"
-                                            
-                                            if mode == "Lusin":
-                                                mult = 12
-                                                sat_auto = "Lusin"
-                                            elif mode == "Pack":
-                                                isi = c3.number_input("Isi/Pack", min_value=1, value=10, key=f"isi_{u_k}")
-                                                mult = isi
-                                                sat_auto = "Pack"
-                                            
-                                            nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
-                                            ns = c3.text_input("Unit", value=sat_auto, key=f"s_{u_k}")
-                                            
-                                            # Hitung Otomatis Harga Jual
-                                            h_jual = int(harga_dasar * mult)
-                                            nh = c4.number_input("Harga Jual", value=h_jual, step=500, format="%d", key=f"h_{u_k}")
-                                            
-                                            np = c5.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
-                                            td = c6.checkbox("🗑️", key=f"d_{u_k}")
-                                            
-                                            temp_up.append({
-                                                "del": td, "pos": np, "Nama": r['Nama Barang'], 
-                                                "Qty": nq, "Harga": nh, "Sat": ns
-                                            })
+                                # --- KOTAK EDIT (DIKELUARKAN DARI FORM BIAR LIVE) ---
+                                st.write("### 📝 Edit Daftar Barang")
+                                temp_up = []
+                                for i, r in enumerate(items_list):
+                                    row_master = df_barang[df_barang['Nama Barang'] == r['Nama Barang']]
+                                    harga_dasar = float(row_master['Harga'].values[0]) if not row_master.empty else float(r['Harga'])
                                     
-                                    st.write("---")
-                                    add_b = st.multiselect("Tambah Barang Baru:", options=df_barang['Nama Barang'].tolist(), key=f"add_new_{real_row_idx}")
+                                    u_k = f"r{real_row_idx}_i{i}"
                                     
-                                    if st.form_submit_button("💾 SIMPAN SEMUA PERUBAHAN", use_container_width=True):
-                                        final = sorted([x for x in temp_up if not x['del']], key=lambda x: x['pos'])
-                                        for p in add_b:
-                                            rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                            final.append({"Nama": p, "Qty": 1, "Harga": float(rb['Harga']), "Sat": str(rb['Satuan'])})
-                                        
-                                        save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty']*x['Harga']} for x in final]
-                                        sheet.update_cell(real_row_idx, 5, str(save_data))
-                                        st.cache_data.clear()
-                                        st.success("Tersimpan!"); time.sleep(1); st.rerun()
+                                    with st.container(border=True):
+                                        c1, c2, c3, c4, c5, c6 = st.columns([2.2, 0.9, 1.2, 1.3, 0.8, 0.4])
+                                        c1.markdown(f"**{r['Nama Barang']}**")
+                                        c1.caption(f"Master: Rp {harga_dasar:,.0f}/Pcs")
 
-                                # --- MENU PRINT / DOWNLOAD ---
+                                        # KALKULATOR LIVE
+                                        mode = c2.selectbox("Mode", ["Pcs", "Lusin", "Pack"], key=f"m_{u_k}")
+                                        
+                                        mult = 1
+                                        sat_auto = "Pcs"
+                                        if mode == "Lusin":
+                                            mult = 12
+                                            sat_auto = "Lusin"
+                                        elif mode == "Pack":
+                                            isi_p = c3.number_input("Isi/Pack", min_value=1, value=10, key=f"isi_{u_k}")
+                                            mult = isi_p
+                                            sat_auto = "Pack"
+                                        
+                                        nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
+                                        ns = c3.text_input("Unit", value=sat_auto, key=f"s_{u_k}")
+                                        
+                                        # HARGA OTOMATIS BERUBAH DISINI
+                                        h_jual = int(harga_dasar * mult)
+                                        nh = c4.number_input("Harga Jual", value=h_jual, step=500, format="%d", key=f"h_{u_k}")
+                                        
+                                        np = c5.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
+                                        td = c6.checkbox("🗑️", key=f"d_{u_k}")
+                                        
+                                        temp_up.append({"del": td, "pos": np, "Nama": r['Nama Barang'], "Qty": nq, "Harga": nh, "Sat": ns})
+                                
+                                st.write("---")
+                                add_b = st.multiselect("Tambah Barang Baru:", options=df_barang['Nama Barang'].tolist(), key=f"add_new_{real_row_idx}")
+                                
+                                # TOMBOL SIMPAN (SEKARANG BERDIRI SENDIRI)
+                                if st.button("💾 SIMPAN PERUBAHAN DATA", key=f"btn_save_{real_row_idx}", use_container_width=True):
+                                    final = sorted([x for x in temp_up if not x['del']], key=lambda x: x['pos'])
+                                    for p in add_b:
+                                        rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
+                                        final.append({"Nama": p, "Qty": 1, "Harga": float(rb['Harga']), "Sat": str(rb['Satuan'])})
+                                    
+                                    save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty']*x['Harga']} for x in final]
+                                    sheet.update_cell(real_row_idx, 5, str(save_data))
+                                    st.cache_data.clear()
+                                    st.success("Tersimpan!"); time.sleep(1); st.rerun()
+
+                                # --- MENU PRINT / DOWNLOAD (TETAP SAMA) ---
                                 if items_list:
                                     f_df = pd.DataFrame(items_list)
                                     subt = f_df['Total_Row'].sum()
