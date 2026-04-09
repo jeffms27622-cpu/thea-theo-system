@@ -12,14 +12,14 @@ import time
 # =========================================================
 # 1. KONFIGURASI UTAMA & DATA KANTOR
 # =========================================================
-MARKETING_NAME  = "Asin"
-MARKETING_WA    = "0815-8199-775"
+MARKETING_NAME = "Asin"
+MARKETING_WA = "0815-8199-775"
 MARKETING_EMAIL = "alattulis.tts@gmail.com"
 
-COMPANY_NAME    = "PT. THEA THEO STATIONARY"
-SLOGAN          = "Office & School Supplies Solution"
-ADDR            = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
-OFFICE_PHONE    = "(021) 55780659"
+COMPANY_NAME = "PT. THEA THEO STATIONARY"
+SLOGAN = "Office & School Supplies Solution"
+ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
+OFFICE_PHONE = "(021) 55780659"
 
 if "ADMIN_PASSWORD" in st.secrets:
     ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
@@ -54,26 +54,15 @@ def connect_gsheet():
 def load_db():
     if os.path.exists("database_barang.csv"):
         try:
-            # PAKE VERSI SAKTI:
-            # sep=None & engine='python' biar otomatis deteksi koma/titik koma
-            # on_bad_lines='skip' biar kalau ada baris rusak (seperti baris 73), aplikasi GAK MATI
             df = pd.read_csv("database_barang.csv", sep=None, engine='python', on_bad_lines='skip')
-            
-            # Bersihkan nama kolom dari spasi hantu
             df.columns = df.columns.str.strip()
-            
-            # Pastikan kolom "Harga" jadi angka, kalau gagal jadi 0
             if 'Harga' in df.columns:
                 df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce').fillna(0)
-            
             return df
         except Exception as e:
             st.error(f"Gagal membaca CSV: {e}")
-    
-    # Kalau CSV gagal total, aplikasi tetep jalan dengan tabel kosong
     return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
 
-# BARIS WAJIB: Jangan lupa panggil fungsinya di luar
 df_barang = load_db()
 
 # =========================================================
@@ -170,7 +159,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
 def generate_excel(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        workbook  = writer.book
+        workbook = writer.book
         worksheet = workbook.add_worksheet('Quotation')
 
         fmt_navy_bg = workbook.add_format({'bg_color': '#002855', 'font_color': 'white', 'bold': True, 'font_size': 18, 'valign': 'vcenter'})
@@ -230,39 +219,103 @@ if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
     st.info(f"Marketing Aktif: {MARKETING_NAME} | {MARKETING_WA}")
 
-elif menu == "📝 Portal Customer":
+elif menu == "📝 Admin Marketing":
     st.subheader("Form Pengajuan Penawaran")
+    
+    # 1. INPUT DATA CUSTOMER
     with st.container(border=True):
         col1, col2 = st.columns(2)
         nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko")
         up_nama = col2.text_input("👤 Nama Penerima (UP)")
         wa_nomor = col1.text_input("📞 Nomor WhatsApp Pembeli")
-        picks = st.multiselect("📦 Pilih Barang:", options=df_barang['Nama Barang'].tolist())
-        if st.button("Tambahkan ke Keranjang"):
-            for p in picks:
-                if p not in st.session_state.cart: st.session_state.cart.append(p)
+
+    # 2. PILIH BARANG & KONVERSI SATUAN
+    with st.container(border=True):
+        st.markdown("### 📦 Tambah Barang")
+        pilihan_barang = st.selectbox("Cari Nama Barang:", options=df_barang['Nama Barang'].tolist())
+        
+        # Ambil data master dari CSV
+        row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
+        h_master = float(row_m['Harga'])
+        satuan_db = str(row_m['Satuan']).strip() # Satuan asli dari database (misal: Rim atau Pack)
+        
+        c1, c2, c3 = st.columns([1.5, 1, 1])
+        
+        # Mode Satuan: Pilihan pertama otomatis mengikuti database Bapak
+        list_mode_cust = ["Sesuai Database", "Lusin (12)", "Dus", "Box", "Pack", "Set"]
+        # Jika barangnya sudah Rim, maka "Sesuai Database" akan mewakili Rim tersebut
+        mode_c = c1.selectbox(f"Pilih Satuan (Default: {satuan_db})", list_mode_cust, key="m_cust")
+        
+        mult_c = 1
+        sat_final = satuan_db # Default pakai satuan dari database
+        
+        if mode_c == "Lusin (12)":
+            mult_c = 12
+            sat_final = "Lusin"
+        elif mode_c in ["Dus", "Box", "Pack", "Set"]:
+            isi_c = c2.number_input(f"Isi per {mode_c}", min_value=1, value=10)
+            mult_c = isi_c
+            sat_final = mode_c
+        else:
+            # Jika pilih "Sesuai Database", maka mult=1 (Harga Master)
+            mult_c = 1
+            sat_final = satuan_db
+            
+        qty_c = c3.number_input(f"Jumlah {sat_final}", min_value=1, value=1)
+        
+        # Hitung Harga (Tidak akan kali 500 kalau satuannya sudah Rim di database)
+        h_jual_c = int(h_master * mult_c)
+        st.info(f"Harga Penawaran: **Rp {h_jual_c:,.0f} / {sat_final}**")
+
+        if st.button("➕ Masukkan ke Daftar Pesanan", use_container_width=True):
+            # Update keranjang jika barang sama dipilih lagi
+            st.session_state.cart = [item for item in st.session_state.cart if item['Nama Barang'] != pilihan_barang]
+            
+            st.session_state.cart.append({
+                "Nama Barang": pilihan_barang,
+                "Qty": int(qty_c),
+                "Harga": float(h_jual_c),
+                "Satuan": sat_final,
+                "Total_Row": float(qty_c * h_jual_c)
+            })
+            st.toast(f"Berhasil ditambah: {pilihan_barang}")
+            time.sleep(0.5)
             st.rerun()
 
+    # 3. TAMPILAN DAFTAR PESANAN
     if st.session_state.cart:
-        st.markdown("### 📋 Daftar Pesanan")
-        list_pesanan = []
-        for item in st.session_state.cart:
-            row_b = df_barang[df_barang['Nama Barang'] == item].iloc[0]
+        st.markdown("### 📋 Daftar Pesanan Anda")
+        total_p = 0
+        
+        for i, item in enumerate(st.session_state.cart):
             with st.container(border=True):
-                c1, c2, c3, c4 = st.columns([3, 1.5, 1, 0.5])
-                c1.markdown(f"**{item}**")
-                c2.markdown(f"Rp {row_b['Harga']:,.0f} / {row_b['Satuan']}")
-                qty = c3.number_input(f"Jumlah", min_value=1, value=1, key=f"q_c_{item}")
-                if c4.button("❌", key=f"del_c_{item}"):
-                    st.session_state.cart.remove(item); st.rerun()
-                list_pesanan.append({"Nama Barang": str(item), "Qty": int(qty), "Harga": float(row_b['Harga']), "Satuan": str(row_b['Satuan']), "Total_Row": float(qty * row_b['Harga'])})
+                ca, cb, cc, cd = st.columns([3, 1.5, 1.5, 0.5])
+                ca.markdown(f"**{item['Nama Barang']}**")
+                cb.markdown(f"{item['Qty']} {item['Satuan']} (@Rp {item['Harga']:,.0f})")
+                cc.markdown(f"**Rp {item['Total_Row']:,.0f}**")
+                
+                if cd.button("❌", key=f"del_item_{i}"):
+                    st.session_state.cart.pop(i)
+                    st.rerun()
+                total_p += item['Total_Row']
 
-        if st.button(f"🚀 Kirim Pengajuan ke {MARKETING_NAME}", use_container_width=True):
-            sheet = connect_gsheet()
-            if sheet and nama_toko:
-                wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
-                sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(list_pesanan), "Pending", MARKETING_NAME])
-                st.success("Terkirim! Terima kasih."); st.session_state.cart = []
+        st.divider()
+        col_total = st.columns([4, 2])
+        col_total[1].metric("Total Estimasi", f"Rp {total_p:,.0f}")
+        
+        if st.button(f"🚀 KIRIM PENAWARAN KE PAK {MARKETING_NAME.upper()}", use_container_width=True, type="primary"):
+            if not nama_toko:
+                st.error("Nama Toko/Perusahaan wajib diisi!")
+            else:
+                sheet = connect_gsheet()
+                if sheet:
+                    wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
+                    sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(st.session_state.cart), "Pending", MARKETING_NAME])
+                    st.balloons()
+                    st.success("Terkirim! Pesanan Anda sedang kami proses.")
+                    st.session_state.cart = []
+                    time.sleep(2)
+                    st.rerun()
 
 elif menu == "👨‍💻 Admin Dashboard":
     st.title(f"Admin Dashboard - {MARKETING_NAME}")
@@ -293,35 +346,58 @@ elif menu == "👨‍💻 Admin Dashboard":
                             
                             with st.expander(f"🛠️ KELOLA: {row['Customer']}", expanded=True):
                                 try:
+                                    # MENGAMBIL DATA ASLI DARI PORTAL CUSTOMER
                                     items_list = ast.literal_eval(str(row['Pesanan']))
                                 except:
                                     items_list = []
 
-                                # --- FORM EDIT ---
-                                with st.form(key=f"f_edit_{real_row_idx}"):
-                                    st.write("### 📝 Edit Daftar Barang")
-                                    temp_up = []
-                                    for i, r in enumerate(items_list):
-                                        
-                                        # PERBAIKAN PROPORSI KOLOM: 
-                                        # c3 (Unit) dan c5 (Pos) dibesarkan, c4 (Harga) dikecilkan
-                                        c1, c2, c3, c4, c5, c6 = st.columns([2.5, 0.7, 1.2, 1.5, 0.8, 0.4])
+                                st.write("### 📝 Edit Daftar Barang")
+                                temp_up = []
+                                
+                                for i, r in enumerate(items_list):
+                                    # Ambil Harga Master (hanya untuk referensi caption)
+                                    row_master = df_barang[df_barang['Nama Barang'] == r['Nama Barang']]
+                                    harga_master_asli = float(row_master['Harga'].values[0]) if not row_master.empty else float(r['Harga'])
+                                    
+                                    u_k = f"r{real_row_idx}_i{i}"
+                                    
+                                    with st.container(border=True):
+                                        c1, c2, c3, c4, c5, c6 = st.columns([2.0, 1.1, 1.2, 1.3, 0.8, 0.4])
                                         c1.markdown(f"**{r['Nama Barang']}**")
+                                        # Caption menunjukkan harga master asli biar Bapak gak bingung
+                                        c1.caption(f"Master CSV: Rp {harga_master_asli:,.0f}")
+
+                                        # --- PILIHAN MODE ---
+                                        # Default mode adalah "Pcs/Tetap" agar mengikuti input Customer
+                                        list_mode = ["Pcs/Tetap", "Lusin (12)", "Dus", "Box", "Pack", "Set", "Rim"]
+                                        mode = c2.selectbox("Ubah Satuan?", list_mode, key=f"m_{u_k}")
                                         
-                                        safe_name = str(r['Nama Barang']).replace(" ", "_").replace(".", "")
-                                        u_k = f"r{real_row_idx}_{safe_name}"
-                                        
+                                        # LOGIKA: Jika Bapak pilih "Pcs/Tetap", maka pakai Harga & Satuan dari Customer
+                                        if mode == "Pcs/Tetap":
+                                            mult = 1
+                                            # Ambil satuan dan harga yang dikirim customer
+                                            sat_init = str(r.get('Satuan', 'Pcs'))
+                                            harga_init = int(float(r.get('Harga', harga_master_asli)))
+                                        else:
+                                            # Jika Bapak pilih mode lain (Lusin/Dus), baru kalkulator bekerja
+                                            sat_init = mode
+                                            if mode == "Lusin (12)": mult = 12
+                                            elif mode == "Rim": mult = 1 # Rim tetap harga master (sesuai request)
+                                            else:
+                                                isi_m = c3.number_input("Isi per...", min_value=1, value=10, key=f"isi_{u_k}")
+                                                mult = isi_m
+                                            harga_init = int(harga_master_asli * mult)
+
+                                        # SINKRONISASI LIVE KE INPUT
+                                        trigger_val = f"{mode}_{mult}"
+                                        if st.session_state.get(f"trig_{u_k}") != trigger_val:
+                                            st.session_state[f"h_{u_k}"] = harga_init
+                                            st.session_state[f"s_{u_k}"] = sat_init
+                                            st.session_state[f"trig_{u_k}"] = trigger_val
+
                                         nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
-                                        
-                                        opsi_satuan = ["Pcs", "Lusin", "Box", "Pack", "Rim", "Dus", "Set", "Roll", "Lembar", "Botol", "Buku", "Unit"]
-                                        satuan_sekarang = str(r.get('Satuan','Pcs')).strip()
-                                        if satuan_sekarang not in opsi_satuan:
-                                            opsi_satuan.insert(0, satuan_sekarang)
-                                            
-                                        ns = c3.selectbox("Unit", options=opsi_satuan, index=opsi_satuan.index(satuan_sekarang), key=f"s_{u_k}")
-                                        
-                                        # HARGA DIBUAT TANPA KOMA DESIMAL BIAR RAPI (format="%d")
-                                        nh = c4.number_input("Harga", value=int(float(r['Harga'])), step=500, format="%d", key=f"h_{u_k}")
+                                        ns = c3.text_input("Unit", key=f"s_{u_k}")
+                                        nh = c4.number_input("Harga Jual", step=500, format="%d", key=f"h_{u_k}")
                                         
                                         np = c5.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
                                         td = c6.checkbox("🗑️", key=f"d_{u_k}")
@@ -330,30 +406,24 @@ elif menu == "👨‍💻 Admin Dashboard":
                                             "del": td, "pos": np, "Nama": r['Nama Barang'], 
                                             "Qty": nq, "Harga": nh, "Sat": ns
                                         })
+                                
+                                st.write("---")
+                                add_b = st.multiselect("Tambah Barang Baru:", options=df_barang['Nama Barang'].tolist(), key=f"add_new_{real_row_idx}")
+                                
+                                if st.button("💾 SIMPAN PERUBAHAN DATA", key=f"btn_save_{real_row_idx}", use_container_width=True):
+                                    final = sorted([x for x in temp_up if not x['del']], key=lambda x: x['pos'])
+                                    for p in add_b:
+                                        rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
+                                        final.append({"Nama": p, "Qty": 1, "Harga": float(rb['Harga']), "Sat": str(rb['Satuan'])})
                                     
-                                    st.write("---")
-                                    add_b = st.multiselect("Tambah Barang Baru:", options=df_barang['Nama Barang'].tolist(), key=f"add_new_{real_row_idx}")
-                                    ins_pos = st.number_input("Taruh di No:", value=float(len(items_list)+1), key=f"ins_pos_{real_row_idx}")
+                                    save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty']*x['Harga']} for x in final]
+                                    sheet.update_cell(real_row_idx, 5, str(save_data))
+                                    st.cache_data.clear()
+                                    st.success("Tersimpan!"); time.sleep(1); st.rerun()
 
-                                    if st.form_submit_button("💾 SIMPAN SEMUA PERUBAHAN", use_container_width=True):
-                                        final = sorted([x for x in temp_up if not x['del']], key=lambda x: x['pos'])
-                                        for p in add_b:
-                                            rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
-                                            final.append({"Nama": p, "Qty": 1, "Harga": float(rb['Harga']), "Sat": str(rb['Satuan'])})
-                                        
-                                        save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty']*x['Harga']} for x in final]
-                                        
-                                        sheet.update_cell(real_row_idx, 5, str(save_data))
-                                        
-                                        keys_del = [k for k in st.session_state.keys() if f"r{real_row_idx}_" in k or f"_{real_row_idx}" in k]
-                                        for k in keys_del:
-                                            del st.session_state[k]
-                                            
-                                        st.cache_data.clear()
-                                        st.success("Tersimpan Sempurna!"); time.sleep(1); st.rerun()
-
-                                # --- MENU PRINT / DOWNLOAD ---
+                                # --- DOWNLOAD AREA (PDF & EXCEL) ---
                                 if items_list:
+                                    # Pakai data terbaru hasil simpan untuk hitung total di UI
                                     f_df = pd.DataFrame(items_list)
                                     subt = f_df['Total_Row'].sum()
                                     tax = subt * 0.11
@@ -364,23 +434,15 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     no_s = c_no.text_input("No Surat:", value=f"/S-TTS/IV/2026", key=f"ns_print_{real_row_idx}")
                                     c_met.metric("Total Quotation", f"Rp {gtot:,.0f}")
                                     
-                                    nama_toko = str(row['Customer']).replace(" ","_")
-                                    tgl = datetime.now().strftime('%d%m%y')
-                                    n_pdf = f"{nama_toko}_{tgl}.pdf"
-                                    
                                     b1, b2 = st.columns(2)
                                     pdf_data = generate_pdf(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
-                                    b1.download_button(label=f"📩 DOWNLOAD PDF ({nama_toko})", data=pdf_data, file_name=n_pdf, key=f"btn_p_{real_row_idx}", use_container_width=True)
+                                    b1.download_button(label=f"📩 DOWNLOAD PDF", data=pdf_data, file_name=f"Quo_{row['Customer']}.pdf", key=f"btn_p_{real_row_idx}", use_container_width=True)
                                     
                                     xls_data = generate_excel(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
-                                    b2.download_button(label=f"📊 DOWNLOAD EXCEL ({nama_toko})", data=xls_data, file_name=f"{nama_toko}.xlsx", key=f"btn_x_{real_row_idx}", use_container_width=True)
+                                    b2.download_button(label=f"📊 DOWNLOAD EXCEL", data=xls_data, file_name=f"{row['Customer']}.xlsx", key=f"btn_x_{real_row_idx}", use_container_width=True)
 
-                                    st.write("")
                                     if st.button("✅ PENAWARAN SELESAI (HAPUS)", key=f"done_btn_{real_row_idx}", type="primary", use_container_width=True):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
                                         st.rerun()
-                        else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
+                    else: st.info(f"Antrean bersih, Pak {MARKETING_NAME}!")
             except Exception as e: st.error(f"Error Sistem: {e}")
-
-
-
