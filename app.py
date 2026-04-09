@@ -211,7 +211,7 @@ def generate_excel(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_tota
 # 5. UI UTAMA (STREAMLIT)
 # =========================================================
 st.sidebar.title(f"Portal {MARKETING_NAME}")
-menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Admin Marketing", "👨‍💻 Admin Dashboard"])
+menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Admin Sales", "👨‍💻 Sales Dashboard"])
 
 if 'cart' not in st.session_state: st.session_state.cart = []
 
@@ -219,7 +219,7 @@ if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
     st.info(f"Marketing Aktif: {MARKETING_NAME} | {MARKETING_WA}")
 
-elif menu == "📝 Admin Marketing":
+elif menu == "📝 Admin Sales":
     st.subheader("Form Pengajuan Penawaran")
     
     # 1. INPUT DATA CUSTOMER
@@ -317,8 +317,8 @@ elif menu == "📝 Admin Marketing":
                     time.sleep(2)
                     st.rerun()
 
-elif menu == "👨‍💻 Admin Dashboard":
-    st.title(f"Admin Dashboard - {MARKETING_NAME}")
+elif menu == "👨‍💻 Sales Dashboard":
+    st.title(f"Sales Dashboard - {MARKETING_NAME}")
     
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
