@@ -222,6 +222,11 @@ if menu == "🏠 Home":
 elif menu == "📝 Admin Sales":
     st.subheader("Form Pengajuan Penawaran")
     
+    # --- TRIK SAKTI RESET PENCARIAN ---
+    # Kita buat 'counter' di session state. Kalau counter berubah, kotak pencarian reset.
+    if "widget_id" not in st.session_state:
+        st.session_state.widget_id = 0
+
     # 1. INPUT DATA CUSTOMER
     with st.container(border=True):
         col1, col2 = st.columns(2)
@@ -232,77 +237,76 @@ elif menu == "📝 Admin Sales":
     # 2. PILIH BARANG & KONVERSI SATUAN
     with st.container(border=True):
         st.markdown("### 📦 Tambah Barang")
-        pilihan_barang = st.selectbox("Cari Nama Barang:", options=df_barang['Nama Barang'].tolist())
         
-        # Ambil data master dari CSV
-        row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
-        h_master = float(row_m['Harga'])
-        satuan_db = str(row_m['Satuan']).strip() # Satuan asli dari database (misal: Rim atau Pack)
+        # PENTING: Key selectbox digabung dengan widget_id biar bisa direset paksa
+        pilihan_barang = st.selectbox(
+            "Cari Nama Barang (Ketik di sini):", 
+            options=[""] + df_barang['Nama Barang'].tolist(), 
+            key=f"pilih_brg_{st.session_state.widget_id}",
+            help="Ketik nama barang untuk mencari"
+        )
         
-        c1, c2, c3 = st.columns([1.5, 1, 1])
-        
-        # Mode Satuan: Pilihan pertama otomatis mengikuti database Bapak
-        list_mode_cust = ["Sesuai Database", "Lusin (12)", "Dus", "Box", "Pack", "Set"]
-        # Jika barangnya sudah Rim, maka "Sesuai Database" akan mewakili Rim tersebut
-        mode_c = c1.selectbox(f"Pilih Satuan (Default: {satuan_db})", list_mode_cust, key="m_cust")
-        
-        mult_c = 1
-        sat_final = satuan_db # Default pakai satuan dari database
-        
-        if mode_c == "Lusin (12)":
-            mult_c = 12
-            sat_final = "Lusin"
-        elif mode_c in ["Dus", "Box", "Pack", "Set"]:
-            isi_c = c2.number_input(f"Isi per {mode_c}", min_value=1, value=10)
-            mult_c = isi_c
-            sat_final = mode_c
-        else:
-            # Jika pilih "Sesuai Database", maka mult=1 (Harga Master)
+        if pilihan_barang != "":
+            # Ambil data master
+            row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
+            h_master = float(row_m['Harga'])
+            satuan_db = str(row_m['Satuan']).strip() 
+            
+            c1, c2, c3 = st.columns([1.5, 1, 1])
+            list_mode_cust = ["Sesuai Database", "Lusin (12)", "Dus", "Box", "Pack", "Set"]
+            mode_c = c1.selectbox(f"Pilih Satuan (Default: {satuan_db})", list_mode_cust, key=f"m_c_{st.session_state.widget_id}")
+            
             mult_c = 1
-            sat_final = satuan_db
+            sat_final = satuan_db 
             
-        qty_c = c3.number_input(f"Jumlah {sat_final}", min_value=1, value=1)
-        
-        # Hitung Harga (Tidak akan kali 500 kalau satuannya sudah Rim di database)
-        h_jual_c = int(h_master * mult_c)
-        st.info(f"Harga Penawaran: **Rp {h_jual_c:,.0f} / {sat_final}**")
-
-        if st.button("➕ Masukkan ke Daftar Pesanan", use_container_width=True):
-            # Update keranjang jika barang sama dipilih lagi
-            st.session_state.cart = [item for item in st.session_state.cart if item['Nama Barang'] != pilihan_barang]
+            if mode_c == "Lusin (12)":
+                mult_c = 12
+                sat_final = "Lusin"
+            elif mode_c in ["Dus", "Box", "Pack", "Set"]:
+                isi_c = c2.number_input(f"Isi per {mode_c}", min_value=1, value=10, key=f"isi_c_{st.session_state.widget_id}")
+                mult_c = isi_c
+                sat_final = mode_c
             
-            st.session_state.cart.append({
-                "Nama Barang": pilihan_barang,
-                "Qty": int(qty_c),
-                "Harga": float(h_jual_c),
-                "Satuan": sat_final,
-                "Total_Row": float(qty_c * h_jual_c)
-            })
-            st.toast(f"Berhasil ditambah: {pilihan_barang}")
-            time.sleep(0.5)
-            st.rerun()
+            qty_c = c3.number_input(f"Jumlah {sat_final}", min_value=1, value=1, key=f"qty_c_{st.session_state.widget_id}")
+            
+            h_jual_c = int(h_master * mult_c)
+            st.info(f"Harga Penawaran: **Rp {h_jual_c:,.0f} / {sat_final}**")
 
-    # 3. TAMPILAN DAFTAR PESANAN
+            if st.button("➕ Masukkan ke Daftar Pesanan", use_container_width=True):
+                # Update keranjang
+                st.session_state.cart = [item for item in st.session_state.cart if item['Nama Barang'] != pilihan_barang]
+                st.session_state.cart.append({
+                    "Nama Barang": pilihan_barang,
+                    "Qty": int(qty_c),
+                    "Harga": float(h_jual_c),
+                    "Satuan": sat_final,
+                    "Total_Row": float(qty_c * h_jual_c)
+                })
+                
+                # --- PROSES RESET: Ubah widget_id biar selectbox balik ke awal ---
+                st.session_state.widget_id += 1
+                st.toast(f"Berhasil ditambah: {pilihan_barang}")
+                time.sleep(0.2)
+                st.rerun()
+        else:
+            st.write("👆 Silakan pilih atau ketik nama barang dulu Pak Asin.")
+
+    # 3. TAMPILAN DAFTAR PESANAN (TETAP SAMA)
     if st.session_state.cart:
         st.markdown("### 📋 Daftar Pesanan Anda")
         total_p = 0
-        
         for i, item in enumerate(st.session_state.cart):
             with st.container(border=True):
                 ca, cb, cc, cd = st.columns([3, 1.5, 1.5, 0.5])
                 ca.markdown(f"**{item['Nama Barang']}**")
                 cb.markdown(f"{item['Qty']} {item['Satuan']} (@Rp {item['Harga']:,.0f})")
                 cc.markdown(f"**Rp {item['Total_Row']:,.0f}**")
-                
                 if cd.button("❌", key=f"del_item_{i}"):
                     st.session_state.cart.pop(i)
                     st.rerun()
                 total_p += item['Total_Row']
 
         st.divider()
-        col_total = st.columns([4, 2])
-        col_total[1].metric("Total Estimasi", f"Rp {total_p:,.0f}")
-        
         if st.button(f"🚀 KIRIM PENAWARAN KE PAK {MARKETING_NAME.upper()}", use_container_width=True, type="primary"):
             if not nama_toko:
                 st.error("Nama Toko/Perusahaan wajib diisi!")
@@ -312,9 +316,9 @@ elif menu == "📝 Admin Sales":
                     wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
                     sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(st.session_state.cart), "Pending", MARKETING_NAME])
                     st.balloons()
-                    st.success("Terkirim! Pesanan Anda sedang kami proses.")
+                    st.success("Terkirim!")
                     st.session_state.cart = []
-                    time.sleep(2)
+                    time.sleep(1)
                     st.rerun()
 
 elif menu == "👨‍💻 Sales Dashboard":
