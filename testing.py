@@ -286,25 +286,28 @@ elif menu == "👨‍💻 Admin Dashboard":
                                 except:
                                     items_list = []
 
-                                # --- KOTAK EDIT (DIKELUARKAN DARI FORM BIAR LIVE) ---
                                 st.write("### 📝 Edit Daftar Barang")
                                 temp_up = []
+                                
                                 for i, r in enumerate(items_list):
+                                    # Ambil Harga Master Dasar
                                     row_master = df_barang[df_barang['Nama Barang'] == r['Nama Barang']]
-                                    harga_dasar = float(row_master['Harga'].values[0]) if not row_master.empty else float(r['Harga'])
+                                    harga_master = float(row_master['Harga'].values[0]) if not row_master.empty else float(r['Harga'])
                                     
                                     u_k = f"r{real_row_idx}_i{i}"
                                     
                                     with st.container(border=True):
                                         c1, c2, c3, c4, c5, c6 = st.columns([2.2, 0.9, 1.2, 1.3, 0.8, 0.4])
                                         c1.markdown(f"**{r['Nama Barang']}**")
-                                        c1.caption(f"Master: Rp {harga_dasar:,.0f}/Pcs")
+                                        c1.caption(f"Master: Rp {harga_master:,.0f}/Pcs")
 
-                                        # KALKULATOR LIVE
+                                        # --- LOGIKA KALKULATOR SAKTI ---
+                                        # 1. Pilih Mode
                                         mode = c2.selectbox("Mode", ["Pcs", "Lusin", "Pack"], key=f"m_{u_k}")
                                         
                                         mult = 1
                                         sat_auto = "Pcs"
+                                        
                                         if mode == "Lusin":
                                             mult = 12
                                             sat_auto = "Lusin"
@@ -313,22 +316,32 @@ elif menu == "👨‍💻 Admin Dashboard":
                                             mult = isi_p
                                             sat_auto = "Pack"
                                         
+                                        # 2. Hitung Harga Jual yang seharusnya
+                                        h_otomatis = int(harga_master * mult)
+
+                                        # --- KUNCI: Pakai session_state agar Harga Jual berubah seketika ---
+                                        if f"h_{u_k}" not in st.session_state or st.session_state.get(f"prev_m_{u_k}") != mode:
+                                            st.session_state[f"h_{u_k}"] = h_otomatis
+                                            st.session_state[f"s_{u_k}"] = sat_auto
+                                            st.session_state[f"prev_m_{u_k}"] = mode
+
                                         nq = c2.number_input("Qty", value=int(r['Qty']), key=f"q_{u_k}")
-                                        ns = c3.text_input("Unit", value=sat_auto, key=f"s_{u_k}")
+                                        ns = c3.text_input("Unit", key=f"s_{u_k}")
                                         
-                                        # HARGA OTOMATIS BERUBAH DISINI
-                                        h_jual = int(harga_dasar * mult)
-                                        nh = c4.number_input("Harga Jual", value=h_jual, step=500, format="%d", key=f"h_{u_k}")
+                                        # Input Harga Jual yang nilainya nempel ke session_state
+                                        nh = c4.number_input("Harga Jual", step=500, format="%d", key=f"h_{u_k}")
                                         
                                         np = c5.number_input("Pos", value=float(i+1), step=0.1, key=f"p_{u_k}")
                                         td = c6.checkbox("🗑️", key=f"d_{u_k}")
                                         
-                                        temp_up.append({"del": td, "pos": np, "Nama": r['Nama Barang'], "Qty": nq, "Harga": nh, "Sat": ns})
+                                        temp_up.append({
+                                            "del": td, "pos": np, "Nama": r['Nama Barang'], 
+                                            "Qty": nq, "Harga": nh, "Sat": ns
+                                        })
                                 
                                 st.write("---")
                                 add_b = st.multiselect("Tambah Barang Baru:", options=df_barang['Nama Barang'].tolist(), key=f"add_new_{real_row_idx}")
                                 
-                                # TOMBOL SIMPAN (SEKARANG BERDIRI SENDIRI)
                                 if st.button("💾 SIMPAN PERUBAHAN DATA", key=f"btn_save_{real_row_idx}", use_container_width=True):
                                     final = sorted([x for x in temp_up if not x['del']], key=lambda x: x['pos'])
                                     for p in add_b:
@@ -340,7 +353,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     st.cache_data.clear()
                                     st.success("Tersimpan!"); time.sleep(1); st.rerun()
 
-                                # --- MENU PRINT / DOWNLOAD (TETAP SAMA) ---
+                                # --- DOWNLOAD AREA ---
                                 if items_list:
                                     f_df = pd.DataFrame(items_list)
                                     subt = f_df['Total_Row'].sum()
@@ -363,7 +376,6 @@ elif menu == "👨‍💻 Admin Dashboard":
                                     xls_data = generate_excel(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
                                     b2.download_button(label=f"📊 DOWNLOAD EXCEL ({nama_toko})", data=xls_data, file_name=f"{nama_toko}.xlsx", key=f"btn_x_{real_row_idx}", use_container_width=True)
 
-                                    st.write("")
                                     if st.button("✅ PENAWARAN SELESAI (HAPUS)", key=f"done_btn_{real_row_idx}", type="primary", use_container_width=True):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
                                         st.rerun()
