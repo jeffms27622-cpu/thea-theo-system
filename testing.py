@@ -302,7 +302,7 @@ elif menu == "👨‍💻 Admin Dashboard":
                                         c1.caption(f"Master: Rp {harga_master:,.0f}/Pcs")
 
                                         # --- PILIHAN MODE LENGKAP ---
-                                        list_mode = ["Pcs", "Lusin (12)", "Dus", "Box", "Pack", "Set", "Buku", "Rim (500)"]
+                                        list_mode = ["Pcs", "Lusin (12)", "Dus", "Box", "Pack", "Set", "Buku", "Rim"]
                                         mode = c2.selectbox("Mode", list_mode, key=f"m_{u_k}")
                                         
                                         # Logika Pengali Otomatis
