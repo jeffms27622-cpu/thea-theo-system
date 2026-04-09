@@ -234,53 +234,59 @@ elif menu == "📝 Portal Customer":
         st.markdown("### 📦 Tambah Barang")
         pilihan_barang = st.selectbox("Cari Nama Barang:", options=df_barang['Nama Barang'].tolist())
         
-        # Ambil data master
+        # Ambil data master dari CSV
         row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
         h_master = float(row_m['Harga'])
+        satuan_db = str(row_m['Satuan']).strip() # Satuan asli dari database (misal: Rim atau Pack)
         
         c1, c2, c3 = st.columns([1.5, 1, 1])
-        # Mode Satuan Lengkap
-        list_mode_cust = ["Pcs", "Lusin (12)", "Rim (500)", "Dus", "Box", "Pack", "Set", "Buku"]
-        mode_c = c1.selectbox("Pilih Satuan:", list_mode_cust, key="m_cust")
+        
+        # Mode Satuan: Pilihan pertama otomatis mengikuti database Bapak
+        list_mode_cust = ["Sesuai Database", "Lusin (12)", "Dus", "Box", "Pack", "Set"]
+        # Jika barangnya sudah Rim, maka "Sesuai Database" akan mewakili Rim tersebut
+        mode_c = c1.selectbox(f"Pilih Satuan (Default: {satuan_db})", list_mode_cust, key="m_cust")
         
         mult_c = 1
-        sat_c = mode_c.split(" ")[0]
+        sat_final = satuan_db # Default pakai satuan dari database
         
         if mode_c == "Lusin (12)":
             mult_c = 12
-        elif mode_c == "Rim (500)":
-            mult_c = 500
-        elif mode_c in ["Dus", "Box", "Pack", "Set", "Buku"]:
-            isi_c = c2.number_input(f"Isi per {sat_c}", min_value=1, value=10)
+            sat_final = "Lusin"
+        elif mode_c in ["Dus", "Box", "Pack", "Set"]:
+            isi_c = c2.number_input(f"Isi per {mode_c}", min_value=1, value=10)
             mult_c = isi_c
+            sat_final = mode_c
+        else:
+            # Jika pilih "Sesuai Database", maka mult=1 (Harga Master)
+            mult_c = 1
+            sat_final = satuan_db
             
-        qty_c = c3.number_input(f"Jumlah {sat_c}", min_value=1, value=1)
+        qty_c = c3.number_input(f"Jumlah {sat_final}", min_value=1, value=1)
         
-        # Hitung Harga
+        # Hitung Harga (Tidak akan kali 500 kalau satuannya sudah Rim di database)
         h_jual_c = int(h_master * mult_c)
-        st.info(f"Harga Estimasi: **Rp {h_jual_c:,.0f} / {sat_c}**")
+        st.info(f"Harga Penawaran: **Rp {h_jual_c:,.0f} / {sat_final}**")
 
         if st.button("➕ Masukkan ke Daftar Pesanan", use_container_width=True):
-            # Cek jika barang sudah ada, hapus dulu biar tidak double (Update)
+            # Update keranjang jika barang sama dipilih lagi
             st.session_state.cart = [item for item in st.session_state.cart if item['Nama Barang'] != pilihan_barang]
             
             st.session_state.cart.append({
                 "Nama Barang": pilihan_barang,
                 "Qty": int(qty_c),
                 "Harga": float(h_jual_c),
-                "Satuan": sat_c,
+                "Satuan": sat_final,
                 "Total_Row": float(qty_c * h_jual_c)
             })
             st.toast(f"Berhasil ditambah: {pilihan_barang}")
             time.sleep(0.5)
             st.rerun()
 
-    # 3. TAMPILAN DAFTAR PESANAN (Seperti versi sebelumnya agar customer bisa cek)
+    # 3. TAMPILAN DAFTAR PESANAN
     if st.session_state.cart:
         st.markdown("### 📋 Daftar Pesanan Anda")
         total_p = 0
         
-        # List keranjang yang bisa dicek & dihapus satu-satu
         for i, item in enumerate(st.session_state.cart):
             with st.container(border=True):
                 ca, cb, cc, cd = st.columns([3, 1.5, 1.5, 0.5])
@@ -288,7 +294,6 @@ elif menu == "📝 Portal Customer":
                 cb.markdown(f"{item['Qty']} {item['Satuan']} (@Rp {item['Harga']:,.0f})")
                 cc.markdown(f"**Rp {item['Total_Row']:,.0f}**")
                 
-                # Tombol hapus item
                 if cd.button("❌", key=f"del_item_{i}"):
                     st.session_state.cart.pop(i)
                     st.rerun()
