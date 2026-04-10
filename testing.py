@@ -401,20 +401,43 @@ def hitung_total(items: list):
 
 
 # =========================================================
-# 9. HELPER: CARI ROW INDEX DI GSHEET (AMAN)
+# 9. HELPER: CARI ROW INDEX DI GSHEET (AMAN & ROBUST)
 # =========================================================
-def cari_row_index_gsheet(sheet, waktu_key: str, customer_key: str) -> int:
-    """
-    Cari row index berdasarkan Waktu + Customer agar tidak salah baris
-    walau ada baris kosong. Kembalikan index 1-based untuk GSheet.
-    """
+def cari_row_index_gsheet(sheet, waktu_key: str, customer_key: str, status_expected: str = "Pending") -> int:
     try:
         all_vals = sheet.get_all_values()
+        if not all_vals: return -1
+
+        # Bersihkan spasi dan jadikan huruf kecil untuk antisipasi format
+        headers = [str(h).strip().lower() for h in all_vals[0]]
+        waktu_idx = headers.index("waktu") if "waktu" in headers else 0
+        cust_idx = headers.index("customer") if "customer" in headers else 1
+        status_idx = headers.index("status") if "status" in headers else 5
+
+        w_key = str(waktu_key).strip().lower()
+        c_key = str(customer_key).strip().lower()
+
+        best_match = -1
+
         for i, row in enumerate(all_vals):
-            if i == 0:
-                continue
-            if len(row) >= 2 and row[0] == waktu_key and row[1] == customer_key:
+            if i == 0: continue
+            
+            # Lewati jika baris kosong atau kepotong
+            if len(row) <= max(cust_idx, status_idx): continue
+
+            w_val = str(row[waktu_idx]).strip().lower() if len(row) > waktu_idx else ""
+            c_val = str(row[cust_idx]).strip().lower()
+            s_val = str(row[status_idx]).strip().lower()
+
+            # Kriteria 1: Cocok Waktu & Customer (Kondisi Ideal)
+            if w_val == w_key and c_val == c_key:
                 return i + 1
+
+            # Kriteria 2: Fallback (Jika waktu berubah format di GSheet, pastikan Customer & Status cocok)
+            if c_val == c_key and s_val == status_expected.lower():
+                best_match = i + 1
+
+        return best_match
     except Exception as e:
         logger.error(f"Error cari row index: {e}")
     return -1
@@ -831,13 +854,23 @@ elif menu == "👨‍💻 Sales Dashboard":
                             type="primary",
                             use_container_width=True
                         ):
-                            real_row = cari_row_index_gsheet(sheet, row['Waktu'], row['Customer'])
-                            if real_row == -1:
-                                st.error("❌ Gagal menemukan baris.")
-                            else:
-                                sheet.update_cell(real_row, 6, "Processed")
-                                logger.info(f"Penawaran selesai: {row['Customer']}")
-                                st.rerun()
+                            with st.spinner("Memproses penyelesaian penawaran..."):
+                                real_row = cari_row_index_gsheet(sheet, row['Waktu'], row['Customer'], "Pending")
+                                
+                                if real_row == -1:
+                                    st.error("❌ Gagal menemukan baris. Data mungkin sudah berubah di Google Sheets.")
+                                else:
+                                    try:
+                                        header_gsheet = sheet.row_values(1)
+                                        col_status = header_gsheet.index("Status") + 1 if "Status" in header_gsheet else 6
+                                        
+                                        sheet.update_cell(real_row, col_status, "Processed")
+                                        logger.info(f"Penawaran selesai: {row['Customer']}")
+                                        st.success("✅ Penawaran Selesai!")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"❌ Terjadi kesalahan saat sinkronisasi GSheet: {e}")
 
     # ── TAB 2: RIWAYAT ──────────────────────────────────────
     with tab_riwayat:
@@ -896,7 +929,17 @@ elif menu == "👨‍💻 Sales Dashboard":
                         )
 
                     if st.button("↩️ Kembalikan ke Pending", key=f"reopen_{idx}"):
-                        real_row = cari_row_index_gsheet(sheet, row['Waktu'], row['Customer'])
-                        if real_row != -1:
-                            sheet.update_cell(real_row, 6, "Pending")
-                            st.rerun()
+                        with st.spinner("Mengembalikan antrean..."):
+                            real_row = cari_row_index_gsheet(sheet, row['Waktu'], row['Customer'], "Processed")
+                            if real_row != -1:
+                                try:
+                                    header_gsheet = sheet.row_values(1)
+                                    col_status = header_gsheet.index("Status") + 1 if "Status" in header_gsheet else 6
+                                    sheet.update_cell(real_row, col_status, "Pending")
+                                    st.success("✅ Antrean dikembalikan ke Pending!")
+                                    time.sleep(1)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Error GSheet: {e}")
+                            else:
+                                st.error("❌ Gagal menemukan baris. Data mungkin sudah terhapus.")
