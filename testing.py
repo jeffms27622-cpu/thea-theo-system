@@ -648,7 +648,30 @@ elif menu == "👨‍💻 Sales Dashboard":
             st.info("Belum ada data yang diproses.")
         st.stop()
 
-    df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
+    # Normalisasi: strip spasi & samakan kapitalisasi header GSheet
+    raw_headers = [str(h).strip() for h in all_vals[0]]
+
+    # Mapping fleksibel → nama kolom standar yang dipakai kode
+    COLUMN_ALIASES = {
+        "waktu":    "Waktu",
+        "customer": "Customer",
+        "up":       "UP",
+        "wa":       "WA",
+        "pesanan":  "Pesanan",
+        "status":   "Status",
+        "sales":    "Sales",
+    }
+    normalized_headers = [
+        COLUMN_ALIASES.get(h.lower(), h) for h in raw_headers
+    ]
+
+    df_gs = pd.DataFrame(all_vals[1:], columns=normalized_headers)
+
+    # Pastikan semua kolom wajib ada (isi kosong kalau tidak ada)
+    for col in ["Waktu", "Customer", "UP", "WA", "Pesanan", "Status", "Sales"]:
+        if col not in df_gs.columns:
+            logger.warning(f"Kolom '{col}' tidak ditemukan di GSheet. Diisi kosong.")
+            df_gs[col] = ""
 
     # ── TAB 1: PENDING ──────────────────────────────────────
     with tab_pending:
