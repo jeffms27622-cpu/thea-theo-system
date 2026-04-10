@@ -810,34 +810,65 @@ elif menu == "👨‍💻 Sales Dashboard":
 
             st.write(f"**{len(processed)} penawaran ditemukan.**")
 
+            # ── Tabel ringkas — TANPA loop generate PDF/Excel, sangat ringan ──
+            tabel_data = []
             for idx in processed.index:
                 row        = df_gs.loc[idx]
-                gsheet_row = idx + 2
                 items_list = json_to_pesanan(str(row["Pesanan"]))
-                subt, tax, gtot = hitung_total(items_list) if items_list else (0, 0, 0)
+                _, _, gtot = hitung_total(items_list) if items_list else (0, 0, 0)
+                tabel_data.append({
+                    "idx":      idx,
+                    "Waktu":    row["Waktu"],
+                    "Customer": row["Customer"],
+                    "UP":       row["UP"],
+                    "WA":       row["WA"],
+                    "Total":    f"Rp {gtot:,.0f}",
+                    "Items":    len(items_list),
+                })
 
-                with st.expander(f"✅ {row['Customer']} — {row['Waktu']} | Total: Rp {gtot:,.0f}"):
-                    st.write(f"**UP:** {row['UP']} | **WA:** {row['WA']}")
+            df_tabel = pd.DataFrame(tabel_data)
+            st.dataframe(
+                df_tabel[["Waktu", "Customer", "UP", "WA", "Total", "Items"]].reset_index(drop=True),
+                use_container_width=True
+            )
 
-                    if items_list:
-                        f_df = pd.DataFrame(items_list)
-                        if "Total_Row" not in f_df.columns:
-                            f_df["Total_Row"] = f_df["Qty"].astype(float) * f_df["Harga"].astype(float)
-                        st.dataframe(
-                            f_df[["Nama Barang", "Qty", "Satuan", "Harga", "Total_Row"]],
-                            use_container_width=True
-                        )
+            st.divider()
+            st.markdown("#### 🖨️ Cetak Ulang / Kembalikan ke Pending")
+            st.caption("Pilih customer dari daftar di bawah untuk generate ulang PDF/Excel atau kembalikan ke antrean.")
 
-                        c_no2, _ = st.columns([2, 1])
-                        no_s2    = c_no2.text_input("No Surat:", value="/S-TTS/IV/2026", key=f"ns_rw_{gsheet_row}")
+            # Pilih customer — hanya SATU yang aktif, tidak loop semua
+            pilihan_rw = st.selectbox(
+                "Pilih Customer:",
+                options=["— pilih —"] + df_tabel["Customer"].tolist(),
+                key="select_riwayat"
+            )
 
-                        b1r, b2r = st.columns(2)
-                        pdf_data2 = generate_pdf(no_s2, row["Customer"], row["UP"], f_df, subt, tax, gtot)
-                        b1r.download_button(label="📩 PDF",   data=pdf_data2, file_name=f"Quo_{row['Customer']}.pdf", key=f"btn_rw_p_{gsheet_row}", use_container_width=True)
-                        xls_data2 = generate_excel(no_s2, row["Customer"], row["UP"], f_df, subt, tax, gtot)
-                        b2r.download_button(label="📊 Excel", data=xls_data2, file_name=f"{row['Customer']}.xlsx",    key=f"btn_rw_x_{gsheet_row}", use_container_width=True)
+            if pilihan_rw != "— pilih —":
+                sel        = df_tabel[df_tabel["Customer"] == pilihan_rw].iloc[0]
+                idx_sel    = sel["idx"]
+                row_sel    = df_gs.loc[idx_sel]
+                gsheet_row = idx_sel + 2
+                items_sel  = json_to_pesanan(str(row_sel["Pesanan"]))
 
-                    if st.button("↩️ Kembalikan ke Pending", key=f"reopen_{gsheet_row}"):
+                if items_sel:
+                    f_df_sel       = pd.DataFrame(items_sel)
+                    if "Total_Row" not in f_df_sel.columns:
+                        f_df_sel["Total_Row"] = f_df_sel["Qty"].astype(float) * f_df_sel["Harga"].astype(float)
+                    subt_s, tax_s, gtot_s = hitung_total(items_sel)
+
+                    st.write(f"**Customer:** {row_sel['Customer']} | **UP:** {row_sel['UP']} | **Total: Rp {gtot_s:,.0f}**")
+                    st.dataframe(f_df_sel[["Nama Barang", "Qty", "Satuan", "Harga", "Total_Row"]], use_container_width=True)
+
+                    # Nomor surat hanya muncul untuk 1 customer yang dipilih — tidak bikin lag
+                    no_s_rw = st.text_input("No Surat:", value="/S-TTS/IV/2026", key="ns_riwayat_aktif")
+
+                    b1r, b2r, b3r = st.columns(3)
+                    pdf_rw = generate_pdf(no_s_rw, row_sel["Customer"], row_sel["UP"], f_df_sel, subt_s, tax_s, gtot_s)
+                    b1r.download_button(label="📩 PDF",   data=pdf_rw,  file_name=f"Quo_{row_sel['Customer']}.pdf", key="btn_rw_pdf",  use_container_width=True)
+                    xls_rw = generate_excel(no_s_rw, row_sel["Customer"], row_sel["UP"], f_df_sel, subt_s, tax_s, gtot_s)
+                    b2r.download_button(label="📊 Excel", data=xls_rw,  file_name=f"{row_sel['Customer']}.xlsx",   key="btn_rw_xls",  use_container_width=True)
+
+                    if b3r.button("↩️ Ke Pending", key="btn_rw_reopen", use_container_width=True):
                         try:
                             sheet = get_sheet()
                             sheet.update_cell(gsheet_row, 6, "Pending")
