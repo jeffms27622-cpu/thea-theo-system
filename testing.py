@@ -8,6 +8,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import io
 import time
+import hashlib
 
 # =========================================================
 # 1. KONFIGURASI UTAMA & DATA KANTOR
@@ -211,7 +212,19 @@ def generate_excel(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_tota
     return output.getvalue()
 
 # =========================================================
-# 5. UI UTAMA (STREAMLIT)
+# 5. HELPER: Stable widget key berbasis nama barang + row
+# =========================================================
+def make_stable_key(row_idx, nama_barang, suffix):
+    """
+    Buat key widget yang STABIL berdasarkan nama barang (bukan index posisi).
+    Ini mencegah nilai widget tercampur saat urutan diubah.
+    """
+    # Hash pendek dari nama barang agar aman sebagai key
+    h = hashlib.md5(nama_barang.encode()).hexdigest()[:8]
+    return f"r{row_idx}_{h}_{suffix}"
+
+# =========================================================
+# 6. UI UTAMA (STREAMLIT)
 # =========================================================
 st.sidebar.title(f"Portal {MARKETING_NAME}")
 menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Admin Sales", "👨‍💻 Sales Dashboard"])
@@ -360,57 +373,97 @@ elif menu == "👨‍💻 Sales Dashboard":
 
                                 st.write("### 📝 Edit Daftar Barang")
                                 st.caption("💡 Tip: Ubah angka **Pos** untuk mengatur urutan (contoh: sisipkan barang antara no.2 dan no.3 dengan nilai 2.5). Centang 🗑️ untuk hapus.")
+
+                                # =====================================================
+                                # FIX UTAMA: Render items dengan STABLE KEY
+                                # Key widget dibuat dari nama barang (hash), BUKAN index.
+                                # Sehingga setelah sort/reorder, widget tetap terikat
+                                # ke barang yang benar dan tidak tukar nilai.
+                                # =====================================================
                                 temp_up = []
 
                                 for i, r in enumerate(items_list):
-                                    # FIX: Selalu ambil harga & satuan dari CSV master
-                                    row_master        = df_barang[df_barang['Nama Barang'] == r['Nama Barang']]
+                                    nama_item = r['Nama Barang']
+
+                                    # Ambil data master dari CSV
+                                    row_master        = df_barang[df_barang['Nama Barang'] == nama_item]
                                     harga_master_asli = float(row_master['Harga'].values[0]) if not row_master.empty else float(r['Harga'])
                                     satuan_master     = str(row_master['Satuan'].values[0]).strip() if not row_master.empty else str(r.get('Satuan', 'Pcs'))
 
-                                    u_k = f"r{real_row_idx}_i{i}"
+                                    # KEY STABIL — berbasis nama barang, bukan index `i`
+                                    u_k = make_stable_key(real_row_idx, nama_item, "")
 
                                     with st.container(border=True):
                                         c1, c2, c3, c4, c5, c6 = st.columns([2.0, 1.1, 1.2, 1.3, 0.7, 0.4])
 
-                                        c1.markdown(f"**{r['Nama Barang']}**")
+                                        c1.markdown(f"**{nama_item}**")
                                         c1.caption(f"Harga Master: Rp {harga_master_asli:,.0f} / {satuan_master}")
 
                                         list_mode = ["Pcs/Tetap", "Lusin (12)", "Dus", "Box", "Pack", "Set", "Rim"]
-                                        mode = c2.selectbox("Ubah Satuan?", list_mode, key=f"m_{u_k}")
 
-                                        # FIX: Harga selalu dihitung ulang dari master CSV
+                                        # ─── SELECTBOX MODE dengan key stabil ─────────────────
+                                        mode = c2.selectbox(
+                                            "Ubah Satuan?",
+                                            list_mode,
+                                            key=f"m_{u_k}"
+                                        )
+
+                                        # ─── Hitung mult & sat_init dari mode ─────────────────
                                         if mode == "Pcs/Tetap":
-                                            mult       = 1
-                                            sat_init   = satuan_master
-                                            harga_init = int(harga_master_asli)
+                                            mult     = 1
+                                            sat_init = satuan_master
                                         elif mode == "Lusin (12)":
-                                            mult       = 12
-                                            sat_init   = "Lusin"
-                                            harga_init = int(harga_master_asli * mult)
+                                            mult     = 12
+                                            sat_init = "Lusin"
                                         elif mode == "Rim":
-                                            mult       = 1
-                                            sat_init   = "Rim"
-                                            harga_init = int(harga_master_asli)
+                                            mult     = 1
+                                            sat_init = "Rim"
                                         else:
-                                            isi_m      = c3.number_input(f"Isi per {mode}", min_value=1, value=10, key=f"isi_{u_k}")
-                                            mult       = isi_m
-                                            sat_init   = mode
-                                            harga_init = int(harga_master_asli * mult)
+                                            # Dus / Box / Pack / Set → perlu input isi
+                                            isi_m = c3.number_input(
+                                                f"Isi per {mode}",
+                                                min_value=1,
+                                                value=10,
+                                                key=f"isi_{u_k}"
+                                            )
+                                            mult     = isi_m
+                                            sat_init = mode
 
-                                        # Sinkronisasi live: kalau mode/mult berubah, reset harga & satuan
+                                        harga_init = int(harga_master_asli * mult)
+
+                                        # ─── SINKRONISASI: reset harga & satuan otomatis ──────
+                                        # Jika mode atau mult berubah → paksa reset nilai widget
+                                        # harga & satuan agar selalu sinkron dengan master CSV.
                                         trigger_val = f"{mode}_{mult}"
-                                        if st.session_state.get(f"trig_{u_k}") != trigger_val:
+                                        trig_key    = f"trig_{u_k}"
+
+                                        if st.session_state.get(trig_key) != trigger_val:
+                                            # Mode berubah → update session state untuk harga & satuan
                                             st.session_state[f"h_{u_k}"] = harga_init
                                             st.session_state[f"s_{u_k}"] = sat_init
-                                            st.session_state[f"trig_{u_k}"] = trigger_val
+                                            st.session_state[trig_key]   = trigger_val
 
-                                        nq  = c2.number_input("Qty", min_value=1, value=int(r['Qty']), key=f"q_{u_k}")
-                                        ns  = c3.text_input("Unit", key=f"s_{u_k}")
-                                        nh  = c4.number_input("Harga Jual", step=500, format="%d", key=f"h_{u_k}")
+                                        # ─── QTY, SATUAN, HARGA dengan key stabil ─────────────
+                                        nq = c2.number_input(
+                                            "Qty",
+                                            min_value=1,
+                                            value=int(r['Qty']),
+                                            key=f"q_{u_k}"
+                                        )
+                                        ns = c3.text_input(
+                                            "Unit",
+                                            key=f"s_{u_k}"
+                                            # nilai diisi dari session_state (di-reset saat mode berubah)
+                                        )
+                                        nh = c4.number_input(
+                                            "Harga Jual",
+                                            step=500,
+                                            format="%d",
+                                            key=f"h_{u_k}"
+                                            # nilai diisi dari session_state (di-reset saat mode berubah)
+                                        )
 
-                                        # Kolom Pos: default ke nomor urut saat ini (i+1), bisa diubah manual
-                                        # Contoh: sisipkan barang baru antara no.2 dan no.3 dengan mengisi 2.5
+                                        # ─── POS untuk pengurutan ─────────────────────────────
                                         np_ = c5.number_input(
                                             "Pos",
                                             value=float(i + 1),
@@ -419,12 +472,17 @@ elif menu == "👨‍💻 Sales Dashboard":
                                             key=f"p_{u_k}",
                                             help="Ubah untuk mengatur urutan. Contoh: 2.5 = sisipkan antara no.2 dan no.3"
                                         )
-                                        td  = c6.checkbox("🗑️", key=f"d_{u_k}", help="Centang untuk hapus barang ini")
+
+                                        td = c6.checkbox(
+                                            "🗑️",
+                                            key=f"d_{u_k}",
+                                            help="Centang untuk hapus barang ini"
+                                        )
 
                                         temp_up.append({
                                             "del":   td,
                                             "pos":   np_,
-                                            "Nama":  r['Nama Barang'],
+                                            "Nama":  nama_item,
                                             "Qty":   nq,
                                             "Harga": nh,
                                             "Sat":   ns
@@ -438,7 +496,7 @@ elif menu == "👨‍💻 Sales Dashboard":
                                 )
 
                                 if st.button("💾 SIMPAN PERUBAHAN DATA", key=f"btn_save_{real_row_idx}", use_container_width=True):
-                                    # FIX: Filter hapus → sort by Pos → auto-renumber bersih di PDF/Excel
+                                    # Filter hapus → sort by Pos → auto-renumber bersih di PDF/Excel
                                     final = sorted(
                                         [x for x in temp_up if not x['del']],
                                         key=lambda x: x['pos']
@@ -468,11 +526,18 @@ elif menu == "👨‍💻 Sales Dashboard":
 
                                     sheet.update_cell(real_row_idx, 5, str(save_data))
                                     st.cache_data.clear()
+
+                                    # ─── Bersihkan session_state terkait widget lama ──────────
+                                    # Agar setelah simpan & rerun, widget mulai fresh dari data baru
+                                    keys_to_clear = [k for k in st.session_state if f"r{real_row_idx}_" in k]
+                                    for k in keys_to_clear:
+                                        del st.session_state[k]
+
                                     st.success(f"Tersimpan! {len(save_data)} barang, urutan sudah dirapikan.")
                                     time.sleep(1)
                                     st.rerun()
 
-                                # FIX: Re-fetch data terbaru dari sheet agar PDF/Excel tidak pakai data lama
+                                # Re-fetch data terbaru dari sheet agar PDF/Excel tidak pakai data lama
                                 try:
                                     current_row_data = sheet.row_values(real_row_idx)
                                     current_items    = ast.literal_eval(current_row_data[4]) if len(current_row_data) > 4 else items_list
