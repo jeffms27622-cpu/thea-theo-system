@@ -159,19 +159,19 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
 def generate_excel(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        workbook = writer.book
+        workbook  = writer.book
         worksheet = workbook.add_worksheet('Quotation')
 
-        fmt_navy_bg = workbook.add_format({'bg_color': '#002855', 'font_color': 'white', 'bold': True, 'font_size': 18, 'valign': 'vcenter'})
-        fmt_gold_text = workbook.add_format({'font_color': '#B8860B', 'bold': True, 'font_size': 10})
-        fmt_white_text = workbook.add_format({'font_color': 'white', 'font_size': 9})
+        fmt_navy_bg      = workbook.add_format({'bg_color': '#002855', 'font_color': 'white', 'bold': True, 'font_size': 18, 'valign': 'vcenter'})
+        fmt_gold_text    = workbook.add_format({'font_color': '#B8860B', 'bold': True, 'font_size': 10})
+        fmt_white_text   = workbook.add_format({'font_color': 'white', 'font_size': 9})
         fmt_header_table = workbook.add_format({'bg_color': '#002855', 'font_color': 'white', 'bold': True, 'border': 1, 'align': 'center'})
-        fmt_border = workbook.add_format({'border': 1})
-        fmt_money = workbook.add_format({'border': 1, 'num_format': '#,##0'})
-        fmt_total_label = workbook.add_format({'bold': True, 'align': 'right'})
-        fmt_grand_total = workbook.add_format({'bg_color': '#002855', 'font_color': 'white', 'bold': True, 'num_format': '#,##0', 'align': 'right'})
+        fmt_border       = workbook.add_format({'border': 1})
+        fmt_money        = workbook.add_format({'border': 1, 'num_format': '#,##0'})
+        fmt_total_label  = workbook.add_format({'bold': True, 'align': 'right'})
+        fmt_grand_total  = workbook.add_format({'bg_color': '#002855', 'font_color': 'white', 'bold': True, 'num_format': '#,##0', 'align': 'right'})
 
-        worksheet.set_column('A:A', 5); worksheet.set_column('B:B', 45); worksheet.set_column('C:C', 10)
+        worksheet.set_column('A:A', 5);  worksheet.set_column('B:B', 45); worksheet.set_column('C:C', 10)
         worksheet.set_column('D:D', 10); worksheet.set_column('E:E', 15); worksheet.set_column('F:F', 18)
 
         for r in range(0, 5): worksheet.write_blank(r, 0, '', fmt_navy_bg)
@@ -193,17 +193,20 @@ def generate_excel(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_tota
 
         row_idx = 12
         for i, row in df_order.iterrows():
-            worksheet.write(row_idx, 0, i+1, fmt_border); worksheet.write(row_idx, 1, row['Nama Barang'], fmt_border)
-            worksheet.write(row_idx, 2, row['Qty'], fmt_border); worksheet.write(row_idx, 3, row['Satuan'], fmt_border)
-            worksheet.write(row_idx, 4, row['Harga'], fmt_money); worksheet.write(row_idx, 5, row['Total_Row'], fmt_money)
+            worksheet.write(row_idx, 0, i+1, fmt_border)
+            worksheet.write(row_idx, 1, row['Nama Barang'], fmt_border)
+            worksheet.write(row_idx, 2, row['Qty'], fmt_border)
+            worksheet.write(row_idx, 3, row['Satuan'], fmt_border)
+            worksheet.write(row_idx, 4, row['Harga'], fmt_money)
+            worksheet.write(row_idx, 5, row['Total_Row'], fmt_money)
             row_idx += 1
 
         row_idx += 1
-        worksheet.write(row_idx, 4, "Sub Total", fmt_total_label); worksheet.write(row_idx, 5, subtotal, fmt_money)
+        worksheet.write(row_idx, 4, "Sub Total",    fmt_total_label); worksheet.write(row_idx, 5, subtotal,    fmt_money)
         row_idx += 1
-        worksheet.write(row_idx, 4, "VAT (PPN 11%)", fmt_total_label); worksheet.write(row_idx, 5, ppn, fmt_money)
+        worksheet.write(row_idx, 4, "VAT (PPN 11%)", fmt_total_label); worksheet.write(row_idx, 5, ppn,        fmt_money)
         row_idx += 1
-        worksheet.write(row_idx, 4, "GRAND TOTAL", fmt_total_label); worksheet.write(row_idx, 5, grand_total, fmt_grand_total)
+        worksheet.write(row_idx, 4, "GRAND TOTAL",  fmt_total_label); worksheet.write(row_idx, 5, grand_total, fmt_grand_total)
 
     return output.getvalue()
 
@@ -215,10 +218,16 @@ menu = st.sidebar.selectbox("Pilih Menu:", ["🏠 Home", "📝 Admin Sales", "�
 
 if 'cart' not in st.session_state: st.session_state.cart = []
 
+# ---------------------------------------------------------
+# HOME
+# ---------------------------------------------------------
 if menu == "🏠 Home":
     st.title(f"Selamat Datang di {COMPANY_NAME}")
     st.info(f"Marketing Aktif: {MARKETING_NAME} | {MARKETING_WA}")
 
+# ---------------------------------------------------------
+# ADMIN SALES
+# ---------------------------------------------------------
 elif menu == "📝 Admin Sales":
     st.subheader("Form Pengajuan Penawaran")
 
@@ -229,8 +238,8 @@ elif menu == "📝 Admin Sales":
     with st.container(border=True):
         col1, col2 = st.columns(2)
         nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko")
-        up_nama = col2.text_input("👤 Nama Penerima (UP)")
-        wa_nomor = col1.text_input("📞 Nomor WhatsApp Pembeli")
+        up_nama   = col2.text_input("👤 Nama Penerima (UP)")
+        wa_nomor  = col1.text_input("📞 Nomor WhatsApp Pembeli")
 
     # 2. PILIH BARANG & KONVERSI SATUAN
     with st.container(border=True):
@@ -244,27 +253,26 @@ elif menu == "📝 Admin Sales":
         )
 
         if pilihan_barang != "":
-            row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
-            h_master = float(row_m['Harga'])
+            row_m     = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
+            h_master  = float(row_m['Harga'])
             satuan_db = str(row_m['Satuan']).strip()
 
             c1, c2, c3 = st.columns([1.5, 1, 1])
             list_mode_cust = ["Sesuai Database", "Lusin (12)", "Dus", "Box", "Pack", "Set"]
             mode_c = c1.selectbox(f"Pilih Satuan (Default: {satuan_db})", list_mode_cust, key=f"m_c_{st.session_state.widget_id}")
 
-            mult_c = 1
+            mult_c    = 1
             sat_final = satuan_db
 
             if mode_c == "Lusin (12)":
-                mult_c = 12
+                mult_c    = 12
                 sat_final = "Lusin"
             elif mode_c in ["Dus", "Box", "Pack", "Set"]:
-                isi_c = c2.number_input(f"Isi per {mode_c}", min_value=1, value=10, key=f"isi_c_{st.session_state.widget_id}")
-                mult_c = isi_c
+                isi_c     = c2.number_input(f"Isi per {mode_c}", min_value=1, value=10, key=f"isi_c_{st.session_state.widget_id}")
+                mult_c    = isi_c
                 sat_final = mode_c
 
-            qty_c = c3.number_input(f"Jumlah {sat_final}", min_value=1, value=1, key=f"qty_c_{st.session_state.widget_id}")
-
+            qty_c    = c3.number_input(f"Jumlah {sat_final}", min_value=1, value=1, key=f"qty_c_{st.session_state.widget_id}")
             h_jual_c = int(h_master * mult_c)
             st.info(f"Harga Penawaran: **Rp {h_jual_c:,.0f} / {sat_final}**")
 
@@ -314,13 +322,16 @@ elif menu == "📝 Admin Sales":
                     time.sleep(1)
                     st.rerun()
 
+# ---------------------------------------------------------
+# SALES DASHBOARD
+# ---------------------------------------------------------
 elif menu == "👨‍💻 Sales Dashboard":
     st.title(f"Sales Dashboard - {MARKETING_NAME}")
 
     pwd = st.sidebar.text_input("Password:", type="password")
     if pwd == ADMIN_PASSWORD:
 
-        # --- 1. UPLOAD DATABASE (SIDEBAR) ---
+        # --- UPLOAD DATABASE (SIDEBAR) ---
         with st.sidebar.expander("📁 Update Database (.csv)", expanded=False):
             up_f = st.file_uploader("Pilih file CSV", type=["csv"], key="admin_csv_up")
             if up_f and st.button("🚀 Update Sekarang"):
@@ -328,13 +339,13 @@ elif menu == "👨‍💻 Sales Dashboard":
                 st.cache_data.clear()
                 st.success("Database Terupdate!"); time.sleep(1); st.rerun()
 
-        # --- 2. KELOLA ANTREAN ---
+        # --- KELOLA ANTREAN ---
         sheet = connect_gsheet()
         if sheet:
             try:
                 all_vals = sheet.get_all_values()
                 if len(all_vals) > 1:
-                    df_gs = pd.DataFrame(all_vals[1:], columns=all_vals[0])
+                    df_gs   = pd.DataFrame(all_vals[1:], columns=all_vals[0])
                     pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == MARKETING_NAME)]
 
                     if not pending.empty:
@@ -348,41 +359,43 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     items_list = []
 
                                 st.write("### 📝 Edit Daftar Barang")
+                                st.caption("💡 Tip: Ubah angka **Pos** untuk mengatur urutan (contoh: sisipkan barang antara no.2 dan no.3 dengan nilai 2.5). Centang 🗑️ untuk hapus.")
                                 temp_up = []
 
                                 for i, r in enumerate(items_list):
                                     # FIX: Selalu ambil harga & satuan dari CSV master
-                                    row_master = df_barang[df_barang['Nama Barang'] == r['Nama Barang']]
+                                    row_master        = df_barang[df_barang['Nama Barang'] == r['Nama Barang']]
                                     harga_master_asli = float(row_master['Harga'].values[0]) if not row_master.empty else float(r['Harga'])
-                                    satuan_master = str(row_master['Satuan'].values[0]).strip() if not row_master.empty else str(r.get('Satuan', 'Pcs'))
+                                    satuan_master     = str(row_master['Satuan'].values[0]).strip() if not row_master.empty else str(r.get('Satuan', 'Pcs'))
 
                                     u_k = f"r{real_row_idx}_i{i}"
 
                                     with st.container(border=True):
-                                        c1, c2, c3, c4, c5 = st.columns([2.0, 1.1, 1.2, 1.5, 0.4])
+                                        c1, c2, c3, c4, c5, c6 = st.columns([2.0, 1.1, 1.2, 1.3, 0.7, 0.4])
+
                                         c1.markdown(f"**{r['Nama Barang']}**")
                                         c1.caption(f"Harga Master: Rp {harga_master_asli:,.0f} / {satuan_master}")
 
                                         list_mode = ["Pcs/Tetap", "Lusin (12)", "Dus", "Box", "Pack", "Set", "Rim"]
                                         mode = c2.selectbox("Ubah Satuan?", list_mode, key=f"m_{u_k}")
 
-                                        # FIX: Harga selalu dihitung dari master CSV
+                                        # FIX: Harga selalu dihitung ulang dari master CSV
                                         if mode == "Pcs/Tetap":
-                                            mult = 1
-                                            sat_init = satuan_master
+                                            mult       = 1
+                                            sat_init   = satuan_master
                                             harga_init = int(harga_master_asli)
                                         elif mode == "Lusin (12)":
-                                            mult = 12
-                                            sat_init = "Lusin"
+                                            mult       = 12
+                                            sat_init   = "Lusin"
                                             harga_init = int(harga_master_asli * mult)
                                         elif mode == "Rim":
-                                            mult = 1
-                                            sat_init = "Rim"
+                                            mult       = 1
+                                            sat_init   = "Rim"
                                             harga_init = int(harga_master_asli)
                                         else:
-                                            isi_m = c3.number_input(f"Isi per {mode}", min_value=1, value=10, key=f"isi_{u_k}")
-                                            mult = isi_m
-                                            sat_init = mode
+                                            isi_m      = c3.number_input(f"Isi per {mode}", min_value=1, value=10, key=f"isi_{u_k}")
+                                            mult       = isi_m
+                                            sat_init   = mode
                                             harga_init = int(harga_master_asli * mult)
 
                                         # Sinkronisasi live: kalau mode/mult berubah, reset harga & satuan
@@ -392,17 +405,29 @@ elif menu == "👨‍💻 Sales Dashboard":
                                             st.session_state[f"s_{u_k}"] = sat_init
                                             st.session_state[f"trig_{u_k}"] = trigger_val
 
-                                        nq = c2.number_input("Qty", min_value=1, value=int(r['Qty']), key=f"q_{u_k}")
-                                        ns = c3.text_input("Unit", key=f"s_{u_k}")
-                                        nh = c4.number_input("Harga Jual", step=500, format="%d", key=f"h_{u_k}")
-                                        td = c5.checkbox("🗑️", key=f"d_{u_k}", help="Centang untuk hapus")
+                                        nq  = c2.number_input("Qty", min_value=1, value=int(r['Qty']), key=f"q_{u_k}")
+                                        ns  = c3.text_input("Unit", key=f"s_{u_k}")
+                                        nh  = c4.number_input("Harga Jual", step=500, format="%d", key=f"h_{u_k}")
+
+                                        # Kolom Pos: default ke nomor urut saat ini (i+1), bisa diubah manual
+                                        # Contoh: sisipkan barang baru antara no.2 dan no.3 dengan mengisi 2.5
+                                        np_ = c5.number_input(
+                                            "Pos",
+                                            value=float(i + 1),
+                                            step=0.1,
+                                            format="%.1f",
+                                            key=f"p_{u_k}",
+                                            help="Ubah untuk mengatur urutan. Contoh: 2.5 = sisipkan antara no.2 dan no.3"
+                                        )
+                                        td  = c6.checkbox("🗑️", key=f"d_{u_k}", help="Centang untuk hapus barang ini")
 
                                         temp_up.append({
-                                            "del": td,
-                                            "Nama": r['Nama Barang'],
-                                            "Qty": nq,
+                                            "del":   td,
+                                            "pos":   np_,
+                                            "Nama":  r['Nama Barang'],
+                                            "Qty":   nq,
                                             "Harga": nh,
-                                            "Sat": ns
+                                            "Sat":   ns
                                         })
 
                                 st.write("---")
@@ -413,51 +438,56 @@ elif menu == "👨‍💻 Sales Dashboard":
                                 )
 
                                 if st.button("💾 SIMPAN PERUBAHAN DATA", key=f"btn_save_{real_row_idx}", use_container_width=True):
-                                    # FIX: Filter hapus, urutan otomatis tanpa field Pos
-                                    final = [x for x in temp_up if not x['del']]
+                                    # FIX: Filter hapus → sort by Pos → auto-renumber bersih di PDF/Excel
+                                    final = sorted(
+                                        [x for x in temp_up if not x['del']],
+                                        key=lambda x: x['pos']
+                                    )
 
+                                    # Barang baru dari multiselect ditaruh di akhir list
                                     for p in add_b:
                                         rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
                                         final.append({
-                                            "Nama": p,
-                                            "Qty": 1,
+                                            "Nama":  p,
+                                            "Qty":   1,
                                             "Harga": float(rb['Harga']),
-                                            "Sat": str(rb['Satuan'])
+                                            "Sat":   str(rb['Satuan'])
                                         })
 
+                                    # Nomor urut di PDF/Excel selalu 1,2,3,... rapi sesuai hasil sort Pos
                                     save_data = [
                                         {
                                             "Nama Barang": x['Nama'],
-                                            "Qty": x['Qty'],
-                                            "Harga": x['Harga'],
-                                            "Satuan": x['Sat'],
-                                            "Total_Row": x['Qty'] * x['Harga']
+                                            "Qty":         x['Qty'],
+                                            "Harga":       x['Harga'],
+                                            "Satuan":      x['Sat'],
+                                            "Total_Row":   x['Qty'] * x['Harga']
                                         }
                                         for x in final
                                     ]
 
                                     sheet.update_cell(real_row_idx, 5, str(save_data))
                                     st.cache_data.clear()
-                                    st.success(f"Tersimpan! {len(save_data)} barang.")
+                                    st.success(f"Tersimpan! {len(save_data)} barang, urutan sudah dirapikan.")
                                     time.sleep(1)
                                     st.rerun()
 
-                                # FIX: Re-fetch data terbaru dari sheet untuk PDF/Excel
+                                # FIX: Re-fetch data terbaru dari sheet agar PDF/Excel tidak pakai data lama
                                 try:
                                     current_row_data = sheet.row_values(real_row_idx)
-                                    current_items = ast.literal_eval(current_row_data[4]) if len(current_row_data) > 4 else items_list
+                                    current_items    = ast.literal_eval(current_row_data[4]) if len(current_row_data) > 4 else items_list
                                 except:
                                     current_items = items_list
 
                                 if current_items:
                                     f_df = pd.DataFrame(current_items)
                                     subt = f_df['Total_Row'].sum()
-                                    tax = subt * 0.11
+                                    tax  = subt * 0.11
                                     gtot = subt + tax
 
                                     st.markdown("### 🖨️ Menu Print & Download")
                                     c_no, c_met = st.columns([2, 1])
-                                    no_s = c_no.text_input("No Surat:", value=f"/S-TTS/IV/2026", key=f"ns_print_{real_row_idx}")
+                                    no_s = c_no.text_input("No Surat:", value="/S-TTS/IV/2026", key=f"ns_print_{real_row_idx}")
                                     c_met.metric("Total Quotation", f"Rp {gtot:,.0f}")
 
                                     b1, b2 = st.columns(2)
