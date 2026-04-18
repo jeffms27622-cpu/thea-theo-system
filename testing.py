@@ -93,7 +93,29 @@ html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; }
     border-radius: 10px;
 }
 
-/* ── MAIN AREA INPUT — pastikan teks selalu gelap ── */
+/* ── MAIN AREA — semua teks gelap, tidak terkena override sidebar ── */
+
+/* Semua teks paragraf & markdown di main area (bukan sidebar) */
+section.main p,
+section.main span,
+section.main div.stMarkdown,
+section.main .stMarkdown p,
+section.main .stMarkdown strong,
+section.main [data-testid="stMarkdownContainer"] p,
+section.main [data-testid="stMarkdownContainer"] strong,
+section.main [data-testid="stCaptionContainer"],
+section.main small,
+section.main .stCaption {
+    color: #1e1e1e !important;
+}
+
+/* Caption / subtext khusus */
+section.main [data-testid="stCaptionContainer"] p,
+section.main .stCaption p {
+    color: #5a7a9a !important;
+}
+
+/* Input fields */
 .stTextInput > div > div > input,
 .stNumberInput > div > div > input,
 .stTextArea > div > div > textarea {
@@ -127,6 +149,12 @@ html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; }
     color: #1e1e1e !important;
 }
 
+/* Teks di dalam selectbox yang terpilih */
+[data-testid="stSelectbox"] span,
+[data-testid="stMultiSelect"] span {
+    color: #1e1e1e !important;
+}
+
 /* Dropdown options (listbox) */
 [data-baseweb="select"] [data-baseweb="option"],
 [data-baseweb="popover"] li,
@@ -136,16 +164,23 @@ ul[role="listbox"] li {
 }
 
 /* Label utama di main area */
-.stTextInput label,
-.stSelectbox label,
-.stNumberInput label,
-.stMultiSelect label,
-.stCheckbox label {
+section.main .stTextInput label,
+section.main .stSelectbox label,
+section.main .stNumberInput label,
+section.main .stMultiSelect label,
+section.main .stCheckbox label {
     font-weight: 600 !important;
     font-size: 0.78rem !important;
     letter-spacing: 0.06em !important;
     text-transform: uppercase !important;
     color: #002855 !important;
+}
+
+/* Container border teks */
+section.main [data-testid="stVerticalBlockBorderWrapper"] p,
+section.main [data-testid="stVerticalBlockBorderWrapper"] strong,
+section.main [data-testid="stVerticalBlockBorderWrapper"] span {
+    color: #1e1e1e !important;
 }
 
 /* ── HEADER ── */
@@ -584,7 +619,7 @@ elif menu == "📝 Admin Sales":
         for i, item in enumerate(st.session_state.cart):
             with st.container(border=True):
                 ca, cb, cc, cd = st.columns([3, 2, 1.5, 0.4])
-                ca.markdown(f"**{item['Nama Barang']}**")
+                ca.markdown(f"<span style='color:#002855;font-weight:700;font-size:0.95rem;'>{item['Nama Barang']}</span>", unsafe_allow_html=True)
                 ca.caption(f"@ Rp {item['Harga']:,.0f} / {item['Satuan']}")
                 cb.markdown(f"🔢 **{item['Qty']} {item['Satuan']}**")
                 cc.markdown(f"**Rp {item['Total_Row']:,.0f}**")
@@ -758,8 +793,8 @@ elif menu == "👨‍💻 Sales Dashboard":
 
                                     with st.container(border=True):
                                         c1, c2, c3, c4, c5, c6 = st.columns([2.0, 1.1, 1.2, 1.3, 0.7, 0.4])
-                                        c1.markdown(f"**{nama_item}**")
-                                        c1.caption(f"Master: Rp {harga_master:,.0f} / {satuan_master}")
+                                        c1.markdown(f"<span style='color:#002855;font-weight:700;font-size:0.95rem;'>{nama_item}</span>", unsafe_allow_html=True)
+                                        c1.markdown(f"<span style='color:#5a7a9a;font-size:0.78rem;'>Master: Rp {harga_master:,.0f} / {satuan_master}</span>", unsafe_allow_html=True)
 
                                         mode = c2.selectbox("Ubah Satuan?", list_mode, key=f"m_{u_k}")
                                         if mode in ["Dus", "Box", "Pack", "Set"]:
