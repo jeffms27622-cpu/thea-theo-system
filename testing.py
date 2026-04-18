@@ -179,7 +179,21 @@ section.main .stCheckbox label {
 /* Container border teks */
 section.main [data-testid="stVerticalBlockBorderWrapper"] p,
 section.main [data-testid="stVerticalBlockBorderWrapper"] strong,
-section.main [data-testid="stVerticalBlockBorderWrapper"] span {
+section.main [data-testid="stVerticalBlockBorderWrapper"] span,
+section.main [data-testid="stVerticalBlockBorderWrapper"] div {
+    color: #1e1e1e !important;
+}
+
+/* Override khusus: pastikan semua span HTML inline juga gelap di main area */
+section.main [data-testid="stMarkdownContainer"] * {
+    color: inherit;
+}
+
+/* Paksa semua teks di expander content juga gelap */
+section.main [data-testid="stExpander"] p,
+section.main [data-testid="stExpander"] span,
+section.main [data-testid="stExpander"] strong,
+section.main [data-testid="stExpander"] li {
     color: #1e1e1e !important;
 }
 
@@ -620,9 +634,9 @@ elif menu == "📝 Admin Sales":
             with st.container(border=True):
                 ca, cb, cc, cd = st.columns([3, 2, 1.5, 0.4])
                 ca.markdown(f"<span style='color:#002855;font-weight:700;font-size:0.95rem;'>{item['Nama Barang']}</span>", unsafe_allow_html=True)
-                ca.caption(f"@ Rp {item['Harga']:,.0f} / {item['Satuan']}")
-                cb.markdown(f"🔢 **{item['Qty']} {item['Satuan']}**")
-                cc.markdown(f"**Rp {item['Total_Row']:,.0f}**")
+                ca.markdown(f"<span style='color:#5a7a9a;font-size:0.80rem;'>@ Rp {item['Harga']:,.0f} / {item['Satuan']}</span>", unsafe_allow_html=True)
+                cb.markdown(f"<span style='color:#002855;font-weight:600;font-size:0.92rem;'>🔢 {item['Qty']} {item['Satuan']}</span>", unsafe_allow_html=True)
+                cc.markdown(f"<span style='color:#002855;font-weight:700;font-size:0.95rem;'>Rp {item['Total_Row']:,.0f}</span>", unsafe_allow_html=True)
                 if cd.button("✕", key=f"del_item_{i}", help="Hapus item ini"):
                     st.session_state.cart.pop(i); st.rerun()
 
