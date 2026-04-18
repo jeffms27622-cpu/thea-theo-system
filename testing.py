@@ -744,55 +744,28 @@ elif menu == "👨‍💻 Sales Dashboard":
                                 render_section_title("📝 Edit Daftar Barang")
                                 st.caption("💡 Ubah angka **Pos** untuk mengatur urutan (2.5 = sisipkan antara no.2 & no.3). Centang 🗑️ untuk hapus.")
 
-                                # ── Pass 1: Inisialisasi session_state ──
-                                needs_rerun = False
+                                # ── Pass 1: Inisialisasi session_state HANYA jika belum ada ──
+                                # Selalu pakai data dari GSheets (r['Harga'], r['Satuan'], r['Qty'])
+                                # TIDAK pernah reset dari database master agar inputan admin sales terjaga
                                 for i, r in enumerate(items_list):
-                                    nama_item     = r['Nama Barang']
-                                    row_master    = df_barang[df_barang['Nama Barang'] == nama_item]
-                                    harga_master  = float(row_master['Harga'].values[0]) if not row_master.empty else float(r['Harga'])
-                                    satuan_master = str(row_master['Satuan'].values[0]).strip() if not row_master.empty else str(r.get('Satuan', 'Pcs'))
-                                    u_k           = item_key(real_row_idx, nama_item)
+                                    nama_item = r['Nama Barang']
+                                    u_k       = item_key(real_row_idx, nama_item)
 
-                                    mode_key = f"m_{u_k}"
-                                    if mode_key not in st.session_state:
-                                        st.session_state[mode_key] = "Pcs/Tetap"
-                                    mode_now = st.session_state[mode_key]
+                                    harga_tersimpan  = float(r.get('Harga', 0))
+                                    satuan_tersimpan = str(r.get('Satuan', 'Pcs')).strip()
 
-                                    isi_key = f"isi_{u_k}"
-                                    if isi_key not in st.session_state:
-                                        st.session_state[isi_key] = 10
-
-                                    if mode_now == "Lusin (12)":
-                                        mult_now = 12;  sat_now = "Lusin"
-                                    elif mode_now == "Rim":
-                                        mult_now = 1;   sat_now = "Rim"
-                                    elif mode_now in ["Dus", "Box", "Pack", "Set"]:
-                                        mult_now = int(st.session_state[isi_key])
-                                        sat_now  = mode_now
-                                    else:
-                                        mult_now = 1;   sat_now = satuan_master
-
-                                    harga_now   = int(harga_master * mult_now)
-                                    trigger_val = f"{mode_now}_{mult_now}"
-                                    trig_key    = f"trig_{u_k}"
-
-                                    if (f"h_{u_k}" not in st.session_state or
-                                            st.session_state.get(trig_key) != trigger_val):
-                                        st.session_state[f"h_{u_k}"]  = harga_now
-                                        st.session_state[f"s_{u_k}"]  = sat_now
-                                        st.session_state[trig_key]    = trigger_val
-                                        needs_rerun = True
-
-                                    qty_key = f"q_{u_k}"
-                                    if qty_key not in st.session_state:
-                                        st.session_state[qty_key] = int(r['Qty'])
-
-                                    pos_key = f"p_{u_k}"
-                                    if pos_key not in st.session_state:
-                                        st.session_state[pos_key] = float(i + 1)
-
-                                if needs_rerun:
-                                    st.rerun()
+                                    if f"h_{u_k}" not in st.session_state:
+                                        st.session_state[f"h_{u_k}"] = int(harga_tersimpan)
+                                    if f"s_{u_k}" not in st.session_state:
+                                        st.session_state[f"s_{u_k}"] = satuan_tersimpan
+                                    if f"q_{u_k}" not in st.session_state:
+                                        st.session_state[f"q_{u_k}"] = int(r.get('Qty', 1))
+                                    if f"p_{u_k}" not in st.session_state:
+                                        st.session_state[f"p_{u_k}"] = float(i + 1)
+                                    if f"m_{u_k}" not in st.session_state:
+                                        st.session_state[f"m_{u_k}"] = "Pcs/Tetap"
+                                    if f"isi_{u_k}" not in st.session_state:
+                                        st.session_state[f"isi_{u_k}"] = 10
 
                                 # ── Pass 2: Render widget ──
                                 temp_up   = []
@@ -800,19 +773,40 @@ elif menu == "👨‍💻 Sales Dashboard":
 
                                 for i, r in enumerate(items_list):
                                     nama_item     = r['Nama Barang']
-                                    row_master    = df_barang[df_barang['Nama Barang'] == nama_item]
-                                    harga_master  = float(row_master['Harga'].values[0]) if not row_master.empty else float(r['Harga'])
-                                    satuan_master = str(row_master['Satuan'].values[0]).strip() if not row_master.empty else str(r.get('Satuan', 'Pcs'))
                                     u_k           = item_key(real_row_idx, nama_item)
+
+                                    # Harga master hanya untuk info referensi
+                                    row_master    = df_barang[df_barang['Nama Barang'] == nama_item]
+                                    harga_master  = float(row_master['Harga'].values[0]) if not row_master.empty else float(r.get('Harga', 0))
+                                    satuan_master = str(row_master['Satuan'].values[0]).strip() if not row_master.empty else str(r.get('Satuan', 'Pcs'))
 
                                     with st.container(border=True):
                                         c1, c2, c3, c4, c5, c6 = st.columns([2.0, 1.1, 1.2, 1.3, 0.7, 0.4])
                                         c1.markdown(f"<span style='color:#002855;font-weight:700;font-size:0.95rem;'>{nama_item}</span>", unsafe_allow_html=True)
-                                        c1.markdown(f"<span style='color:#5a7a9a;font-size:0.78rem;'>Master: Rp {harga_master:,.0f} / {satuan_master}</span>", unsafe_allow_html=True)
+                                        c1.markdown(f"<span style='color:#5a7a9a;font-size:0.78rem;'>📋 Master DB: Rp {harga_master:,.0f} / {satuan_master}</span>", unsafe_allow_html=True)
+                                        c1.markdown(f"<span style='color:#B8860B;font-size:0.78rem;font-weight:600;'>💾 Tersimpan: Rp {int(r.get('Harga',0)):,.0f} / {str(r.get('Satuan',''))}</span>", unsafe_allow_html=True)
 
-                                        mode = c2.selectbox("Ubah Satuan?", list_mode, key=f"m_{u_k}")
+                                        # Selectbox mode satuan — hanya untuk kalkulasi otomatis harga
+                                        mode = c2.selectbox("Kalkulasi Otomatis?", list_mode, key=f"m_{u_k}")
                                         if mode in ["Dus", "Box", "Pack", "Set"]:
                                             c3.number_input(f"Isi per {mode}", min_value=1, step=1, key=f"isi_{u_k}")
+
+                                        # Tombol apply kalkulasi otomatis
+                                        if mode != "Pcs/Tetap":
+                                            if mode == "Lusin (12)":
+                                                harga_kalkulasi = int(harga_master * 12)
+                                                sat_kalkulasi   = "Lusin"
+                                            elif mode == "Rim":
+                                                harga_kalkulasi = int(harga_master)
+                                                sat_kalkulasi   = "Rim"
+                                            else:
+                                                isi_val = st.session_state.get(f"isi_{u_k}", 10)
+                                                harga_kalkulasi = int(harga_master * isi_val)
+                                                sat_kalkulasi   = mode
+                                            if c2.button(f"▶ Apply", key=f"apply_{u_k}", help=f"Set harga ke Rp {harga_kalkulasi:,.0f} / {sat_kalkulasi}"):
+                                                st.session_state[f"h_{u_k}"] = harga_kalkulasi
+                                                st.session_state[f"s_{u_k}"] = sat_kalkulasi
+                                                st.rerun()
 
                                         nq  = c2.number_input("Qty",        min_value=1, step=1,   key=f"q_{u_k}")
                                         ns  = c3.text_input  ("Unit",                              key=f"s_{u_k}")
