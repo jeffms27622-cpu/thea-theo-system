@@ -34,7 +34,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# CUSTOM CSS — ENHANCED UI
+# CUSTOM CSS — FIXED: teks putih + sidebar scope
 # =========================================================
 st.markdown("""
 <style>
@@ -48,26 +48,107 @@ html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; }
     min-height: 100vh;
 }
 
+/* ── SIDEBAR ── hanya target elemen di dalam sidebar, TIDAK pakai wildcard * */
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg, #002855 0%, #003d7a 40%, #001f42 100%) !important;
     border-right: 3px solid #B8860B;
 }
-[data-testid="stSidebar"] * { color: #e8edf5 !important; }
+
+/* Teks umum sidebar (label, caption, p) */
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span:not([data-baseweb]),
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] div.stMarkdown,
+[data-testid="stSidebar"] .stCaption {
+    color: #e8edf5 !important;
+}
+
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: #f0c040 !important;
+    font-family: 'Playfair Display', serif !important;
+    font-size: 1.1rem !important;
+}
+
 [data-testid="stSidebar"] .stSelectbox label,
 [data-testid="stSidebar"] .stTextInput label {
-    color: #B8860B !important; font-weight: 600; letter-spacing: 0.05em;
-    text-transform: uppercase; font-size: 0.75rem;
+    color: #B8860B !important;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-size: 0.75rem;
 }
+
 [data-testid="stSidebar"] [data-testid="stSelectbox"] > div > div {
     background: rgba(255,255,255,0.1) !important;
     border: 1px solid rgba(184,134,11,0.4) !important;
-    color: white !important; border-radius: 8px;
-}
-[data-testid="stSidebar"] .stExpander {
-    background: rgba(255,255,255,0.08) !important;
-    border: 1px solid rgba(184,134,11,0.3) !important; border-radius: 10px;
+    color: white !important;
+    border-radius: 8px;
 }
 
+[data-testid="stSidebar"] .stExpander {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(184,134,11,0.3) !important;
+    border-radius: 10px;
+}
+
+/* ── MAIN AREA INPUT — pastikan teks selalu gelap ── */
+.stTextInput > div > div > input,
+.stNumberInput > div > div > input,
+.stTextArea > div > div > textarea {
+    color: #1e1e1e !important;
+    border-radius: 10px !important;
+    border: 1.5px solid #c8d6e5 !important;
+    background: white !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 0.9rem !important;
+    padding: 10px 14px !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+.stTextInput > div > div > input:focus,
+.stNumberInput > div > div > input:focus {
+    border-color: #002855 !important;
+    box-shadow: 0 0 0 3px rgba(0,40,85,0.1) !important;
+}
+
+/* Selectbox main area */
+[data-testid="stSelectbox"] > div > div {
+    border-radius: 10px !important;
+    border: 1.5px solid #c8d6e5 !important;
+    background: white !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    color: #1e1e1e !important;
+}
+[data-testid="stMultiSelect"] > div > div {
+    border-radius: 10px !important;
+    border: 1.5px solid #c8d6e5 !important;
+    background: white !important;
+    color: #1e1e1e !important;
+}
+
+/* Dropdown options (listbox) */
+[data-baseweb="select"] [data-baseweb="option"],
+[data-baseweb="popover"] li,
+ul[role="listbox"] li {
+    color: #1e1e1e !important;
+    background: white !important;
+}
+
+/* Label utama di main area */
+.stTextInput label,
+.stSelectbox label,
+.stNumberInput label,
+.stMultiSelect label,
+.stCheckbox label {
+    font-weight: 600 !important;
+    font-size: 0.78rem !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    color: #002855 !important;
+}
+
+/* ── HEADER ── */
 .top-header {
     background: linear-gradient(135deg, #002855 0%, #004080 60%, #002855 100%);
     border-radius: 16px; padding: 28px 36px; margin-bottom: 28px;
@@ -101,32 +182,7 @@ html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; }
     padding-left: 12px; margin: 20px 0 14px 0;
 }
 
-.stTextInput label, .stSelectbox label, .stNumberInput label, .stMultiSelect label {
-    font-weight: 600 !important; font-size: 0.78rem !important;
-    letter-spacing: 0.06em !important; text-transform: uppercase !important;
-    color: #002855 !important;
-}
-
-.stTextInput > div > div > input,
-.stNumberInput > div > div > input {
-    border-radius: 10px !important; border: 1.5px solid #c8d6e5 !important;
-    background: white !important; font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 0.9rem !important; padding: 10px 14px !important;
-    transition: border-color 0.2s, box-shadow 0.2s !important;
-}
-.stTextInput > div > div > input:focus,
-.stNumberInput > div > div > input:focus {
-    border-color: #002855 !important; box-shadow: 0 0 0 3px rgba(0,40,85,0.1) !important;
-}
-
-[data-testid="stSelectbox"] > div > div {
-    border-radius: 10px !important; border: 1.5px solid #c8d6e5 !important;
-    background: white !important; font-family: 'Plus Jakarta Sans', sans-serif !important;
-}
-[data-testid="stMultiSelect"] > div > div {
-    border-radius: 10px !important; border: 1.5px solid #c8d6e5 !important; background: white !important;
-}
-
+/* ── BUTTONS ── */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, #002855 0%, #004080 100%) !important;
     color: white !important; border: none !important; border-radius: 10px !important;
@@ -160,6 +216,7 @@ html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; }
     transition: all 0.2s ease !important;
 }
 
+/* ── EXPANDER ── */
 .streamlit-expanderHeader {
     background: linear-gradient(135deg, #f8fafd 0%, #f0f5fc 100%) !important;
     border-radius: 12px !important; font-weight: 700 !important;
@@ -172,6 +229,7 @@ html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; }
     border-color: #B8860B !important;
 }
 
+/* ── METRIC ── */
 [data-testid="stMetric"] {
     background: white !important; border: 1px solid #e0e8f0 !important;
     border-radius: 14px !important; padding: 16px 20px !important;
@@ -203,14 +261,6 @@ hr {
     background: #002855 !important; color: white !important;
     border-left: 4px solid #B8860B !important; border-radius: 10px !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important; font-weight: 600 !important;
-}
-
-.stCheckbox label {
-    font-weight: 600 !important; font-size: 0.82rem !important; color: #e74c3c !important;
-}
-
-[data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
-    color: #f0c040 !important; font-family: 'Playfair Display', serif !important; font-size: 1.1rem !important;
 }
 
 [data-testid="stFileUploader"] {
@@ -288,7 +338,7 @@ df_barang = load_db()
 
 
 # =========================================================
-# PDF / EXCEL GENERATORS (tidak diubah)
+# PDF / EXCEL GENERATORS
 # =========================================================
 class PenawaranPDF(FPDF):
     def header(self):
@@ -581,8 +631,27 @@ elif menu == "👨‍💻 Sales Dashboard":
             try:
                 all_vals = sheet.get_all_values()
                 if len(all_vals) > 1:
-                    df_gs   = pd.DataFrame(all_vals[1:], columns=all_vals[0])
-                    pending = df_gs[(df_gs['Status'] == 'Pending') & (df_gs['Sales'] == MARKETING_NAME)]
+                    # ── FIX: Normalisasi header — strip spasi & BOM ──
+                    raw_headers = all_vals[0]
+                    clean_headers = [h.strip().lstrip('\ufeff') for h in raw_headers]
+
+                    # Pastikan kolom wajib ada; jika tidak, tambahkan dengan nilai kosong
+                    required_cols = ["Waktu", "Customer", "UP", "WA", "Pesanan", "Status", "Sales"]
+                    df_gs = pd.DataFrame(all_vals[1:], columns=clean_headers)
+
+                    # Tambah kolom yang mungkin hilang
+                    for col in required_cols:
+                        if col not in df_gs.columns:
+                            df_gs[col] = ""
+
+                    # Strip nilai string di semua kolom kritis
+                    for col in required_cols:
+                        df_gs[col] = df_gs[col].astype(str).str.strip()
+
+                    pending = df_gs[
+                        (df_gs['Status'].str.lower() == 'pending') &
+                        (df_gs['Sales'] == MARKETING_NAME)
+                    ]
 
                     total_all     = len(df_gs[df_gs['Sales'] == MARKETING_NAME])
                     total_pending = len(pending)
@@ -598,19 +667,24 @@ elif menu == "👨‍💻 Sales Dashboard":
                         render_section_title(f"⏳ Antrean Pending ({total_pending} penawaran)")
 
                         for idx, row in pending.iterrows():
-                            real_row_idx = df_gs.index[idx] + 2
+                            real_row_idx = idx + 2  # +2: 1 for header row, 1 for 1-based index
                             try:
                                 items_preview = ast.literal_eval(str(row['Pesanan']))
                                 n_items = len(items_preview)
                             except:
                                 items_preview = []; n_items = 0
 
-                            exp_label = f"🏢 {row['Customer']}  ·  UP: {row['UP']}  ·  {n_items} item  ·  📅 {row['Waktu']}"
+                            waktu_val    = row.get('Waktu', '')
+                            customer_val = row.get('Customer', '')
+                            up_val       = row.get('UP', '')
+                            wa_val       = row.get('WA', '')
+
+                            exp_label = f"🏢 {customer_val}  ·  UP: {up_val}  ·  {n_items} item  ·  📅 {waktu_val}"
                             with st.expander(exp_label, expanded=True):
                                 hi1, hi2, hi3 = st.columns(3)
-                                hi1.info(f"🏢 **{row['Customer']}**")
-                                hi2.info(f"👤 UP: **{row['UP']}**")
-                                hi3.info(f"📞 WA: **{row['WA']}**")
+                                hi1.info(f"🏢 **{customer_val}**")
+                                hi2.info(f"👤 UP: **{up_val}**")
+                                hi3.info(f"📞 WA: **{wa_val}**")
                                 st.markdown("---")
 
                                 try:
@@ -743,21 +817,23 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     no_s = c_no.text_input("📄 Nomor Surat:", value="/S-TTS/IV/2026", key=f"ns_print_{real_row_idx}")
 
                                     b1, b2 = st.columns(2)
-                                    pdf_data = generate_pdf(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
-                                    b1.download_button(label="📩 DOWNLOAD PDF", data=pdf_data, file_name=f"Quo_{row['Customer']}.pdf", key=f"btn_p_{real_row_idx}", use_container_width=True, type="primary")
-                                    xls_data = generate_excel(no_s, row['Customer'], row['UP'], f_df, subt, tax, gtot)
-                                    b2.download_button(label="📊 DOWNLOAD EXCEL", data=xls_data, file_name=f"{row['Customer']}.xlsx", key=f"btn_x_{real_row_idx}", use_container_width=True)
+                                    pdf_data = generate_pdf(no_s, customer_val, up_val, f_df, subt, tax, gtot)
+                                    b1.download_button(label="📩 DOWNLOAD PDF", data=pdf_data, file_name=f"Quo_{customer_val}.pdf", key=f"btn_p_{real_row_idx}", use_container_width=True, type="primary")
+                                    xls_data = generate_excel(no_s, customer_val, up_val, f_df, subt, tax, gtot)
+                                    b2.download_button(label="📊 DOWNLOAD EXCEL", data=xls_data, file_name=f"{customer_val}.xlsx", key=f"btn_x_{real_row_idx}", use_container_width=True)
 
                                     st.markdown("<br>", unsafe_allow_html=True)
                                     if st.button("✅ TANDAI PENAWARAN SELESAI & HAPUS DARI ANTREAN", key=f"done_btn_{real_row_idx}", type="primary", use_container_width=True):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
-                                        st.success(f"✅ Penawaran {row['Customer']} selesai diproses.")
+                                        st.success(f"✅ Penawaran {customer_val} selesai diproses.")
                                         st.rerun()
                     else:
                         st.markdown(f"""<div style="text-align:center; padding:48px 20px; color:#7a9ab8;"><div style="font-size:3rem; margin-bottom:12px;">🎉</div><div style="font-size:1.1rem; font-weight:700; color:#002855;">Antrean Bersih!</div><div style="font-size:0.85rem; margin-top:6px;">Semua penawaran sudah diproses, Pak {MARKETING_NAME}.</div></div>""", unsafe_allow_html=True)
 
             except Exception as e:
                 st.error(f"❌ Error Sistem: {e}")
+                import traceback
+                st.code(traceback.format_exc(), language="python")
 
     elif pwd != "":
         st.sidebar.error("❌ Password salah. Coba lagi.")
