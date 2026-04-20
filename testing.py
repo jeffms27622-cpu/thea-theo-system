@@ -31,7 +31,7 @@ st.set_page_config(
     page_title=f"{COMPANY_NAME} - {MARKETING_NAME}",
     layout="wide",
     page_icon="📎",
-    initial_sidebar_state="collapsed"  # ← Sidebar collapsed by default on mobile
+    initial_sidebar_state="collapsed",   # sidebar collapsed by default → mobile friendly
 )
 
 # =========================================================
@@ -41,7 +41,6 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700&display=swap');
 
-/* ── RESET & BASE ── */
 html, body, [class*="css"] {
     font-family: 'Plus Jakarta Sans', sans-serif;
     -webkit-tap-highlight-color: transparent;
@@ -49,23 +48,20 @@ html, body, [class*="css"] {
 }
 #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
 
-/* ── APP BACKGROUND ── */
 .stApp {
     background: linear-gradient(135deg, #f0f4f8 0%, #e8edf5 50%, #f5f0e8 100%);
     min-height: 100vh;
 }
 
-/* ── MOBILE: Hilangkan padding berlebih di main container ── */
+/* ── CONTAINER PADDING ── */
 .block-container {
-    padding: 0.5rem 0.75rem 2rem 0.75rem !important;
+    padding: 0.6rem 0.8rem 3rem 0.8rem !important;
     max-width: 100% !important;
 }
-
-/* Desktop: padding lebih lega */
 @media (min-width: 768px) {
     .block-container {
-        padding: 1rem 2rem 2rem 2rem !important;
-        max-width: 1200px !important;
+        padding: 1.2rem 2.5rem 3rem 2.5rem !important;
+        max-width: 1280px !important;
         margin: 0 auto !important;
     }
 }
@@ -75,16 +71,13 @@ html, body, [class*="css"] {
     background: linear-gradient(180deg, #002855 0%, #003d7a 40%, #001f42 100%) !important;
     border-right: 3px solid #B8860B;
     min-width: 260px !important;
-    max-width: 80vw !important;
+    max-width: 85vw !important;
 }
-
 [data-testid="stSidebar"] p,
 [data-testid="stSidebar"] span:not([data-baseweb]),
 [data-testid="stSidebar"] label,
 [data-testid="stSidebar"] div.stMarkdown,
-[data-testid="stSidebar"] .stCaption {
-    color: #e8edf5 !important;
-}
+[data-testid="stSidebar"] .stCaption { color: #e8edf5 !important; }
 [data-testid="stSidebar"] h1,
 [data-testid="stSidebar"] h2,
 [data-testid="stSidebar"] h3 {
@@ -94,17 +87,13 @@ html, body, [class*="css"] {
 }
 [data-testid="stSidebar"] .stSelectbox label,
 [data-testid="stSidebar"] .stTextInput label {
-    color: #B8860B !important;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    font-size: 0.75rem;
+    color: #B8860B !important; font-weight: 600;
+    letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.75rem;
 }
 [data-testid="stSidebar"] [data-testid="stSelectbox"] > div > div {
     background: rgba(255,255,255,0.1) !important;
     border: 1px solid rgba(184,134,11,0.4) !important;
-    color: white !important;
-    border-radius: 8px;
+    color: white !important; border-radius: 8px;
 }
 [data-testid="stSidebar"] .stExpander {
     background: rgba(255,255,255,0.08) !important;
@@ -115,98 +104,58 @@ html, body, [class*="css"] {
 /* ── HEADER ── */
 .top-header {
     background: linear-gradient(135deg, #002855 0%, #004080 60%, #002855 100%);
-    border-radius: 12px;
-    padding: 16px 18px;
-    margin-bottom: 16px;
+    border-radius: 12px; padding: 16px 18px; margin-bottom: 16px;
     border-bottom: 4px solid #B8860B;
-    box-shadow: 0 8px 32px rgba(0,40,85,0.3);
-    position: relative;
-    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,40,85,0.3); position: relative; overflow: hidden;
 }
 .top-header::before {
-    content: '';
-    position: absolute;
-    top: -50%; right: -10%;
+    content: ''; position: absolute; top: -50%; right: -10%;
     width: 200px; height: 200px;
     background: radial-gradient(circle, rgba(184,134,11,0.15) 0%, transparent 70%);
     border-radius: 50%;
 }
 .top-header-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.3rem;
-    font-weight: 700;
-    color: white;
-    margin: 0;
-    line-height: 1.2;
+    font-family: 'Playfair Display', serif; font-size: 1.25rem;
+    font-weight: 700; color: white; margin: 0; line-height: 1.2;
 }
 .top-header-subtitle {
-    font-size: 0.7rem;
-    color: #B8860B;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    font-weight: 600;
-    margin-top: 3px;
+    font-size: 0.68rem; color: #B8860B; letter-spacing: 0.1em;
+    text-transform: uppercase; font-weight: 600; margin-top: 3px;
 }
 .top-header-badge {
-    display: inline-block;
-    background: rgba(184,134,11,0.2);
-    border: 1px solid #B8860B;
-    color: #f0c040;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    margin-top: 8px;
+    display: inline-block; background: rgba(184,134,11,0.2);
+    border: 1px solid #B8860B; color: #f0c040; padding: 4px 12px;
+    border-radius: 20px; font-size: 0.7rem; font-weight: 600;
+    letter-spacing: 0.06em; margin-top: 8px;
 }
-
-/* Desktop header: lebih besar */
 @media (min-width: 768px) {
-    .top-header {
-        padding: 28px 36px;
-        border-radius: 16px;
-        margin-bottom: 28px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
+    .top-header { padding: 28px 36px; border-radius: 16px; margin-bottom: 28px;
+        display: flex; align-items: center; justify-content: space-between; }
     .top-header-title { font-size: 1.85rem; }
     .top-header-subtitle { font-size: 0.8rem; }
-    .top-header-badge {
-        display: block;
-        margin-top: 0;
-        padding: 6px 16px;
-        font-size: 0.8rem;
-    }
+    .top-header-badge { margin-top: 0; padding: 6px 16px; font-size: 0.8rem; }
 }
 
 /* ── SECTION TITLE ── */
 .section-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.05rem;
-    color: #002855;
-    font-weight: 700;
-    border-left: 4px solid #B8860B;
-    padding-left: 10px;
-    margin: 16px 0 12px 0;
+    font-family: 'Playfair Display', serif; font-size: 1rem;
+    color: #002855; font-weight: 700; border-left: 4px solid #B8860B;
+    padding-left: 10px; margin: 14px 0 10px 0;
 }
 @media (min-width: 768px) {
     .section-title { font-size: 1.3rem; margin: 20px 0 14px 0; }
 }
 
-/* ── INPUTS — ukuran touch-friendly ── */
+/* ── INPUTS — touch-friendly ── */
 .stTextInput > div > div > input,
 .stNumberInput > div > div > input,
 .stTextArea > div > div > textarea {
-    color: #1e1e1e !important;
-    border-radius: 10px !important;
-    border: 1.5px solid #c8d6e5 !important;
-    background: white !important;
+    color: #1e1e1e !important; border-radius: 10px !important;
+    border: 1.5px solid #c8d6e5 !important; background: white !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 1rem !important;          /* ← lebih besar di mobile */
-    padding: 12px 14px !important;       /* ← lebih tinggi supaya mudah tap */
+    font-size: 1rem !important;          /* iOS tidak zoom jika ≥ 16px */
+    padding: 12px 14px !important; min-height: 48px !important;
     transition: border-color 0.2s, box-shadow 0.2s !important;
-    min-height: 48px !important;         /* ← touch target minimum */
     -webkit-appearance: none;
 }
 .stTextInput > div > div > input:focus,
@@ -218,311 +167,206 @@ html, body, [class*="css"] {
 
 /* Selectbox */
 [data-testid="stSelectbox"] > div > div {
-    border-radius: 10px !important;
-    border: 1.5px solid #c8d6e5 !important;
-    background: white !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    color: #1e1e1e !important;
-    min-height: 48px !important;
+    border-radius: 10px !important; border: 1.5px solid #c8d6e5 !important;
+    background: white !important; font-family: 'Plus Jakarta Sans', sans-serif !important;
+    color: #1e1e1e !important; min-height: 48px !important;
 }
 [data-testid="stMultiSelect"] > div > div {
-    border-radius: 10px !important;
-    border: 1.5px solid #c8d6e5 !important;
-    background: white !important;
-    color: #1e1e1e !important;
-    min-height: 48px !important;
+    border-radius: 10px !important; border: 1.5px solid #c8d6e5 !important;
+    background: white !important; color: #1e1e1e !important; min-height: 48px !important;
 }
 [data-testid="stSelectbox"] span,
 [data-testid="stMultiSelect"] span { color: #1e1e1e !important; }
 
-/* Dropdown option */
+/* Dropdown options */
 [data-baseweb="select"] [data-baseweb="option"],
 [data-baseweb="popover"] li,
 ul[role="listbox"] li {
-    color: #1e1e1e !important;
-    background: white !important;
-    padding: 12px 16px !important;      /* ← touch-friendly */
-    font-size: 0.95rem !important;
+    color: #1e1e1e !important; background: white !important;
+    padding: 12px 16px !important; font-size: 0.95rem !important;
 }
 
-/* Label */
+/* Labels */
 section.main .stTextInput label,
 section.main .stSelectbox label,
 section.main .stNumberInput label,
 section.main .stMultiSelect label,
 section.main .stCheckbox label {
-    font-weight: 600 !important;
-    font-size: 0.78rem !important;
-    letter-spacing: 0.06em !important;
-    text-transform: uppercase !important;
+    font-weight: 600 !important; font-size: 0.78rem !important;
+    letter-spacing: 0.06em !important; text-transform: uppercase !important;
     color: #002855 !important;
 }
 
-/* ── BUTTONS — touch-friendly minimum 48px ── */
+/* ── BUTTONS — min 48px touch target ── */
 .stButton > button {
-    min-height: 48px !important;
-    font-size: 0.88rem !important;
-    padding: 12px 20px !important;
-    border-radius: 10px !important;
-    width: 100% !important;             /* ← full width di mobile */
+    min-height: 48px !important; border-radius: 10px !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.06em !important;
-    text-transform: uppercase !important;
+    font-weight: 700 !important; font-size: 0.85rem !important;
+    letter-spacing: 0.06em !important; text-transform: uppercase !important;
     transition: all 0.2s ease !important;
-    cursor: pointer !important;
-    -webkit-tap-highlight-color: transparent;
+    cursor: pointer !important; -webkit-tap-highlight-color: transparent;
+    width: 100% !important;              /* full-width di mobile */
 }
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, #002855 0%, #004080 100%) !important;
-    color: white !important;
-    border: none !important;
+    color: white !important; border: none !important;
     box-shadow: 0 4px 14px rgba(0,40,85,0.3) !important;
     border-bottom: 3px solid #B8860B !important;
 }
-.stButton > button[kind="primary"]:active {
-    transform: scale(0.97) !important;
-    box-shadow: 0 2px 8px rgba(0,40,85,0.3) !important;
-}
+.stButton > button[kind="primary"]:active { transform: scale(0.97) !important; }
 .stButton > button:not([kind="primary"]) {
-    background: white !important;
-    color: #002855 !important;
+    background: white !important; color: #002855 !important;
     border: 1.5px solid #002855 !important;
 }
 .stButton > button:not([kind="primary"]):active {
-    background: #f0f4f8 !important;
-    border-color: #B8860B !important;
-    color: #B8860B !important;
+    background: #f0f4f8 !important; border-color: #B8860B !important; color: #B8860B !important;
 }
-
-/* Desktop: tombol tidak harus full width */
 @media (min-width: 768px) {
     .stButton > button { width: auto !important; }
-    .stButton > button:hover:not([kind="primary"]) {
-        background: #f0f4f8 !important;
-        border-color: #B8860B !important;
-        color: #B8860B !important;
-        transform: translateY(-1px) !important;
-    }
     .stButton > button[kind="primary"]:hover {
         transform: translateY(-2px) !important;
         box-shadow: 0 8px 20px rgba(0,40,85,0.4) !important;
         background: linear-gradient(135deg, #003366 0%, #0050a0 100%) !important;
     }
+    .stButton > button:not([kind="primary"]):hover {
+        background: #f0f4f8 !important; border-color: #B8860B !important;
+        color: #B8860B !important; transform: translateY(-1px) !important;
+    }
 }
 
-/* Download button */
 .stDownloadButton > button {
-    min-height: 48px !important;
-    border-radius: 10px !important;
+    min-height: 48px !important; border-radius: 10px !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-weight: 700 !important;
-    font-size: 0.82rem !important;
-    letter-spacing: 0.06em !important;
-    text-transform: uppercase !important;
-    width: 100% !important;
-    transition: all 0.2s ease !important;
+    font-weight: 700 !important; font-size: 0.82rem !important;
+    letter-spacing: 0.06em !important; text-transform: uppercase !important;
+    width: 100% !important; transition: all 0.2s ease !important;
 }
 @media (min-width: 768px) {
     .stDownloadButton > button { width: auto !important; }
 }
 
-/* ── METRIC CARDS ── */
-[data-testid="stMetric"] {
-    background: white !important;
-    border: 1px solid #e0e8f0 !important;
-    border-radius: 14px !important;
-    padding: 14px 16px !important;
-    box-shadow: 0 2px 12px rgba(0,40,85,0.07) !important;
-    border-top: 3px solid #B8860B !important;
-    transition: transform 0.2s, box-shadow 0.2s !important;
-}
-[data-testid="stMetricLabel"] {
-    font-size: 0.7rem !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.08em !important;
-    text-transform: uppercase !important;
-    color: #5a7a9a !important;
-}
-[data-testid="stMetricValue"] {
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-weight: 800 !important;
-    color: #002855 !important;
-    font-size: 1.3rem !important;       /* ← lebih kecil di mobile supaya muat */
-}
-@media (min-width: 768px) {
-    [data-testid="stMetricValue"] { font-size: 1.75rem !important; }
-    [data-testid="stMetric"]:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(0,40,85,0.12) !important;
-    }
-}
-
 /* ── EXPANDER ── */
 .streamlit-expanderHeader {
     background: linear-gradient(135deg, #f8fafd 0%, #f0f5fc 100%) !important;
-    border-radius: 12px !important;
-    font-weight: 700 !important;
-    color: #002855 !important;
-    font-size: 0.9rem !important;
-    border: 1.5px solid #dce8f0 !important;
-    padding: 14px 16px !important;
-    transition: background 0.2s !important;
-    min-height: 48px !important;
+    border-radius: 12px !important; font-weight: 700 !important;
+    color: #002855 !important; font-size: 0.88rem !important;
+    border: 1.5px solid #dce8f0 !important; padding: 14px 16px !important;
+    transition: background 0.2s !important; min-height: 48px !important;
 }
 .streamlit-expanderHeader:hover {
     background: linear-gradient(135deg, #edf3fb 0%, #e4eef8 100%) !important;
     border-color: #B8860B !important;
 }
 
-/* ── TEKS MAIN AREA ── */
-section.main p,
-section.main span,
-section.main div.stMarkdown,
-section.main .stMarkdown p,
-section.main .stMarkdown strong,
+/* ── METRIC ── */
+[data-testid="stMetric"] {
+    background: white !important; border: 1px solid #e0e8f0 !important;
+    border-radius: 14px !important; padding: 12px 14px !important;
+    box-shadow: 0 2px 12px rgba(0,40,85,0.07) !important;
+    border-top: 3px solid #B8860B !important;
+    transition: transform 0.2s, box-shadow 0.2s !important;
+}
+[data-testid="stMetricLabel"] {
+    font-size: 0.68rem !important; font-weight: 600 !important;
+    letter-spacing: 0.08em !important; text-transform: uppercase !important;
+    color: #5a7a9a !important;
+}
+[data-testid="stMetricValue"] {
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-weight: 800 !important; color: #002855 !important;
+    font-size: 1.1rem !important;
+}
+@media (min-width: 768px) {
+    [data-testid="stMetricValue"] { font-size: 1.6rem !important; }
+    [data-testid="stMetric"]:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(0,40,85,0.12) !important;
+    }
+}
+
+/* ── MAIN AREA TEXT ── */
+section.main p, section.main span, section.main div.stMarkdown,
+section.main .stMarkdown p, section.main .stMarkdown strong,
 section.main [data-testid="stMarkdownContainer"] p,
 section.main [data-testid="stMarkdownContainer"] strong,
 section.main [data-testid="stCaptionContainer"],
-section.main small,
-section.main .stCaption { color: #1e1e1e !important; }
-
+section.main small, section.main .stCaption { color: #1e1e1e !important; }
 section.main [data-testid="stCaptionContainer"] p,
 section.main .stCaption p { color: #5a7a9a !important; }
-
 section.main [data-testid="stVerticalBlockBorderWrapper"] p,
 section.main [data-testid="stVerticalBlockBorderWrapper"] strong,
 section.main [data-testid="stVerticalBlockBorderWrapper"] span,
 section.main [data-testid="stVerticalBlockBorderWrapper"] div { color: #1e1e1e !important; }
-
 section.main [data-testid="stMarkdownContainer"] * { color: inherit; }
-
 section.main [data-testid="stExpander"] p,
 section.main [data-testid="stExpander"] span,
 section.main [data-testid="stExpander"] strong,
 section.main [data-testid="stExpander"] li { color: #1e1e1e !important; }
 
-/* ── DIVIDER ── */
+/* ── MISC ── */
 hr {
-    border: none !important;
-    border-top: 2px solid transparent !important;
+    border: none !important; border-top: 2px solid transparent !important;
     background: linear-gradient(90deg, transparent, #B8860B, transparent) !important;
-    height: 2px !important;
-    margin: 16px 0 !important;
+    height: 2px !important; margin: 14px 0 !important;
 }
-
-/* ── TOAST ── */
 [data-testid="stToast"] {
-    background: #002855 !important;
-    color: white !important;
-    border-left: 4px solid #B8860B !important;
-    border-radius: 10px !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-weight: 600 !important;
-    font-size: 0.9rem !important;
+    background: #002855 !important; color: white !important;
+    border-left: 4px solid #B8860B !important; border-radius: 10px !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important; font-weight: 600 !important;
 }
-
-/* ── FILE UPLOADER ── */
 [data-testid="stFileUploader"] {
-    border: 2px dashed #c8d6e5 !important;
-    border-radius: 12px !important;
-    background: #f8fafd !important;
-    transition: border-color 0.2s !important;
-    padding: 16px !important;
+    border: 2px dashed #c8d6e5 !important; border-radius: 12px !important;
+    background: #f8fafd !important; transition: border-color 0.2s !important;
+}
+[data-testid="stAlert"] {
+    border-radius: 10px !important; font-size: 0.88rem !important;
 }
 
 /* ── PRICE BOX ── */
 .price-info-box {
-    background: linear-gradient(135deg, #002855, #004080);
-    color: white;
-    border-radius: 12px;
-    padding: 14px 18px;
-    font-weight: 700;
-    font-size: 0.95rem;
-    border-left: 4px solid #B8860B;
-    box-shadow: 0 4px 16px rgba(0,40,85,0.25);
-    margin: 8px 0;
+    background: linear-gradient(135deg, #002855, #004080); color: white;
+    border-radius: 12px; padding: 12px 16px; font-weight: 700; font-size: 0.88rem;
+    border-left: 4px solid #B8860B; box-shadow: 0 4px 16px rgba(0,40,85,0.25);
+    margin: 8px 0; line-height: 1.8;
 }
-.price-info-box span { color: #f0c040; font-size: 1.1rem; }
+.price-info-box span { color: #f0c040; font-size: 1rem; }
 
 /* ── FEATURE CARDS ── */
 .feature-card {
-    background: white;
-    border-radius: 14px;
-    padding: 18px 14px;
-    border: 1px solid #e0e8f0;
-    border-top: 3px solid #B8860B;
-    box-shadow: 0 4px 16px rgba(0,40,85,0.08);
-    text-align: center;
-    transition: transform 0.25s, box-shadow 0.25s;
-    margin-bottom: 12px;
+    background: white; border-radius: 14px; padding: 18px 14px;
+    border: 1px solid #e0e8f0; border-top: 3px solid #B8860B;
+    box-shadow: 0 4px 16px rgba(0,40,85,0.08); text-align: center;
+    transition: transform 0.25s, box-shadow 0.25s; margin-bottom: 12px;
 }
 .feature-card .icon { font-size: 2rem; margin-bottom: 8px; }
 .feature-card h4 { color: #002855; font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
 .feature-card p { color: #7a9ab8; font-size: 0.78rem; line-height: 1.5; margin: 0; }
-
 @media (min-width: 768px) {
-    .feature-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 10px 28px rgba(0,40,85,0.16);
-    }
+    .feature-card:hover { transform: translateY(-4px); box-shadow: 0 10px 28px rgba(0,40,85,0.16); }
     .feature-card { padding: 24px 20px; }
 }
 
-/* ── DATAFRAME / TABLE ── */
-[data-testid="stDataFrame"] {
-    border-radius: 10px !important;
-    overflow: hidden !important;
-    font-size: 0.82rem !important;
-}
+/* ── NUMBER INPUT buttons lebih besar ── */
+.stNumberInput button { min-width: 40px !important; min-height: 40px !important; }
 
-/* ── KOLOM: stack di mobile, side by side di desktop ── */
-/* Streamlit columns secara otomatis stack di layar sempit,
-   tapi kita bisa kurangi gap-nya di mobile */
-[data-testid="column"] {
-    padding: 0 4px !important;
-}
-@media (min-width: 768px) {
-    [data-testid="column"] { padding: 0 8px !important; }
-}
-
-/* ── NUMBER INPUT — tombol +/- lebih besar ── */
-.stNumberInput button {
-    min-width: 40px !important;
-    min-height: 40px !important;
-}
-
-/* ── CHECKBOX ── */
+/* ── CHECKBOX touch target ── */
 .stCheckbox > label {
-    min-height: 40px !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    cursor: pointer !important;
-}
-.stCheckbox > label > div:first-child {
-    width: 20px !important;
-    height: 20px !important;
-    min-width: 20px !important;
+    min-height: 40px !important; display: flex !important;
+    align-items: center !important; gap: 8px !important; cursor: pointer !important;
 }
 
-/* ── SCROLLBAR halus di mobile ── */
+/* ── COLUMN gap ── */
+[data-testid="column"] { padding: 0 4px !important; }
+@media (min-width: 768px) { [data-testid="column"] { padding: 0 8px !important; } }
+
+/* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(0,40,85,0.2); border-radius: 4px; }
 
-/* ── BOTTOM SAFE AREA (iPhone notch) ── */
+/* ── iPhone safe-area ── */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
-    .stApp {
-        padding-bottom: env(safe-area-inset-bottom);
-    }
-}
-
-/* ── ALERT / INFO BOX ── */
-[data-testid="stAlert"] {
-    border-radius: 10px !important;
-    font-size: 0.88rem !important;
-    padding: 12px 16px !important;
+    .stApp { padding-bottom: env(safe-area-inset-bottom); }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -577,7 +421,7 @@ df_barang = load_db()
 
 
 # =========================================================
-# PDF GENERATOR (tidak berubah dari versi asli)
+# PDF GENERATOR
 # =========================================================
 class PenawaranPDF(FPDF):
     def header(self):
@@ -648,21 +492,459 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     pdf.cell(130, 5, "", 0, 0); pdf.cell(60, 5, "Sales Consultant", 0, 1, 'C')
     return pdf.output(dest='S').encode('latin-1')
 
+
 # =========================================================
-# CATATAN PENGGUNAAN (untuk referensi kolom di halaman app)
+# EXCEL GENERATOR
 # =========================================================
-# Untuk layout yang mobile-friendly, gunakan pola ini di halaman-halaman kamu:
-#
-# JANGAN:
-#   col1, col2, col3 = st.columns(3)  ← terlalu sempit di HP
-#
-# LAKUKAN:
-#   col1, col2 = st.columns([1,1])    ← maks 2 kolom untuk form
-#   # atau
-#   col1, col2 = st.columns([2,1])    ← konten + aksi
-#
-# Untuk TABEL RINGKASAN (3+ kolom), pakai st.columns([1,1,1]) tapi
-# pastikan kontennya pendek (angka/label singkat).
-#
-# Gunakan st.expander() untuk menyembunyikan section panjang di mobile.
+def generate_excel(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        workbook  = writer.book
+        worksheet = workbook.add_worksheet('Quotation')
+        fmt_navy_bg      = workbook.add_format({'bg_color': '#002855', 'font_color': 'white', 'bold': True, 'font_size': 18, 'valign': 'vcenter'})
+        fmt_gold_text    = workbook.add_format({'font_color': '#B8860B', 'bold': True, 'font_size': 10})
+        fmt_white_text   = workbook.add_format({'font_color': 'white', 'font_size': 9})
+        fmt_header_table = workbook.add_format({'bg_color': '#002855', 'font_color': 'white', 'bold': True, 'border': 1, 'align': 'center'})
+        fmt_border       = workbook.add_format({'border': 1})
+        fmt_money        = workbook.add_format({'border': 1, 'num_format': '#,##0'})
+        fmt_total_label  = workbook.add_format({'bold': True, 'align': 'right'})
+        fmt_grand_total  = workbook.add_format({'bg_color': '#002855', 'font_color': 'white', 'bold': True, 'num_format': '#,##0', 'align': 'right'})
+        worksheet.set_column('A:A', 5);  worksheet.set_column('B:B', 45); worksheet.set_column('C:C', 10)
+        worksheet.set_column('D:D', 10); worksheet.set_column('E:E', 15); worksheet.set_column('F:F', 18)
+        for r in range(0, 5): worksheet.write_blank(r, 0, '', fmt_navy_bg)
+        worksheet.merge_range('B2:F2', COMPANY_NAME, fmt_navy_bg)
+        worksheet.write('B3', "  ".join(SLOGAN.upper()), fmt_gold_text)
+        worksheet.write('B4', f"{ADDR} | Office: {OFFICE_PHONE}", fmt_white_text)
+        worksheet.write('B5', f"WhatsApp: {MARKETING_WA} | Email: {MARKETING_EMAIL}", fmt_white_text)
+        worksheet.write('B7', "PREPARED FOR:", fmt_gold_text)
+        worksheet.write('B8', nama_cust.upper(), workbook.add_format({'bold': True, 'font_size': 12}))
+        worksheet.write('B9', f"Attention: {pic}")
+        worksheet.write('F7', "QUOTATION", workbook.add_format({'bold': True, 'font_size': 20, 'align': 'right', 'font_color': '#002855'}))
+        worksheet.write('F8', f"Ref: {no_surat}", workbook.add_format({'align': 'right'}))
+        worksheet.write('F9', f"Date: {(datetime.utcnow() + timedelta(hours=7)).strftime('%d %B %Y')}", workbook.add_format({'align': 'right'}))
+        header_row = 11
+        for col_num, data in enumerate(['NO', 'DESCRIPTION', 'QTY', 'UNIT', 'PRICE', 'TOTAL']):
+            worksheet.write(header_row, col_num, data, fmt_header_table)
+        row_idx = 12
+        for i, row in df_order.iterrows():
+            worksheet.write(row_idx, 0, i+1, fmt_border); worksheet.write(row_idx, 1, row['Nama Barang'], fmt_border)
+            worksheet.write(row_idx, 2, row['Qty'], fmt_border); worksheet.write(row_idx, 3, row['Satuan'], fmt_border)
+            worksheet.write(row_idx, 4, row['Harga'], fmt_money); worksheet.write(row_idx, 5, row['Total_Row'], fmt_money)
+            row_idx += 1
+        row_idx += 1
+        worksheet.write(row_idx, 4, "Sub Total", fmt_total_label); worksheet.write(row_idx, 5, subtotal, fmt_money); row_idx += 1
+        worksheet.write(row_idx, 4, "VAT (PPN 11%)", fmt_total_label); worksheet.write(row_idx, 5, ppn, fmt_money); row_idx += 1
+        worksheet.write(row_idx, 4, "GRAND TOTAL", fmt_total_label); worksheet.write(row_idx, 5, grand_total, fmt_grand_total)
+    return output.getvalue()
+
+
+def item_key(row_idx, nama_barang, suffix=""):
+    h = hashlib.md5(nama_barang.encode()).hexdigest()[:8]
+    return f"r{row_idx}_{h}_{suffix}" if suffix else f"r{row_idx}_{h}"
+
+def clear_row_state(real_row_idx):
+    keys_to_clear = [k for k in list(st.session_state.keys()) if k.startswith(f"r{real_row_idx}_")]
+    for k in keys_to_clear:
+        del st.session_state[k]
+
+
 # =========================================================
+# SIDEBAR
+# =========================================================
+with st.sidebar:
+    st.markdown(f"""
+    <div style="text-align:center; padding: 20px 0 10px 0;">
+        <div style="font-size:2.4rem;">📎</div>
+        <div style="font-family:'Playfair Display',serif; font-size:1.1rem; color:#f0c040; font-weight:700; margin-top:6px;">
+            TTS Portal
+        </div>
+        <div style="font-size:0.72rem; color:#B8860B; letter-spacing:0.1em; text-transform:uppercase; margin-top:2px;">
+            {MARKETING_NAME} · Sales Console
+        </div>
+    </div>
+    <hr style="border-top:1px solid rgba(184,134,11,0.3); margin: 10px 0 18px 0;">
+    """, unsafe_allow_html=True)
+
+    menu = st.selectbox("Navigasi:", ["🏠 Home", "📝 Admin Sales", "👨‍💻 Sales Dashboard"], label_visibility="collapsed")
+
+    st.markdown("""
+    <hr style="border-top:1px solid rgba(184,134,11,0.2); margin: 18px 0 10px 0;">
+    <div style="font-size:0.7rem; color:rgba(255,255,255,0.35); text-align:center; padding-bottom:10px;">
+        PT. THEA THEO STATIONARY<br>© 2026 All Rights Reserved
+    </div>
+    """, unsafe_allow_html=True)
+
+
+if 'cart' not in st.session_state:
+    st.session_state.cart = []
+
+
+# =========================================================
+# HOME
+# =========================================================
+if menu == "🏠 Home":
+    render_header(COMPANY_NAME, SLOGAN, f"📍 {ADDR.split(',')[0]}")
+
+    # Mobile: 2 kolom supaya tidak terlalu sempit
+    c1, c2 = st.columns(2)
+    c1.metric("🧑‍💼 Marketing", MARKETING_NAME)
+    c2.metric("📞 WhatsApp", MARKETING_WA)
+    c3, c4 = st.columns(2)
+    c3.metric("📧 Email", "alattulis.tts")
+    c4.metric("🏢 Kantor", OFFICE_PHONE)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Feature cards: 1 kolom di mobile, 3 di desktop
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        st.markdown("""<div class="feature-card"><div class="icon">📝</div><h4>Form Penawaran</h4><p>Buat daftar pesanan, cari barang, atur satuan & harga, kirim ke sales.</p></div>""", unsafe_allow_html=True)
+    with col2:
+        st.markdown("""<div class="feature-card"><div class="icon">📄</div><h4>Generate Quotation</h4><p>Unduh quotation PDF atau Excel siap kirim ke pelanggan.</p></div>""", unsafe_allow_html=True)
+    with col3:
+        st.markdown("""<div class="feature-card"><div class="icon">📊</div><h4>Sales Dashboard</h4><p>Kelola antrean, edit item, dan tandai penawaran selesai.</p></div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.info("💡 Buka **menu ☰** di pojok kiri atas untuk mengakses Form Penawaran atau Sales Dashboard.")
+
+
+# =========================================================
+# ADMIN SALES
+# =========================================================
+elif menu == "📝 Admin Sales":
+    render_header("Form Penawaran", "Buat & kirim penawaran baru", "📋 Admin Sales")
+
+    if "widget_id" not in st.session_state:
+        st.session_state.widget_id = 0
+
+    render_section_title("👤 Data Pelanggan")
+    with st.container(border=True):
+        nama_toko = st.text_input("🏢 Nama Perusahaan / Toko", placeholder="PT. Contoh Maju Bersama")
+        col1, col2 = st.columns(2)
+        up_nama  = col1.text_input("👤 Nama Penerima (UP)", placeholder="Bapak / Ibu ...")
+        wa_nomor = col2.text_input("📞 Nomor WhatsApp",     placeholder="08xx-xxxx-xxxx")
+
+    render_section_title("📦 Tambah Barang ke Keranjang")
+    with st.container(border=True):
+        pilihan_barang = st.selectbox(
+            "🔍 Cari & Pilih Nama Barang:",
+            options=[""] + df_barang['Nama Barang'].tolist(),
+            key=f"pilih_brg_{st.session_state.widget_id}"
+        )
+        if pilihan_barang != "":
+            row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
+            h_master = float(row_m['Harga']); satuan_db = str(row_m['Satuan']).strip()
+
+            # Mobile: 2 kolom saja
+            c1, c2 = st.columns(2)
+            mode_c = c1.selectbox(f"Satuan (Default: {satuan_db})",
+                                  ["Sesuai Database", "Lusin (12)", "Dus", "Box", "Pack", "Set"],
+                                  key=f"m_c_{st.session_state.widget_id}")
+            mult_c = 1; sat_final = satuan_db
+            if mode_c == "Lusin (12)":
+                mult_c = 12; sat_final = "Lusin"
+            elif mode_c in ["Dus", "Box", "Pack", "Set"]:
+                isi_c  = st.number_input(f"Isi per {mode_c}", min_value=1, value=10,
+                                         key=f"isi_c_{st.session_state.widget_id}")
+                mult_c = isi_c; sat_final = mode_c
+
+            qty_c    = c2.number_input(f"Jumlah ({sat_final})", min_value=1, value=1,
+                                       key=f"qty_c_{st.session_state.widget_id}")
+            h_jual_c = int(h_master * mult_c)
+
+            st.markdown(f"""
+            <div class="price-info-box">
+                💰 Harga: <span>Rp {h_jual_c:,.0f}</span> / {sat_final}<br>
+                🔢 Qty: <span>{int(qty_c)} {sat_final}</span> &nbsp;|&nbsp;
+                💵 Total: <span>Rp {int(qty_c * h_jual_c):,.0f}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            if st.button("➕ Masukkan ke Keranjang", use_container_width=True, type="primary"):
+                st.session_state.cart = [x for x in st.session_state.cart if x['Nama Barang'] != pilihan_barang]
+                st.session_state.cart.append({
+                    "Nama Barang": pilihan_barang, "Qty": int(qty_c),
+                    "Harga": float(h_jual_c), "Satuan": sat_final,
+                    "Total_Row": float(qty_c * h_jual_c)
+                })
+                st.session_state.widget_id += 1
+                st.toast(f"✅ Ditambahkan: {pilihan_barang}"); time.sleep(0.2); st.rerun()
+        else:
+            st.markdown("""<div style="text-align:center; padding:20px 0; color:#7a9ab8;">
+                <div style="font-size:2rem; margin-bottom:8px;">🔍</div>
+                <div style="font-size:0.88rem;">Ketik atau klik dropdown di atas untuk mencari barang</div>
+            </div>""", unsafe_allow_html=True)
+
+    if st.session_state.cart:
+        render_section_title(f"🛒 Keranjang ({len(st.session_state.cart)} item)")
+        total_cart = sum(x['Total_Row'] for x in st.session_state.cart)
+        tax_cart   = total_cart * 0.11
+        grand_cart = total_cart + tax_cart
+
+        # Mobile: 2+1 metric layout
+        m1, m2 = st.columns(2)
+        m1.metric("📦 Item", f"{len(st.session_state.cart)} jenis")
+        m2.metric("💵 Sub Total", f"Rp {total_cart:,.0f}")
+        st.metric("🧾 Total + PPN", f"Rp {grand_cart:,.0f}")
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        for i, item in enumerate(st.session_state.cart):
+            with st.container(border=True):
+                # Nama & harga satu baris penuh
+                st.markdown(
+                    f"<span style='color:#002855;font-weight:700;font-size:0.95rem;'>{item['Nama Barang']}</span><br>"
+                    f"<span style='color:#5a7a9a;font-size:0.80rem;'>@ Rp {item['Harga']:,.0f} / {item['Satuan']}</span>",
+                    unsafe_allow_html=True
+                )
+                ca, cb = st.columns([3, 1])
+                ca.markdown(
+                    f"<span style='color:#002855;font-weight:700;'>🔢 {item['Qty']} {item['Satuan']} &nbsp;·&nbsp; Rp {item['Total_Row']:,.0f}</span>",
+                    unsafe_allow_html=True
+                )
+                if cb.button("✕ Hapus", key=f"del_item_{i}"):
+                    st.session_state.cart.pop(i); st.rerun()
+
+        st.divider()
+        if st.button(f"🚀 KIRIM PENAWARAN KE PAK {MARKETING_NAME.upper()}", use_container_width=True, type="primary"):
+            if not nama_toko:
+                st.error("⚠️ Nama Toko/Perusahaan wajib diisi!")
+            else:
+                sheet = connect_gsheet()
+                if sheet:
+                    wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
+                    sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(st.session_state.cart), "Pending", MARKETING_NAME])
+                    st.balloons(); st.success(f"✅ Penawaran untuk **{nama_toko}** berhasil terkirim!")
+                    st.session_state.cart = []; time.sleep(1); st.rerun()
+
+        if st.button("🗑️ Kosongkan Keranjang", use_container_width=True):
+            st.session_state.cart = []; st.rerun()
+
+
+# =========================================================
+# SALES DASHBOARD
+# =========================================================
+elif menu == "👨‍💻 Sales Dashboard":
+    render_header("Sales Dashboard", f"Kelola antrean · {MARKETING_NAME}", "🔐 Admin Only")
+
+    pwd = st.sidebar.text_input("🔑 Password Admin:", type="password", placeholder="Masukkan password...")
+
+    if pwd == ADMIN_PASSWORD:
+        st.sidebar.success("✅ Login berhasil")
+
+        with st.sidebar.expander("📁 Update Database (.csv)", expanded=False):
+            up_f = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="admin_csv_up")
+            if up_f and st.button("🚀 Update Sekarang"):
+                with open("database_barang.csv", "wb") as f: f.write(up_f.getbuffer())
+                st.cache_data.clear(); st.success("✅ Database diperbarui!"); time.sleep(1); st.rerun()
+
+        sheet = connect_gsheet()
+        if sheet:
+            try:
+                all_vals = sheet.get_all_values()
+                if len(all_vals) > 1:
+                    raw_headers   = all_vals[0]
+                    clean_headers = [h.strip().lstrip('\ufeff') for h in raw_headers]
+                    required_cols = ["Waktu", "Customer", "UP", "WA", "Pesanan", "Status", "Sales"]
+                    df_gs = pd.DataFrame(all_vals[1:], columns=clean_headers)
+                    for col in required_cols:
+                        if col not in df_gs.columns: df_gs[col] = ""
+                    for col in required_cols:
+                        df_gs[col] = df_gs[col].astype(str).str.strip()
+
+                    pending = df_gs[
+                        (df_gs['Status'].str.lower() == 'pending') &
+                        (df_gs['Sales'] == MARKETING_NAME)
+                    ]
+
+                    total_all     = len(df_gs[df_gs['Sales'] == MARKETING_NAME])
+                    total_pending = len(pending)
+                    total_done    = total_all - total_pending
+
+                    dm1, dm2, dm3 = st.columns(3)
+                    dm1.metric("📋 Total",   total_all)
+                    dm2.metric("⏳ Pending",  total_pending)
+                    dm3.metric("✅ Selesai",  total_done)
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+                    if not pending.empty:
+                        render_section_title(f"⏳ Antrean Pending ({total_pending})")
+
+                        for idx, row in pending.iterrows():
+                            real_row_idx = idx + 2
+                            try:
+                                items_preview = ast.literal_eval(str(row['Pesanan']))
+                                n_items = len(items_preview)
+                            except:
+                                items_preview = []; n_items = 0
+
+                            waktu_val    = row.get('Waktu', '')
+                            customer_val = row.get('Customer', '')
+                            up_val       = row.get('UP', '')
+                            wa_val       = row.get('WA', '')
+
+                            exp_label = f"🏢 {customer_val} · {n_items} item · {waktu_val}"
+                            with st.expander(exp_label, expanded=True):
+                                # Mobile: info stack vertikal
+                                st.info(f"🏢 **{customer_val}** &nbsp;|&nbsp; 👤 UP: **{up_val}** &nbsp;|&nbsp; 📞 **{wa_val}**")
+                                st.markdown("---")
+
+                                try:
+                                    items_list = ast.literal_eval(str(row['Pesanan']))
+                                except:
+                                    items_list = []
+
+                                render_section_title("📝 Edit Daftar Barang")
+                                st.caption("💡 Ubah **Pos** untuk urutan (2.5 = sisip antara no.2 & no.3). Centang 🗑️ untuk hapus.")
+
+                                # Pass 1: inisialisasi session_state
+                                for i, r in enumerate(items_list):
+                                    nama_item        = r['Nama Barang']
+                                    u_k              = item_key(real_row_idx, nama_item)
+                                    harga_tersimpan  = float(r.get('Harga', 0))
+                                    satuan_tersimpan = str(r.get('Satuan', 'Pcs')).strip()
+                                    if f"h_{u_k}" not in st.session_state: st.session_state[f"h_{u_k}"] = int(harga_tersimpan)
+                                    if f"s_{u_k}" not in st.session_state: st.session_state[f"s_{u_k}"] = satuan_tersimpan
+                                    if f"q_{u_k}" not in st.session_state: st.session_state[f"q_{u_k}"] = int(r.get('Qty', 1))
+                                    if f"p_{u_k}" not in st.session_state: st.session_state[f"p_{u_k}"] = float(i + 1)
+                                    if f"m_{u_k}" not in st.session_state: st.session_state[f"m_{u_k}"] = "Pcs/Tetap"
+                                    if f"isi_{u_k}" not in st.session_state: st.session_state[f"isi_{u_k}"] = 10
+
+                                # Pass 2: render widget
+                                temp_up   = []
+                                list_mode = ["Pcs/Tetap", "Lusin (12)", "Dus", "Box", "Pack", "Set", "Rim"]
+
+                                for i, r in enumerate(items_list):
+                                    nama_item    = r['Nama Barang']
+                                    u_k          = item_key(real_row_idx, nama_item)
+                                    row_master   = df_barang[df_barang['Nama Barang'] == nama_item]
+                                    harga_master = float(row_master['Harga'].values[0]) if not row_master.empty else float(r.get('Harga', 0))
+                                    satuan_master= str(row_master['Satuan'].values[0]).strip() if not row_master.empty else str(r.get('Satuan', 'Pcs'))
+
+                                    with st.container(border=True):
+                                        # Nama barang full width
+                                        st.markdown(
+                                            f"<span style='color:#002855;font-weight:700;font-size:0.95rem;'>{nama_item}</span><br>"
+                                            f"<span style='color:#5a7a9a;font-size:0.75rem;'>📋 Master: Rp {harga_master:,.0f} / {satuan_master}</span><br>"
+                                            f"<span style='color:#B8860B;font-size:0.75rem;font-weight:600;'>💾 Tersimpan: Rp {int(r.get('Harga',0)):,.0f} / {str(r.get('Satuan',''))}</span>",
+                                            unsafe_allow_html=True
+                                        )
+                                        st.markdown("")
+
+                                        # Mobile: 2 kolom per baris
+                                        c1, c2 = st.columns(2)
+                                        mode = c1.selectbox("Kalkulasi", list_mode, key=f"m_{u_k}")
+                                        nq   = c2.number_input("Qty", min_value=1, step=1, key=f"q_{u_k}")
+
+                                        if mode in ["Dus", "Box", "Pack", "Set"]:
+                                            st.number_input(f"Isi per {mode}", min_value=1, step=1, key=f"isi_{u_k}")
+
+                                        if mode != "Pcs/Tetap":
+                                            if mode == "Lusin (12)":
+                                                harga_kalkulasi = int(harga_master * 12); sat_kalkulasi = "Lusin"
+                                            elif mode == "Rim":
+                                                harga_kalkulasi = int(harga_master); sat_kalkulasi = "Rim"
+                                            else:
+                                                isi_val = st.session_state.get(f"isi_{u_k}", 10)
+                                                harga_kalkulasi = int(harga_master * isi_val); sat_kalkulasi = mode
+                                            if st.button(f"▶ Apply {sat_kalkulasi} — Rp {harga_kalkulasi:,.0f}", key=f"apply_{u_k}", use_container_width=True):
+                                                st.session_state[f"h_{u_k}"] = harga_kalkulasi
+                                                st.session_state[f"s_{u_k}"] = sat_kalkulasi
+                                                st.rerun()
+
+                                        c3, c4 = st.columns(2)
+                                        ns  = c3.text_input("Unit", key=f"s_{u_k}")
+                                        nh  = c4.number_input("Harga Jual", min_value=0, step=500, key=f"h_{u_k}", format="%d")
+
+                                        c5, c6 = st.columns([2, 1])
+                                        np_ = c5.number_input("Pos (urutan)", min_value=0.1, step=0.1, format="%.1f", key=f"p_{u_k}")
+                                        td  = c6.checkbox("🗑️ Hapus", key=f"d_{u_k}")
+
+                                        temp_up.append({"del": td, "pos": np_, "Nama": nama_item, "Qty": nq, "Harga": nh, "Sat": ns})
+
+                                st.markdown("---")
+                                add_b = st.multiselect(
+                                    "➕ Tambah Barang Baru:",
+                                    options=df_barang['Nama Barang'].tolist(),
+                                    key=f"add_new_{real_row_idx}",
+                                    placeholder="Pilih barang untuk ditambahkan..."
+                                )
+
+                                if st.button("💾 SIMPAN PERUBAHAN DATA", key=f"btn_save_{real_row_idx}", use_container_width=True):
+                                    final = sorted([x for x in temp_up if not x['del']], key=lambda x: x['pos'])
+                                    for p in add_b:
+                                        rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
+                                        final.append({"Nama": p, "Qty": 1, "Harga": float(rb['Harga']), "Sat": str(rb['Satuan'])})
+                                    save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty'] * x['Harga']} for x in final]
+                                    sheet.update_cell(real_row_idx, 5, str(save_data))
+                                    st.cache_data.clear()
+                                    clear_row_state(real_row_idx)
+                                    st.success(f"✅ Tersimpan! {len(save_data)} barang.")
+                                    time.sleep(0.8); st.rerun()
+
+                                # Re-fetch untuk PDF/Excel
+                                try:
+                                    current_row_data = sheet.row_values(real_row_idx)
+                                    current_items    = ast.literal_eval(current_row_data[4]) if len(current_row_data) > 4 else items_list
+                                except:
+                                    current_items = items_list
+
+                                if current_items:
+                                    f_df = pd.DataFrame(current_items)
+                                    subt = f_df['Total_Row'].sum(); tax = subt * 0.11; gtot = subt + tax
+
+                                    st.markdown("---")
+                                    render_section_title("🖨️ Download Quotation")
+
+                                    t1, t2 = st.columns(2)
+                                    t1.metric("Sub Total",   f"Rp {subt:,.0f}")
+                                    t2.metric("Grand Total", f"Rp {gtot:,.0f}")
+                                    st.metric("PPN 11%", f"Rp {tax:,.0f}")
+                                    st.markdown("<br>", unsafe_allow_html=True)
+
+                                    no_s = st.text_input("📄 Nomor Surat:", value="/S-TTS/IV/2026", key=f"ns_print_{real_row_idx}")
+
+                                    b1, b2 = st.columns(2)
+                                    pdf_data = generate_pdf(no_s, customer_val, up_val, f_df, subt, tax, gtot)
+                                    b1.download_button(
+                                        label="📩 PDF", data=pdf_data,
+                                        file_name=f"Quo_{customer_val}.pdf",
+                                        key=f"btn_p_{real_row_idx}",
+                                        use_container_width=True, type="primary"
+                                    )
+                                    xls_data = generate_excel(no_s, customer_val, up_val, f_df, subt, tax, gtot)
+                                    b2.download_button(
+                                        label="📊 Excel", data=xls_data,
+                                        file_name=f"{customer_val}.xlsx",
+                                        key=f"btn_x_{real_row_idx}",
+                                        use_container_width=True
+                                    )
+
+                                    st.markdown("<br>", unsafe_allow_html=True)
+                                    if st.button("✅ TANDAI SELESAI & HAPUS DARI ANTREAN",
+                                                 key=f"done_btn_{real_row_idx}",
+                                                 type="primary", use_container_width=True):
+                                        sheet.update_cell(real_row_idx, 6, "Processed")
+                                        st.success(f"✅ Penawaran {customer_val} selesai.")
+                                        st.rerun()
+                    else:
+                        st.markdown(f"""<div style="text-align:center; padding:48px 20px; color:#7a9ab8;">
+                            <div style="font-size:3rem; margin-bottom:12px;">🎉</div>
+                            <div style="font-size:1.1rem; font-weight:700; color:#002855;">Antrean Bersih!</div>
+                            <div style="font-size:0.85rem; margin-top:6px;">Semua penawaran sudah diproses, Pak {MARKETING_NAME}.</div>
+                        </div>""", unsafe_allow_html=True)
+
+            except Exception as e:
+                st.error(f"❌ Error Sistem: {e}")
+                import traceback
+                st.code(traceback.format_exc(), language="python")
+
+    elif pwd != "":
+        st.sidebar.error("❌ Password salah. Coba lagi.")
+        st.warning("🔐 Masukkan password admin yang benar di sidebar untuk mengakses dashboard.")
+    else:
+        st.markdown("""<div style="text-align:center; padding:60px 20px; color:#7a9ab8;">
+            <div style="font-size:3.5rem; margin-bottom:16px;">🔐</div>
+            <div style="font-size:1.2rem; font-weight:700; color:#002855; margin-bottom:8px;">Area Admin</div>
+            <div style="font-size:0.88rem;">Buka menu ☰ di pojok kiri, lalu masukkan password.</div>
+        </div>""", unsafe_allow_html=True)
