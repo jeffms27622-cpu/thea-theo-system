@@ -110,7 +110,6 @@ html, body, [class*="css"] {
     padding-left: 10px; margin: 14px 0 10px 0;
 }
 
-/* ── INPUT / TEXTAREA ─────────────────────────────────────── */
 .stTextInput > div > div > input,
 .stNumberInput > div > div > input,
 .stTextArea > div > div > textarea {
@@ -137,7 +136,6 @@ html, body, [class*="css"] {
     outline: none !important;
 }
 
-/* ── SELECTBOX / MULTISELECT ──────────────────────────────── */
 [data-testid="stSelectbox"] > div > div {
     border-radius: 10px !important; border: 1.5px solid #c8d6e5 !important;
     background: white !important; color: #1e1e1e !important; min-height: 48px !important;
@@ -149,7 +147,6 @@ html, body, [class*="css"] {
 [data-testid="stSelectbox"] span,
 [data-testid="stMultiSelect"] span { color: #1e1e1e !important; }
 
-/* Teks di dalam selectbox yang dipilih */
 [data-testid="stSelectbox"] [data-testid="stMarkdownContainer"] p,
 [data-testid="stSelectbox"] div[role="combobox"] p,
 [data-baseweb="select"] div[data-testid="stMarkdownContainer"] p {
@@ -163,13 +160,11 @@ ul[role="listbox"] li {
     padding: 12px 16px !important; font-size: 0.95rem !important;
 }
 
-/* Input teks di dalam selectbox search */
 [data-baseweb="select"] input {
     color: #1e1e1e !important;
     background: white !important;
 }
 
-/* ── LABELS — WAJIB TERLIHAT ──────────────────────────────── */
 section.main .stTextInput > label,
 section.main .stTextInput label,
 section.main .stSelectbox > label,
@@ -196,7 +191,6 @@ div[class*="stMultiSelect"] label {
     visibility: visible !important;
 }
 
-/* ── TOMBOL ───────────────────────────────────────────────── */
 .stButton > button {
     min-height: 48px !important; border-radius: 10px !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
@@ -257,7 +251,6 @@ div[class*="stMultiSelect"] label {
     [data-testid="stMetricValue"] { font-size: 1.6rem !important; }
 }
 
-/* ── TEKS UMUM — hanya untuk konten markdown, bukan form ─── */
 section.main .stMarkdown p,
 section.main .stMarkdown strong,
 section.main [data-testid="stMarkdownContainer"] p,
@@ -668,6 +661,7 @@ elif menu == "📝 Admin Sales":
 elif menu == "👨‍💻 Sales Dashboard":
     render_header("Sales Dashboard", f"Kelola antrean · {MARKETING_NAME}", "🔐 Admin Only")
 
+    # ── BELUM LOGIN: hanya tampilkan form password, TIDAK ADA akses lain ──
     if not st.session_state.admin_logged_in:
         st.markdown("<br>", unsafe_allow_html=True)
         _, mid_col, _ = st.columns([1, 2, 1])
@@ -696,16 +690,7 @@ elif menu == "👨‍💻 Sales Dashboard":
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("📁 Update Database Barang (.csv)"):
-            up_f = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="csv_up_nologin")
-            if up_f and st.button("🚀 Update Sekarang", key="btn_csv_nologin"):
-                with open("database_barang.csv", "wb") as f:
-                    f.write(up_f.getbuffer())
-                st.cache_data.clear()
-                st.success("✅ Database diperbarui!")
-                time.sleep(1); st.rerun()
-
+    # ── SUDAH LOGIN: tampilkan dashboard + update DB (semua di balik password) ──
     else:
         col_inf, col_out = st.columns([4, 1])
         col_inf.success(f"✅ Login sebagai **{MARKETING_NAME}**")
@@ -713,14 +698,17 @@ elif menu == "👨‍💻 Sales Dashboard":
             st.session_state.admin_logged_in = False
             st.rerun()
 
+        # ── Update Database Barang — HANYA tampil setelah login berhasil ──
         with st.expander("📁 Update Database Barang (.csv)", expanded=False):
+            st.caption("Upload file CSV baru untuk mengganti database produk.")
             up_f2 = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="csv_up_login")
-            if up_f2 and st.button("🚀 Update Sekarang", key="btn_csv_login"):
-                with open("database_barang.csv", "wb") as f:
-                    f.write(up_f2.getbuffer())
-                st.cache_data.clear()
-                st.success("✅ Database diperbarui!")
-                time.sleep(1); st.rerun()
+            if up_f2:
+                if st.button("🚀 Update Database Sekarang", key="btn_csv_login", type="primary"):
+                    with open("database_barang.csv", "wb") as f:
+                        f.write(up_f2.getbuffer())
+                    st.cache_data.clear()
+                    st.success("✅ Database berhasil diperbarui!")
+                    time.sleep(1); st.rerun()
 
         sheet = connect_gsheet()
         if sheet:
