@@ -31,7 +31,7 @@ st.set_page_config(
     page_title=f"{COMPANY_NAME} - {MARKETING_NAME}",
     layout="wide",
     page_icon="📎",
-    initial_sidebar_state="collapsed",   # sidebar collapsed by default → mobile friendly
+    initial_sidebar_state="expanded",
 )
 
 # =========================================================
@@ -53,7 +53,6 @@ html, body, [class*="css"] {
     min-height: 100vh;
 }
 
-/* ── CONTAINER PADDING ── */
 .block-container {
     padding: 0.6rem 0.8rem 3rem 0.8rem !important;
     max-width: 100% !important;
@@ -66,7 +65,6 @@ html, body, [class*="css"] {
     }
 }
 
-/* ── SIDEBAR ── */
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg, #002855 0%, #003d7a 40%, #001f42 100%) !important;
     border-right: 3px solid #B8860B;
@@ -101,7 +99,6 @@ html, body, [class*="css"] {
     border-radius: 10px;
 }
 
-/* ── HEADER ── */
 .top-header {
     background: linear-gradient(135deg, #002855 0%, #004080 60%, #002855 100%);
     border-radius: 12px; padding: 16px 18px; margin-bottom: 16px;
@@ -136,7 +133,6 @@ html, body, [class*="css"] {
     .top-header-badge { margin-top: 0; padding: 6px 16px; font-size: 0.8rem; }
 }
 
-/* ── SECTION TITLE ── */
 .section-title {
     font-family: 'Playfair Display', serif; font-size: 1rem;
     color: #002855; font-weight: 700; border-left: 4px solid #B8860B;
@@ -146,14 +142,23 @@ html, body, [class*="css"] {
     .section-title { font-size: 1.3rem; margin: 20px 0 14px 0; }
 }
 
-/* ── INPUTS — touch-friendly ── */
+/* TOP NAV BAR */
+.topnav-wrap {
+    background: linear-gradient(135deg, #002855 0%, #003d7a 100%);
+    border-radius: 12px;
+    padding: 8px;
+    margin-bottom: 16px;
+    border-bottom: 3px solid #B8860B;
+    box-shadow: 0 4px 16px rgba(0,40,85,0.25);
+}
+
 .stTextInput > div > div > input,
 .stNumberInput > div > div > input,
 .stTextArea > div > div > textarea {
     color: #1e1e1e !important; border-radius: 10px !important;
     border: 1.5px solid #c8d6e5 !important; background: white !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 1rem !important;          /* iOS tidak zoom jika ≥ 16px */
+    font-size: 1rem !important;
     padding: 12px 14px !important; min-height: 48px !important;
     transition: border-color 0.2s, box-shadow 0.2s !important;
     -webkit-appearance: none;
@@ -165,7 +170,6 @@ html, body, [class*="css"] {
     outline: none !important;
 }
 
-/* Selectbox */
 [data-testid="stSelectbox"] > div > div {
     border-radius: 10px !important; border: 1.5px solid #c8d6e5 !important;
     background: white !important; font-family: 'Plus Jakarta Sans', sans-serif !important;
@@ -178,7 +182,6 @@ html, body, [class*="css"] {
 [data-testid="stSelectbox"] span,
 [data-testid="stMultiSelect"] span { color: #1e1e1e !important; }
 
-/* Dropdown options */
 [data-baseweb="select"] [data-baseweb="option"],
 [data-baseweb="popover"] li,
 ul[role="listbox"] li {
@@ -186,7 +189,6 @@ ul[role="listbox"] li {
     padding: 12px 16px !important; font-size: 0.95rem !important;
 }
 
-/* Labels */
 section.main .stTextInput label,
 section.main .stSelectbox label,
 section.main .stNumberInput label,
@@ -197,7 +199,6 @@ section.main .stCheckbox label {
     color: #002855 !important;
 }
 
-/* ── BUTTONS — min 48px touch target ── */
 .stButton > button {
     min-height: 48px !important; border-radius: 10px !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
@@ -205,7 +206,7 @@ section.main .stCheckbox label {
     letter-spacing: 0.06em !important; text-transform: uppercase !important;
     transition: all 0.2s ease !important;
     cursor: pointer !important; -webkit-tap-highlight-color: transparent;
-    width: 100% !important;              /* full-width di mobile */
+    width: 100% !important;
 }
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, #002855 0%, #004080 100%) !important;
@@ -245,7 +246,6 @@ section.main .stCheckbox label {
     .stDownloadButton > button { width: auto !important; }
 }
 
-/* ── EXPANDER ── */
 .streamlit-expanderHeader {
     background: linear-gradient(135deg, #f8fafd 0%, #f0f5fc 100%) !important;
     border-radius: 12px !important; font-weight: 700 !important;
@@ -258,7 +258,6 @@ section.main .stCheckbox label {
     border-color: #B8860B !important;
 }
 
-/* ── METRIC ── */
 [data-testid="stMetric"] {
     background: white !important; border: 1px solid #e0e8f0 !important;
     border-radius: 14px !important; padding: 12px 14px !important;
@@ -284,7 +283,6 @@ section.main .stCheckbox label {
     }
 }
 
-/* ── MAIN AREA TEXT ── */
 section.main p, section.main span, section.main div.stMarkdown,
 section.main .stMarkdown p, section.main .stMarkdown strong,
 section.main [data-testid="stMarkdownContainer"] p,
@@ -303,7 +301,6 @@ section.main [data-testid="stExpander"] span,
 section.main [data-testid="stExpander"] strong,
 section.main [data-testid="stExpander"] li { color: #1e1e1e !important; }
 
-/* ── MISC ── */
 hr {
     border: none !important; border-top: 2px solid transparent !important;
     background: linear-gradient(90deg, transparent, #B8860B, transparent) !important;
@@ -322,7 +319,6 @@ hr {
     border-radius: 10px !important; font-size: 0.88rem !important;
 }
 
-/* ── PRICE BOX ── */
 .price-info-box {
     background: linear-gradient(135deg, #002855, #004080); color: white;
     border-radius: 12px; padding: 12px 16px; font-weight: 700; font-size: 0.88rem;
@@ -331,7 +327,6 @@ hr {
 }
 .price-info-box span { color: #f0c040; font-size: 1rem; }
 
-/* ── FEATURE CARDS ── */
 .feature-card {
     background: white; border-radius: 14px; padding: 18px 14px;
     border: 1px solid #e0e8f0; border-top: 3px solid #B8860B;
@@ -346,25 +341,20 @@ hr {
     .feature-card { padding: 24px 20px; }
 }
 
-/* ── NUMBER INPUT buttons lebih besar ── */
 .stNumberInput button { min-width: 40px !important; min-height: 40px !important; }
 
-/* ── CHECKBOX touch target ── */
 .stCheckbox > label {
     min-height: 40px !important; display: flex !important;
     align-items: center !important; gap: 8px !important; cursor: pointer !important;
 }
 
-/* ── COLUMN gap ── */
 [data-testid="column"] { padding: 0 4px !important; }
 @media (min-width: 768px) { [data-testid="column"] { padding: 0 8px !important; } }
 
-/* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(0,40,85,0.2); border-radius: 4px; }
 
-/* ── iPhone safe-area ── */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
     .stApp { padding-bottom: env(safe-area-inset-bottom); }
 }
@@ -418,6 +408,101 @@ def load_db():
     return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
 
 df_barang = load_db()
+
+
+# =========================================================
+# SESSION STATE — active menu
+# =========================================================
+if "active_menu" not in st.session_state:
+    st.session_state.active_menu = "🏠 Home"
+
+if 'cart' not in st.session_state:
+    st.session_state.cart = []
+
+
+# =========================================================
+# TOP NAVIGATION BAR (always visible, mobile-friendly)
+# =========================================================
+menu_options = ["🏠 Home", "📝 Admin Sales", "👨‍💻 Sales Dashboard"]
+
+st.markdown('<div class="topnav-wrap">', unsafe_allow_html=True)
+nav_col1, nav_col2, nav_col3 = st.columns(3)
+
+with nav_col1:
+    is_active = st.session_state.active_menu == "🏠 Home"
+    if st.button(
+        "🏠 Home",
+        key="nav_home",
+        use_container_width=True,
+        type="primary" if is_active else "secondary"
+    ):
+        st.session_state.active_menu = "🏠 Home"
+        st.rerun()
+
+with nav_col2:
+    is_active = st.session_state.active_menu == "📝 Admin Sales"
+    if st.button(
+        "📝 Admin Sales",
+        key="nav_admin",
+        use_container_width=True,
+        type="primary" if is_active else "secondary"
+    ):
+        st.session_state.active_menu = "📝 Admin Sales"
+        st.rerun()
+
+with nav_col3:
+    is_active = st.session_state.active_menu == "👨‍💻 Sales Dashboard"
+    if st.button(
+        "📊 Dashboard",
+        key="nav_dashboard",
+        use_container_width=True,
+        type="primary" if is_active else "secondary"
+    ):
+        st.session_state.active_menu = "👨‍💻 Sales Dashboard"
+        st.rerun()
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+
+# =========================================================
+# SIDEBAR (tetap ada sebagai pelengkap)
+# =========================================================
+with st.sidebar:
+    st.markdown(f"""
+    <div style="text-align:center; padding: 20px 0 10px 0;">
+        <div style="font-size:2.4rem;">📎</div>
+        <div style="font-family:'Playfair Display',serif; font-size:1.1rem; color:#f0c040; font-weight:700; margin-top:6px;">
+            TTS Portal
+        </div>
+        <div style="font-size:0.72rem; color:#B8860B; letter-spacing:0.1em; text-transform:uppercase; margin-top:2px;">
+            {MARKETING_NAME} · Sales Console
+        </div>
+    </div>
+    <hr style="border-top:1px solid rgba(184,134,11,0.3); margin: 10px 0 18px 0;">
+    """, unsafe_allow_html=True)
+
+    idx = menu_options.index(st.session_state.active_menu)
+    sidebar_menu = st.selectbox(
+        "Navigasi:",
+        menu_options,
+        index=idx,
+        label_visibility="collapsed",
+        key="sidebar_menu"
+    )
+    if sidebar_menu != st.session_state.active_menu:
+        st.session_state.active_menu = sidebar_menu
+        st.rerun()
+
+    st.markdown("""
+    <hr style="border-top:1px solid rgba(184,134,11,0.2); margin: 18px 0 10px 0;">
+    <div style="font-size:0.7rem; color:rgba(255,255,255,0.35); text-align:center; padding-bottom:10px;">
+        PT. THEA THEO STATIONARY<br>© 2026 All Rights Reserved
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# Ambil menu aktif
+menu = st.session_state.active_menu
 
 
 # =========================================================
@@ -549,43 +634,11 @@ def clear_row_state(real_row_idx):
 
 
 # =========================================================
-# SIDEBAR
-# =========================================================
-with st.sidebar:
-    st.markdown(f"""
-    <div style="text-align:center; padding: 20px 0 10px 0;">
-        <div style="font-size:2.4rem;">📎</div>
-        <div style="font-family:'Playfair Display',serif; font-size:1.1rem; color:#f0c040; font-weight:700; margin-top:6px;">
-            TTS Portal
-        </div>
-        <div style="font-size:0.72rem; color:#B8860B; letter-spacing:0.1em; text-transform:uppercase; margin-top:2px;">
-            {MARKETING_NAME} · Sales Console
-        </div>
-    </div>
-    <hr style="border-top:1px solid rgba(184,134,11,0.3); margin: 10px 0 18px 0;">
-    """, unsafe_allow_html=True)
-
-    menu = st.selectbox("Navigasi:", ["🏠 Home", "📝 Admin Sales", "👨‍💻 Sales Dashboard"], label_visibility="collapsed")
-
-    st.markdown("""
-    <hr style="border-top:1px solid rgba(184,134,11,0.2); margin: 18px 0 10px 0;">
-    <div style="font-size:0.7rem; color:rgba(255,255,255,0.35); text-align:center; padding-bottom:10px;">
-        PT. THEA THEO STATIONARY<br>© 2026 All Rights Reserved
-    </div>
-    """, unsafe_allow_html=True)
-
-
-if 'cart' not in st.session_state:
-    st.session_state.cart = []
-
-
-# =========================================================
 # HOME
 # =========================================================
 if menu == "🏠 Home":
     render_header(COMPANY_NAME, SLOGAN, f"📍 {ADDR.split(',')[0]}")
 
-    # Mobile: 2 kolom supaya tidak terlalu sempit
     c1, c2 = st.columns(2)
     c1.metric("🧑‍💼 Marketing", MARKETING_NAME)
     c2.metric("📞 WhatsApp", MARKETING_WA)
@@ -595,7 +648,6 @@ if menu == "🏠 Home":
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Feature cards: 1 kolom di mobile, 3 di desktop
     col1, col2, col3 = st.columns([1, 1, 1])
     with col1:
         st.markdown("""<div class="feature-card"><div class="icon">📝</div><h4>Form Penawaran</h4><p>Buat daftar pesanan, cari barang, atur satuan & harga, kirim ke sales.</p></div>""", unsafe_allow_html=True)
@@ -605,7 +657,7 @@ if menu == "🏠 Home":
         st.markdown("""<div class="feature-card"><div class="icon">📊</div><h4>Sales Dashboard</h4><p>Kelola antrean, edit item, dan tandai penawaran selesai.</p></div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.info("💡 Buka **menu ☰** di pojok kiri atas untuk mengakses Form Penawaran atau Sales Dashboard.")
+    st.info("💡 Gunakan tombol navigasi di atas untuk mengakses Form Penawaran atau Sales Dashboard.")
 
 
 # =========================================================
@@ -635,7 +687,6 @@ elif menu == "📝 Admin Sales":
             row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
             h_master = float(row_m['Harga']); satuan_db = str(row_m['Satuan']).strip()
 
-            # Mobile: 2 kolom saja
             c1, c2 = st.columns(2)
             mode_c = c1.selectbox(f"Satuan (Default: {satuan_db})",
                                   ["Sesuai Database", "Lusin (12)", "Dus", "Box", "Pack", "Set"],
@@ -682,7 +733,6 @@ elif menu == "📝 Admin Sales":
         tax_cart   = total_cart * 0.11
         grand_cart = total_cart + tax_cart
 
-        # Mobile: 2+1 metric layout
         m1, m2 = st.columns(2)
         m1.metric("📦 Item", f"{len(st.session_state.cart)} jenis")
         m2.metric("💵 Sub Total", f"Rp {total_cart:,.0f}")
@@ -691,7 +741,6 @@ elif menu == "📝 Admin Sales":
 
         for i, item in enumerate(st.session_state.cart):
             with st.container(border=True):
-                # Nama & harga satu baris penuh
                 st.markdown(
                     f"<span style='color:#002855;font-weight:700;font-size:0.95rem;'>{item['Nama Barang']}</span><br>"
                     f"<span style='color:#5a7a9a;font-size:0.80rem;'>@ Rp {item['Harga']:,.0f} / {item['Satuan']}</span>",
@@ -785,7 +834,6 @@ elif menu == "👨‍💻 Sales Dashboard":
 
                             exp_label = f"🏢 {customer_val} · {n_items} item · {waktu_val}"
                             with st.expander(exp_label, expanded=True):
-                                # Mobile: info stack vertikal
                                 st.info(f"🏢 **{customer_val}** &nbsp;|&nbsp; 👤 UP: **{up_val}** &nbsp;|&nbsp; 📞 **{wa_val}**")
                                 st.markdown("---")
 
@@ -797,7 +845,6 @@ elif menu == "👨‍💻 Sales Dashboard":
                                 render_section_title("📝 Edit Daftar Barang")
                                 st.caption("💡 Ubah **Pos** untuk urutan (2.5 = sisip antara no.2 & no.3). Centang 🗑️ untuk hapus.")
 
-                                # Pass 1: inisialisasi session_state
                                 for i, r in enumerate(items_list):
                                     nama_item        = r['Nama Barang']
                                     u_k              = item_key(real_row_idx, nama_item)
@@ -810,7 +857,6 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     if f"m_{u_k}" not in st.session_state: st.session_state[f"m_{u_k}"] = "Pcs/Tetap"
                                     if f"isi_{u_k}" not in st.session_state: st.session_state[f"isi_{u_k}"] = 10
 
-                                # Pass 2: render widget
                                 temp_up   = []
                                 list_mode = ["Pcs/Tetap", "Lusin (12)", "Dus", "Box", "Pack", "Set", "Rim"]
 
@@ -822,7 +868,6 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     satuan_master= str(row_master['Satuan'].values[0]).strip() if not row_master.empty else str(r.get('Satuan', 'Pcs'))
 
                                     with st.container(border=True):
-                                        # Nama barang full width
                                         st.markdown(
                                             f"<span style='color:#002855;font-weight:700;font-size:0.95rem;'>{nama_item}</span><br>"
                                             f"<span style='color:#5a7a9a;font-size:0.75rem;'>📋 Master: Rp {harga_master:,.0f} / {satuan_master}</span><br>"
@@ -831,7 +876,6 @@ elif menu == "👨‍💻 Sales Dashboard":
                                         )
                                         st.markdown("")
 
-                                        # Mobile: 2 kolom per baris
                                         c1, c2 = st.columns(2)
                                         mode = c1.selectbox("Kalkulasi", list_mode, key=f"m_{u_k}")
                                         nq   = c2.number_input("Qty", min_value=1, step=1, key=f"q_{u_k}")
@@ -882,7 +926,6 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     st.success(f"✅ Tersimpan! {len(save_data)} barang.")
                                     time.sleep(0.8); st.rerun()
 
-                                # Re-fetch untuk PDF/Excel
                                 try:
                                     current_row_data = sheet.row_values(real_row_idx)
                                     current_items    = ast.literal_eval(current_row_data[4]) if len(current_row_data) > 4 else items_list
@@ -946,5 +989,5 @@ elif menu == "👨‍💻 Sales Dashboard":
         st.markdown("""<div style="text-align:center; padding:60px 20px; color:#7a9ab8;">
             <div style="font-size:3.5rem; margin-bottom:16px;">🔐</div>
             <div style="font-size:1.2rem; font-weight:700; color:#002855; margin-bottom:8px;">Area Admin</div>
-            <div style="font-size:0.88rem;">Buka menu ☰ di pojok kiri, lalu masukkan password.</div>
+            <div style="font-size:0.88rem;">Masukkan password di sidebar (panel kiri) untuk login.</div>
         </div>""", unsafe_allow_html=True)
