@@ -110,15 +110,25 @@ html, body, [class*="css"] {
     padding-left: 10px; margin: 14px 0 10px 0;
 }
 
+/* ── INPUT / TEXTAREA ─────────────────────────────────────── */
 .stTextInput > div > div > input,
 .stNumberInput > div > div > input,
 .stTextArea > div > div > textarea {
-    color: #1e1e1e !important; border-radius: 10px !important;
-    border: 1.5px solid #c8d6e5 !important; background: white !important;
+    color: #1e1e1e !important;
+    border-radius: 10px !important;
+    border: 1.5px solid #c8d6e5 !important;
+    background: white !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
     font-size: 1rem !important;
-    padding: 12px 14px !important; min-height: 48px !important;
+    padding: 12px 14px !important;
+    min-height: 48px !important;
     -webkit-appearance: none;
+}
+.stTextInput > div > div > input::placeholder,
+.stNumberInput > div > div > input::placeholder,
+.stTextArea > div > div > textarea::placeholder {
+    color: #9fb3c8 !important;
+    opacity: 1 !important;
 }
 .stTextInput > div > div > input:focus,
 .stNumberInput > div > div > input:focus {
@@ -127,6 +137,7 @@ html, body, [class*="css"] {
     outline: none !important;
 }
 
+/* ── SELECTBOX / MULTISELECT ──────────────────────────────── */
 [data-testid="stSelectbox"] > div > div {
     border-radius: 10px !important; border: 1.5px solid #c8d6e5 !important;
     background: white !important; color: #1e1e1e !important; min-height: 48px !important;
@@ -138,6 +149,13 @@ html, body, [class*="css"] {
 [data-testid="stSelectbox"] span,
 [data-testid="stMultiSelect"] span { color: #1e1e1e !important; }
 
+/* Teks di dalam selectbox yang dipilih */
+[data-testid="stSelectbox"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stSelectbox"] div[role="combobox"] p,
+[data-baseweb="select"] div[data-testid="stMarkdownContainer"] p {
+    color: #1e1e1e !important;
+}
+
 [data-baseweb="select"] [data-baseweb="option"],
 [data-baseweb="popover"] li,
 ul[role="listbox"] li {
@@ -145,16 +163,40 @@ ul[role="listbox"] li {
     padding: 12px 16px !important; font-size: 0.95rem !important;
 }
 
-section.main .stTextInput label,
-section.main .stSelectbox label,
-section.main .stNumberInput label,
-section.main .stMultiSelect label,
-section.main .stCheckbox label {
-    font-weight: 600 !important; font-size: 0.78rem !important;
-    letter-spacing: 0.06em !important; text-transform: uppercase !important;
-    color: #002855 !important;
+/* Input teks di dalam selectbox search */
+[data-baseweb="select"] input {
+    color: #1e1e1e !important;
+    background: white !important;
 }
 
+/* ── LABELS — WAJIB TERLIHAT ──────────────────────────────── */
+section.main .stTextInput > label,
+section.main .stTextInput label,
+section.main .stSelectbox > label,
+section.main .stSelectbox label,
+section.main .stNumberInput > label,
+section.main .stNumberInput label,
+section.main .stMultiSelect > label,
+section.main .stMultiSelect label,
+section.main .stCheckbox > label,
+section.main .stCheckbox label,
+section.main .stTextArea > label,
+section.main .stTextArea label,
+div[data-testid="stForm"] label,
+div[class*="stTextInput"] label,
+div[class*="stSelectbox"] label,
+div[class*="stNumberInput"] label,
+div[class*="stMultiSelect"] label {
+    font-weight: 600 !important;
+    font-size: 0.78rem !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    color: #002855 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* ── TOMBOL ───────────────────────────────────────────────── */
 .stButton > button {
     min-height: 48px !important; border-radius: 10px !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
@@ -215,8 +257,9 @@ section.main .stCheckbox label {
     [data-testid="stMetricValue"] { font-size: 1.6rem !important; }
 }
 
-section.main p, section.main span, section.main div.stMarkdown,
-section.main .stMarkdown p, section.main .stMarkdown strong,
+/* ── TEKS UMUM — hanya untuk konten markdown, bukan form ─── */
+section.main .stMarkdown p,
+section.main .stMarkdown strong,
 section.main [data-testid="stMarkdownContainer"] p,
 section.main [data-testid="stMarkdownContainer"] strong { color: #1e1e1e !important; }
 section.main [data-testid="stCaptionContainer"] p,
@@ -344,7 +387,7 @@ if "widget_id" not in st.session_state:
 
 
 # =========================================================
-# TOP NAVIGATION BAR — di body halaman, selalu terlihat
+# TOP NAVIGATION BAR
 # =========================================================
 st.markdown('<div class="topnav-container">', unsafe_allow_html=True)
 nc1, nc2, nc3 = st.columns(3)
@@ -520,10 +563,10 @@ elif menu == "📝 Admin Sales":
 
     render_section_title("👤 Data Pelanggan")
     with st.container(border=True):
-        nama_toko = st.text_input("🏢 Nama Perusahaan / Toko", placeholder="PT. Contoh Maju Bersama")
-        col1, col2 = st.columns(2)
-        up_nama  = col1.text_input("👤 Nama Penerima (UP)", placeholder="Bapak / Ibu ...")
-        wa_nomor = col2.text_input("📞 Nomor WhatsApp", placeholder="08xx-xxxx-xxxx")
+        col1, col2, col3 = st.columns(3)
+        nama_toko = col1.text_input("🏢 Nama Perusahaan / Toko", placeholder="PT. Contoh Maju Bersama")
+        up_nama   = col2.text_input("👤 Nama Penerima (UP)", placeholder="Bapak / Ibu ...")
+        wa_nomor  = col3.text_input("📞 Nomor WhatsApp", placeholder="08xx-xxxx-xxxx")
 
     render_section_title("📦 Tambah Barang ke Keranjang")
     with st.container(border=True):
@@ -573,7 +616,7 @@ elif menu == "📝 Admin Sales":
         else:
             st.markdown("""<div style="text-align:center; padding:20px 0; color:#7a9ab8;">
                 <div style="font-size:2rem; margin-bottom:8px;">🔍</div>
-                <div style="font-size:0.88rem;">Ketik atau klik dropdown di atas untuk mencari barang</div>
+                <div style="font-size:0.88rem; color:#5a7a9a;">Ketik atau klik dropdown di atas untuk mencari barang</div>
             </div>""", unsafe_allow_html=True)
 
     if st.session_state.cart:
@@ -625,7 +668,6 @@ elif menu == "📝 Admin Sales":
 elif menu == "👨‍💻 Sales Dashboard":
     render_header("Sales Dashboard", f"Kelola antrean · {MARKETING_NAME}", "🔐 Admin Only")
 
-    # ── LOGIN — di body utama, bukan sidebar ────────────────
     if not st.session_state.admin_logged_in:
         st.markdown("<br>", unsafe_allow_html=True)
         _, mid_col, _ = st.columns([1, 2, 1])
@@ -664,7 +706,6 @@ elif menu == "👨‍💻 Sales Dashboard":
                 st.success("✅ Database diperbarui!")
                 time.sleep(1); st.rerun()
 
-    # ── SUDAH LOGIN ─────────────────────────────────────────
     else:
         col_inf, col_out = st.columns([4, 1])
         col_inf.success(f"✅ Login sebagai **{MARKETING_NAME}**")
