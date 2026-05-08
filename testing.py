@@ -110,7 +110,6 @@ html, body, [class*="css"] {
     padding-left: 10px; margin: 14px 0 10px 0;
 }
 
-/* ── INPUT / TEXTAREA ─────────────────────────────────────── */
 .stTextInput > div > div > input,
 .stNumberInput > div > div > input,
 .stTextArea > div > div > textarea {
@@ -137,7 +136,6 @@ html, body, [class*="css"] {
     outline: none !important;
 }
 
-/* ── SELECTBOX / MULTISELECT ──────────────────────────────── */
 [data-testid="stSelectbox"] > div > div {
     border-radius: 10px !important; border: 1.5px solid #c8d6e5 !important;
     background: white !important; color: #1e1e1e !important; min-height: 48px !important;
@@ -149,7 +147,6 @@ html, body, [class*="css"] {
 [data-testid="stSelectbox"] span,
 [data-testid="stMultiSelect"] span { color: #1e1e1e !important; }
 
-/* Teks di dalam selectbox yang dipilih */
 [data-testid="stSelectbox"] [data-testid="stMarkdownContainer"] p,
 [data-testid="stSelectbox"] div[role="combobox"] p,
 [data-baseweb="select"] div[data-testid="stMarkdownContainer"] p {
@@ -163,13 +160,11 @@ ul[role="listbox"] li {
     padding: 12px 16px !important; font-size: 0.95rem !important;
 }
 
-/* Input teks di dalam selectbox search */
 [data-baseweb="select"] input {
     color: #1e1e1e !important;
     background: white !important;
 }
 
-/* ── LABELS — WAJIB TERLIHAT ──────────────────────────────── */
 section.main .stTextInput > label,
 section.main .stTextInput label,
 section.main .stSelectbox > label,
@@ -196,7 +191,6 @@ div[class*="stMultiSelect"] label {
     visibility: visible !important;
 }
 
-/* ── TOMBOL ───────────────────────────────────────────────── */
 .stButton > button {
     min-height: 48px !important; border-radius: 10px !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
@@ -257,7 +251,6 @@ div[class*="stMultiSelect"] label {
     [data-testid="stMetricValue"] { font-size: 1.6rem !important; }
 }
 
-/* ── TEKS UMUM — hanya untuk konten markdown, bukan form ─── */
 section.main .stMarkdown p,
 section.main .stMarkdown strong,
 section.main [data-testid="stMarkdownContainer"] p,
@@ -303,6 +296,17 @@ hr {
     background: white; border-radius: 16px; padding: 28px 24px;
     border: 1px solid #e0e8f0; border-top: 4px solid #B8860B;
     box-shadow: 0 6px 24px rgba(0,40,85,0.12);
+}
+
+/* ── SEARCH RESULT BOX ── */
+.search-hint {
+    background: #f0f5fc;
+    border: 1.5px solid #c8d6e5;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 0.78rem;
+    color: #5a7a9a;
+    margin-bottom: 6px;
 }
 
 [data-testid="column"] { padding: 0 4px !important; }
@@ -384,6 +388,9 @@ if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
 if "widget_id" not in st.session_state:
     st.session_state.widget_id = 0
+# ── BARU: state untuk search keyword ──
+if "search_keyword" not in st.session_state:
+    st.session_state.search_keyword = ""
 
 
 # =========================================================
@@ -568,14 +575,70 @@ elif menu == "📝 Admin Sales":
         up_nama   = col2.text_input("👤 Nama Penerima (UP)", placeholder="Bapak / Ibu ...")
         wa_nomor  = col3.text_input("📞 Nomor WhatsApp", placeholder="08xx-xxxx-xxxx")
 
+    # =========================================================
+    # PENCARIAN BARANG — DIPERBARUI
+    # =========================================================
     render_section_title("📦 Tambah Barang ke Keranjang")
     with st.container(border=True):
-        pilihan_barang = st.selectbox(
-            "🔍 Cari & Pilih Nama Barang:",
-            options=[""] + df_barang['Nama Barang'].tolist(),
-            key=f"pilih_brg_{st.session_state.widget_id}"
+
+        # Step 1: Text input untuk keyword pencarian
+        keyword = st.text_input(
+            "🔍 Ketik nama barang:",
+            placeholder="Contoh: stabilo, hvs, toner, binder...",
+            key="search_keyword_input"
         )
-        if pilihan_barang != "":
+
+        # Filter hasil berdasarkan keyword
+        if keyword.strip():
+            keyword_lower = keyword.strip().lower()
+            # Split keyword jadi kata-kata, semua harus ada (AND search)
+            kata_kata = keyword_lower.split()
+            mask = df_barang['Nama Barang'].str.lower().apply(
+                lambda x: all(k in x for k in kata_kata)
+            )
+            hasil = df_barang[mask]
+            jumlah_hasil = len(hasil)
+
+            if jumlah_hasil == 0:
+                st.warning(f"⚠️ Tidak ada barang yang cocok dengan **\"{keyword}\"**. Coba kata kunci lain.")
+                pilihan_barang = ""
+            else:
+                # Tampilkan info jumlah hasil
+                MAX_TAMPIL = 50
+                if jumlah_hasil > MAX_TAMPIL:
+                    st.markdown(
+                        f'<div class="search-hint">🔎 Ditemukan <b>{jumlah_hasil}</b> barang — menampilkan {MAX_TAMPIL} teratas. Perjelas kata kunci untuk hasil lebih spesifik.</div>',
+                        unsafe_allow_html=True
+                    )
+                    hasil_tampil = hasil.head(MAX_TAMPIL)
+                else:
+                    st.markdown(
+                        f'<div class="search-hint">✅ Ditemukan <b>{jumlah_hasil}</b> barang</div>',
+                        unsafe_allow_html=True
+                    )
+                    hasil_tampil = hasil
+
+                # Step 2: Selectbox hanya dari hasil filter
+                pilihan_barang = st.selectbox(
+                    f"Pilih dari {len(hasil_tampil)} hasil:",
+                    options=[""] + hasil_tampil['Nama Barang'].tolist(),
+                    key=f"pilih_brg_{st.session_state.widget_id}"
+                )
+        else:
+            # Belum ada keyword — tampilkan placeholder
+            st.markdown("""
+            <div style="text-align:center; padding:20px 0; color:#7a9ab8;">
+                <div style="font-size:2rem; margin-bottom:8px;">🔍</div>
+                <div style="font-size:0.88rem; color:#5a7a9a;">
+                    Ketik nama barang di atas untuk mencari<br>
+                    <span style="font-size:0.78rem; color:#9fb3c8;">Mendukung pencarian multi-kata · contoh: "kertas a4 sinar"</span>
+                </div>
+            </div>""", unsafe_allow_html=True)
+            pilihan_barang = ""
+
+        # Step 3: Tampilkan detail & form jika barang sudah dipilih
+        if pilihan_barang and pilihan_barang != "":
+            st.markdown("---")
             row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
             h_master = float(row_m['Harga']); satuan_db = str(row_m['Satuan']).strip()
 
@@ -613,11 +676,6 @@ elif menu == "📝 Admin Sales":
                 })
                 st.session_state.widget_id += 1
                 st.toast(f"✅ Ditambahkan: {pilihan_barang}"); time.sleep(0.2); st.rerun()
-        else:
-            st.markdown("""<div style="text-align:center; padding:20px 0; color:#7a9ab8;">
-                <div style="font-size:2rem; margin-bottom:8px;">🔍</div>
-                <div style="font-size:0.88rem; color:#5a7a9a;">Ketik atau klik dropdown di atas untuk mencari barang</div>
-            </div>""", unsafe_allow_html=True)
 
     if st.session_state.cart:
         render_section_title(f"🛒 Keranjang ({len(st.session_state.cart)} item)")
@@ -696,16 +754,6 @@ elif menu == "👨‍💻 Sales Dashboard":
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("📁 Update Database Barang (.csv)"):
-            up_f = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="csv_up_nologin")
-            if up_f and st.button("🚀 Update Sekarang", key="btn_csv_nologin"):
-                with open("database_barang.csv", "wb") as f:
-                    f.write(up_f.getbuffer())
-                st.cache_data.clear()
-                st.success("✅ Database diperbarui!")
-                time.sleep(1); st.rerun()
-
     else:
         col_inf, col_out = st.columns([4, 1])
         col_inf.success(f"✅ Login sebagai **{MARKETING_NAME}**")
@@ -714,13 +762,15 @@ elif menu == "👨‍💻 Sales Dashboard":
             st.rerun()
 
         with st.expander("📁 Update Database Barang (.csv)", expanded=False):
+            st.caption("Upload file CSV baru untuk mengganti database produk.")
             up_f2 = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="csv_up_login")
-            if up_f2 and st.button("🚀 Update Sekarang", key="btn_csv_login"):
-                with open("database_barang.csv", "wb") as f:
-                    f.write(up_f2.getbuffer())
-                st.cache_data.clear()
-                st.success("✅ Database diperbarui!")
-                time.sleep(1); st.rerun()
+            if up_f2:
+                if st.button("🚀 Update Database Sekarang", key="btn_csv_login", type="primary"):
+                    with open("database_barang.csv", "wb") as f:
+                        f.write(up_f2.getbuffer())
+                    st.cache_data.clear()
+                    st.success("✅ Database berhasil diperbarui!")
+                    time.sleep(1); st.rerun()
 
         sheet = connect_gsheet()
         if sheet:
@@ -873,7 +923,7 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     st.metric("PPN 11%", f"Rp {tax:,.0f}")
                                     st.markdown("<br>", unsafe_allow_html=True)
 
-                                    no_s = st.text_input("📄 Nomor Surat:", value="/S-TTS/IV/2026", key=f"ns_print_{real_row_idx}")
+                                    no_s = st.text_input("📄 Nomor Surat:", value="/S-TTS/V/2026", key=f"ns_print_{real_row_idx}")
 
                                     b1, b2 = st.columns(2)
                                     pdf_data = generate_pdf(no_s, customer_val, up_val, f_df, subt, tax, gtot)
