@@ -342,7 +342,7 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=300)
 def load_db():
     if os.path.exists("database_barang.csv"):
         try:
@@ -362,8 +362,42 @@ def item_key(row_idx, nama_barang):
     return f"r{row_idx}_{h}"
 
 def clear_row_state(real_row_idx):
-    for k in [k for k in list(st.session_state.keys()) if k.startswith(f"r{real_row_idx}_")]:
+    keys_to_del = [k for k in list(st.session_state.keys()) if k.startswith(f"r{real_row_idx}_")]
+    for k in keys_to_del:
         del st.session_state[k]
+
+# ── FIX: Baca langsung dari GSheet tanpa cache ──
+def read_row_fresh(sheet, row_idx):
+    """Baca baris langsung dari GSheet tanpa cache, pastikan data terbaru."""
+    try:
+        time.sleep(0.5)  # beri jeda agar GSheet API sinkron
+        vals = sheet.row_values(row_idx)
+        if len(vals) > 4 and vals[4].strip():
+            return ast.literal_eval(vals[4])
+        return []
+    except Exception as e:
+        return []
+
+# ── FIX: Simpan ke GSheet dengan verifikasi ──
+def save_to_gsheet_verified(sheet, row_idx, save_data):
+    """Simpan data ke GSheet dan verifikasi berhasil tersimpan."""
+    try:
+        sheet.update_cell(row_idx, 5, str(save_data))
+        time.sleep(1.5)  # tunggu GSheet sinkron
+        # verifikasi: baca kembali dan cek
+        verify = sheet.row_values(row_idx)
+        if len(verify) > 4:
+            try:
+                parsed = ast.literal_eval(verify[4])
+                if len(parsed) == len(save_data):
+                    return True, "OK"
+                else:
+                    return False, f"Jumlah item tidak cocok: {len(parsed)} vs {len(save_data)}"
+            except:
+                return False, "Gagal parse data setelah simpan"
+        return False, "Row kosong setelah simpan"
+    except Exception as e:
+        return False, str(e)
 
 
 # =========================================================
@@ -377,6 +411,9 @@ if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
 if "widget_id" not in st.session_state:
     st.session_state.widget_id = 0
+# FIX: simpan data yang baru disimpan agar tidak terbaca dari cache lama
+if "saved_items_cache" not in st.session_state:
+    st.session_state.saved_items_cache = {}
 
 
 # =========================================================
@@ -661,7 +698,7 @@ elif menu == "📝 Admin Sales":
 elif menu == "👨‍💻 Sales Dashboard":
     render_header("Sales Dashboard", f"Kelola antrean · {MARKETING_NAME}", "🔐 Admin Only")
 
-    # ── BELUM LOGIN: hanya tampilkan form password, TIDAK ADA akses lain ──
+    # ── BELUM LOGIN ──
     if not st.session_state.admin_logged_in:
         st.markdown("<br>", unsafe_allow_html=True)
         _, mid_col, _ = st.columns([1, 2, 1])
@@ -690,15 +727,20 @@ elif menu == "👨‍💻 Sales Dashboard":
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── SUDAH LOGIN: tampilkan dashboard + update DB (semua di balik password) ──
+    # ── SUDAH LOGIN ──
     else:
-        col_inf, col_out = st.columns([4, 1])
+        col_inf, col_out, col_ref = st.columns([3, 1, 1])
         col_inf.success(f"✅ Login sebagai **{MARKETING_NAME}**")
         if col_out.button("🚪 Logout", use_container_width=True, key="btn_logout"):
             st.session_state.admin_logged_in = False
             st.rerun()
+        # FIX: tombol Refresh manual untuk paksa baca ulang dari GSheet
+        if col_ref.button("🔄 Refresh", use_container_width=True, key="btn_refresh"):
+            st.session_state.saved_items_cache = {}
+            st.cache_data.clear()
+            st.rerun()
 
-        # ── Update Database Barang — HANYA tampil setelah login berhasil ──
+        # ── Update Database Barang ──
         with st.expander("📁 Update Database Barang (.csv)", expanded=False):
             st.caption("Upload file CSV baru untuk mengganti database produk.")
             up_f2 = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="csv_up_login")
@@ -764,18 +806,31 @@ elif menu == "👨‍💻 Sales Dashboard":
                                 except:
                                     items_list = []
 
+                                # FIX: Gunakan data dari saved_items_cache kalau ada
+                                # (data yang baru saja disimpan, sebelum GSheet sinkron)
+                                if real_row_idx in st.session_state.saved_items_cache:
+                                    items_list = st.session_state.saved_items_cache[real_row_idx]
+
                                 render_section_title("📝 Edit Daftar Barang")
                                 st.caption("💡 Ubah **Pos** untuk urutan. Centang 🗑️ untuk hapus.")
 
+                                # FIX: Inisialisasi session state dari items_list yang sudah benar
+                                # Hanya inisialisasi kalau belum ada di session state
                                 for i, r in enumerate(items_list):
                                     nama_item = r['Nama Barang']
                                     u_k = item_key(real_row_idx, nama_item)
-                                    if f"h_{u_k}" not in st.session_state: st.session_state[f"h_{u_k}"] = int(float(r.get('Harga', 0)))
-                                    if f"s_{u_k}" not in st.session_state: st.session_state[f"s_{u_k}"] = str(r.get('Satuan', 'Pcs')).strip()
-                                    if f"q_{u_k}" not in st.session_state: st.session_state[f"q_{u_k}"] = int(r.get('Qty', 1))
-                                    if f"p_{u_k}" not in st.session_state: st.session_state[f"p_{u_k}"] = float(i + 1)
-                                    if f"m_{u_k}" not in st.session_state: st.session_state[f"m_{u_k}"] = "Pcs/Tetap"
-                                    if f"isi_{u_k}" not in st.session_state: st.session_state[f"isi_{u_k}"] = 10
+                                    if f"h_{u_k}" not in st.session_state:
+                                        st.session_state[f"h_{u_k}"] = int(float(r.get('Harga', 0)))
+                                    if f"s_{u_k}" not in st.session_state:
+                                        st.session_state[f"s_{u_k}"] = str(r.get('Satuan', 'Pcs')).strip()
+                                    if f"q_{u_k}" not in st.session_state:
+                                        st.session_state[f"q_{u_k}"] = int(r.get('Qty', 1))
+                                    if f"p_{u_k}" not in st.session_state:
+                                        st.session_state[f"p_{u_k}"] = float(i + 1)
+                                    if f"m_{u_k}" not in st.session_state:
+                                        st.session_state[f"m_{u_k}"] = "Pcs/Tetap"
+                                    if f"isi_{u_k}" not in st.session_state:
+                                        st.session_state[f"isi_{u_k}"] = 10
 
                                 temp_up   = []
                                 list_mode = ["Pcs/Tetap", "Lusin (12)", "Dus", "Box", "Pack", "Set", "Rim"]
@@ -788,10 +843,13 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     satuan_master= str(row_master['Satuan'].values[0]).strip() if not row_master.empty else str(r.get('Satuan', 'Pcs'))
 
                                     with st.container(border=True):
+                                        # FIX: Tampilkan harga tersimpan dari session state (bukan dari GSheet)
+                                        harga_tersimpan = st.session_state.get(f"h_{u_k}", int(float(r.get('Harga', 0))))
+                                        satuan_tersimpan = st.session_state.get(f"s_{u_k}", str(r.get('Satuan', '')))
                                         st.markdown(
                                             f"<span style='color:#002855;font-weight:700;font-size:0.95rem;'>{nama_item}</span><br>"
                                             f"<span style='color:#5a7a9a;font-size:0.75rem;'>📋 Master: Rp {harga_master:,.0f} / {satuan_master}</span><br>"
-                                            f"<span style='color:#B8860B;font-size:0.75rem;font-weight:600;'>💾 Tersimpan: Rp {int(r.get('Harga',0)):,.0f} / {str(r.get('Satuan',''))}</span>",
+                                            f"<span style='color:#B8860B;font-size:0.75rem;font-weight:600;'>💾 Tersimpan: Rp {harga_tersimpan:,.0f} / {satuan_tersimpan}</span>",
                                             unsafe_allow_html=True
                                         )
                                         st.markdown("")
@@ -836,18 +894,38 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     for p in add_b:
                                         rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
                                         final.append({"Nama": p, "Qty": 1, "Harga": float(rb['Harga']), "Sat": str(rb['Satuan'])})
-                                    save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty'] * x['Harga']} for x in final]
-                                    sheet.update_cell(real_row_idx, 5, str(save_data))
-                                    st.cache_data.clear()
-                                    clear_row_state(real_row_idx)
-                                    st.success(f"✅ Tersimpan! {len(save_data)} barang.")
-                                    time.sleep(0.8); st.rerun()
+                                    save_data = [
+                                        {
+                                            "Nama Barang": x['Nama'],
+                                            "Qty": x['Qty'],
+                                            "Harga": x['Harga'],
+                                            "Satuan": x['Sat'],
+                                            "Total_Row": x['Qty'] * x['Harga']
+                                        }
+                                        for x in final
+                                    ]
 
-                                try:
-                                    current_row_data = sheet.row_values(real_row_idx)
-                                    current_items    = ast.literal_eval(current_row_data[4]) if len(current_row_data) > 4 else items_list
-                                except:
-                                    current_items = items_list
+                                    with st.spinner("Menyimpan ke Google Sheets..."):
+                                        ok, msg = save_to_gsheet_verified(sheet, real_row_idx, save_data)
+
+                                    if ok:
+                                        # FIX: Simpan ke local cache agar tampilan langsung update
+                                        st.session_state.saved_items_cache[real_row_idx] = save_data
+                                        clear_row_state(real_row_idx)
+                                        st.success(f"✅ Tersimpan & terverifikasi! {len(save_data)} barang.")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    else:
+                                        st.error(f"⚠️ Simpan gagal: {msg}. Coba lagi.")
+
+                                # FIX: Gunakan saved_items_cache untuk quotation juga
+                                if real_row_idx in st.session_state.saved_items_cache:
+                                    current_items = st.session_state.saved_items_cache[real_row_idx]
+                                else:
+                                    # Baca fresh dari GSheet kalau tidak ada di cache
+                                    current_items = read_row_fresh(sheet, real_row_idx)
+                                    if not current_items:
+                                        current_items = items_list
 
                                 if current_items:
                                     f_df = pd.DataFrame(current_items)
@@ -884,6 +962,9 @@ elif menu == "👨‍💻 Sales Dashboard":
                                                  key=f"done_btn_{real_row_idx}",
                                                  type="primary", use_container_width=True):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
+                                        # Hapus dari local cache juga
+                                        if real_row_idx in st.session_state.saved_items_cache:
+                                            del st.session_state.saved_items_cache[real_row_idx]
                                         st.success(f"✅ Penawaran {customer_val} selesai.")
                                         st.rerun()
                     else:
