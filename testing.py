@@ -298,17 +298,6 @@ hr {
     box-shadow: 0 6px 24px rgba(0,40,85,0.12);
 }
 
-/* ── SEARCH RESULT BOX ── */
-.search-hint {
-    background: #f0f5fc;
-    border: 1.5px solid #c8d6e5;
-    border-radius: 10px;
-    padding: 8px 14px;
-    font-size: 0.78rem;
-    color: #5a7a9a;
-    margin-bottom: 6px;
-}
-
 [data-testid="column"] { padding: 0 4px !important; }
 @media (min-width: 768px) { [data-testid="column"] { padding: 0 8px !important; } }
 
@@ -353,7 +342,7 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=300)
 def load_db():
     if os.path.exists("database_barang.csv"):
         try:
@@ -373,8 +362,42 @@ def item_key(row_idx, nama_barang):
     return f"r{row_idx}_{h}"
 
 def clear_row_state(real_row_idx):
-    for k in [k for k in list(st.session_state.keys()) if k.startswith(f"r{real_row_idx}_")]:
+    keys_to_del = [k for k in list(st.session_state.keys()) if k.startswith(f"r{real_row_idx}_")]
+    for k in keys_to_del:
         del st.session_state[k]
+
+# ── FIX: Baca langsung dari GSheet tanpa cache ──
+def read_row_fresh(sheet, row_idx):
+    """Baca baris langsung dari GSheet tanpa cache, pastikan data terbaru."""
+    try:
+        time.sleep(0.5)  # beri jeda agar GSheet API sinkron
+        vals = sheet.row_values(row_idx)
+        if len(vals) > 4 and vals[4].strip():
+            return ast.literal_eval(vals[4])
+        return []
+    except Exception as e:
+        return []
+
+# ── FIX: Simpan ke GSheet dengan verifikasi ──
+def save_to_gsheet_verified(sheet, row_idx, save_data):
+    """Simpan data ke GSheet dan verifikasi berhasil tersimpan."""
+    try:
+        sheet.update_cell(row_idx, 5, str(save_data))
+        time.sleep(1.5)  # tunggu GSheet sinkron
+        # verifikasi: baca kembali dan cek
+        verify = sheet.row_values(row_idx)
+        if len(verify) > 4:
+            try:
+                parsed = ast.literal_eval(verify[4])
+                if len(parsed) == len(save_data):
+                    return True, "OK"
+                else:
+                    return False, f"Jumlah item tidak cocok: {len(parsed)} vs {len(save_data)}"
+            except:
+                return False, "Gagal parse data setelah simpan"
+        return False, "Row kosong setelah simpan"
+    except Exception as e:
+        return False, str(e)
 
 
 # =========================================================
@@ -388,9 +411,9 @@ if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
 if "widget_id" not in st.session_state:
     st.session_state.widget_id = 0
-# ── BARU: state untuk search keyword ──
-if "search_keyword" not in st.session_state:
-    st.session_state.search_keyword = ""
+# FIX: simpan data yang baru disimpan agar tidak terbaca dari cache lama
+if "saved_items_cache" not in st.session_state:
+    st.session_state.saved_items_cache = {}
 
 
 # =========================================================
@@ -575,70 +598,14 @@ elif menu == "📝 Admin Sales":
         up_nama   = col2.text_input("👤 Nama Penerima (UP)", placeholder="Bapak / Ibu ...")
         wa_nomor  = col3.text_input("📞 Nomor WhatsApp", placeholder="08xx-xxxx-xxxx")
 
-    # =========================================================
-    # PENCARIAN BARANG — DIPERBARUI
-    # =========================================================
     render_section_title("📦 Tambah Barang ke Keranjang")
     with st.container(border=True):
-
-        # Step 1: Text input untuk keyword pencarian
-        keyword = st.text_input(
-            "🔍 Ketik nama barang:",
-            placeholder="Contoh: stabilo, hvs, toner, binder...",
-            key="search_keyword_input"
+        pilihan_barang = st.selectbox(
+            "🔍 Cari & Pilih Nama Barang:",
+            options=[""] + df_barang['Nama Barang'].tolist(),
+            key=f"pilih_brg_{st.session_state.widget_id}"
         )
-
-        # Filter hasil berdasarkan keyword
-        if keyword.strip():
-            keyword_lower = keyword.strip().lower()
-            # Split keyword jadi kata-kata, semua harus ada (AND search)
-            kata_kata = keyword_lower.split()
-            mask = df_barang['Nama Barang'].str.lower().apply(
-                lambda x: all(k in x for k in kata_kata)
-            )
-            hasil = df_barang[mask]
-            jumlah_hasil = len(hasil)
-
-            if jumlah_hasil == 0:
-                st.warning(f"⚠️ Tidak ada barang yang cocok dengan **\"{keyword}\"**. Coba kata kunci lain.")
-                pilihan_barang = ""
-            else:
-                # Tampilkan info jumlah hasil
-                MAX_TAMPIL = 50
-                if jumlah_hasil > MAX_TAMPIL:
-                    st.markdown(
-                        f'<div class="search-hint">🔎 Ditemukan <b>{jumlah_hasil}</b> barang — menampilkan {MAX_TAMPIL} teratas. Perjelas kata kunci untuk hasil lebih spesifik.</div>',
-                        unsafe_allow_html=True
-                    )
-                    hasil_tampil = hasil.head(MAX_TAMPIL)
-                else:
-                    st.markdown(
-                        f'<div class="search-hint">✅ Ditemukan <b>{jumlah_hasil}</b> barang</div>',
-                        unsafe_allow_html=True
-                    )
-                    hasil_tampil = hasil
-
-                # Step 2: Selectbox hanya dari hasil filter
-                pilihan_barang = st.selectbox(
-                    f"Pilih dari {len(hasil_tampil)} hasil:",
-                    options=[""] + hasil_tampil['Nama Barang'].tolist(),
-                    key=f"pilih_brg_{st.session_state.widget_id}"
-                )
-        else:
-            # Belum ada keyword — tampilkan placeholder
-            st.markdown("""
-            <div style="text-align:center; padding:20px 0; color:#7a9ab8;">
-                <div style="font-size:2rem; margin-bottom:8px;">🔍</div>
-                <div style="font-size:0.88rem; color:#5a7a9a;">
-                    Ketik nama barang di atas untuk mencari<br>
-                    <span style="font-size:0.78rem; color:#9fb3c8;">Mendukung pencarian multi-kata · contoh: "kertas a4 sinar"</span>
-                </div>
-            </div>""", unsafe_allow_html=True)
-            pilihan_barang = ""
-
-        # Step 3: Tampilkan detail & form jika barang sudah dipilih
-        if pilihan_barang and pilihan_barang != "":
-            st.markdown("---")
+        if pilihan_barang != "":
             row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
             h_master = float(row_m['Harga']); satuan_db = str(row_m['Satuan']).strip()
 
@@ -676,6 +643,11 @@ elif menu == "📝 Admin Sales":
                 })
                 st.session_state.widget_id += 1
                 st.toast(f"✅ Ditambahkan: {pilihan_barang}"); time.sleep(0.2); st.rerun()
+        else:
+            st.markdown("""<div style="text-align:center; padding:20px 0; color:#7a9ab8;">
+                <div style="font-size:2rem; margin-bottom:8px;">🔍</div>
+                <div style="font-size:0.88rem; color:#5a7a9a;">Ketik atau klik dropdown di atas untuk mencari barang</div>
+            </div>""", unsafe_allow_html=True)
 
     if st.session_state.cart:
         render_section_title(f"🛒 Keranjang ({len(st.session_state.cart)} item)")
@@ -726,6 +698,7 @@ elif menu == "📝 Admin Sales":
 elif menu == "👨‍💻 Sales Dashboard":
     render_header("Sales Dashboard", f"Kelola antrean · {MARKETING_NAME}", "🔐 Admin Only")
 
+    # ── BELUM LOGIN ──
     if not st.session_state.admin_logged_in:
         st.markdown("<br>", unsafe_allow_html=True)
         _, mid_col, _ = st.columns([1, 2, 1])
@@ -754,13 +727,20 @@ elif menu == "👨‍💻 Sales Dashboard":
 
             st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── SUDAH LOGIN ──
     else:
-        col_inf, col_out = st.columns([4, 1])
+        col_inf, col_out, col_ref = st.columns([3, 1, 1])
         col_inf.success(f"✅ Login sebagai **{MARKETING_NAME}**")
         if col_out.button("🚪 Logout", use_container_width=True, key="btn_logout"):
             st.session_state.admin_logged_in = False
             st.rerun()
+        # FIX: tombol Refresh manual untuk paksa baca ulang dari GSheet
+        if col_ref.button("🔄 Refresh", use_container_width=True, key="btn_refresh"):
+            st.session_state.saved_items_cache = {}
+            st.cache_data.clear()
+            st.rerun()
 
+        # ── Update Database Barang ──
         with st.expander("📁 Update Database Barang (.csv)", expanded=False):
             st.caption("Upload file CSV baru untuk mengganti database produk.")
             up_f2 = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="csv_up_login")
@@ -826,18 +806,31 @@ elif menu == "👨‍💻 Sales Dashboard":
                                 except:
                                     items_list = []
 
+                                # FIX: Gunakan data dari saved_items_cache kalau ada
+                                # (data yang baru saja disimpan, sebelum GSheet sinkron)
+                                if real_row_idx in st.session_state.saved_items_cache:
+                                    items_list = st.session_state.saved_items_cache[real_row_idx]
+
                                 render_section_title("📝 Edit Daftar Barang")
                                 st.caption("💡 Ubah **Pos** untuk urutan. Centang 🗑️ untuk hapus.")
 
+                                # FIX: Inisialisasi session state dari items_list yang sudah benar
+                                # Hanya inisialisasi kalau belum ada di session state
                                 for i, r in enumerate(items_list):
                                     nama_item = r['Nama Barang']
                                     u_k = item_key(real_row_idx, nama_item)
-                                    if f"h_{u_k}" not in st.session_state: st.session_state[f"h_{u_k}"] = int(float(r.get('Harga', 0)))
-                                    if f"s_{u_k}" not in st.session_state: st.session_state[f"s_{u_k}"] = str(r.get('Satuan', 'Pcs')).strip()
-                                    if f"q_{u_k}" not in st.session_state: st.session_state[f"q_{u_k}"] = int(r.get('Qty', 1))
-                                    if f"p_{u_k}" not in st.session_state: st.session_state[f"p_{u_k}"] = float(i + 1)
-                                    if f"m_{u_k}" not in st.session_state: st.session_state[f"m_{u_k}"] = "Pcs/Tetap"
-                                    if f"isi_{u_k}" not in st.session_state: st.session_state[f"isi_{u_k}"] = 10
+                                    if f"h_{u_k}" not in st.session_state:
+                                        st.session_state[f"h_{u_k}"] = int(float(r.get('Harga', 0)))
+                                    if f"s_{u_k}" not in st.session_state:
+                                        st.session_state[f"s_{u_k}"] = str(r.get('Satuan', 'Pcs')).strip()
+                                    if f"q_{u_k}" not in st.session_state:
+                                        st.session_state[f"q_{u_k}"] = int(r.get('Qty', 1))
+                                    if f"p_{u_k}" not in st.session_state:
+                                        st.session_state[f"p_{u_k}"] = float(i + 1)
+                                    if f"m_{u_k}" not in st.session_state:
+                                        st.session_state[f"m_{u_k}"] = "Pcs/Tetap"
+                                    if f"isi_{u_k}" not in st.session_state:
+                                        st.session_state[f"isi_{u_k}"] = 10
 
                                 temp_up   = []
                                 list_mode = ["Pcs/Tetap", "Lusin (12)", "Dus", "Box", "Pack", "Set", "Rim"]
@@ -850,10 +843,13 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     satuan_master= str(row_master['Satuan'].values[0]).strip() if not row_master.empty else str(r.get('Satuan', 'Pcs'))
 
                                     with st.container(border=True):
+                                        # FIX: Tampilkan harga tersimpan dari session state (bukan dari GSheet)
+                                        harga_tersimpan = st.session_state.get(f"h_{u_k}", int(float(r.get('Harga', 0))))
+                                        satuan_tersimpan = st.session_state.get(f"s_{u_k}", str(r.get('Satuan', '')))
                                         st.markdown(
                                             f"<span style='color:#002855;font-weight:700;font-size:0.95rem;'>{nama_item}</span><br>"
                                             f"<span style='color:#5a7a9a;font-size:0.75rem;'>📋 Master: Rp {harga_master:,.0f} / {satuan_master}</span><br>"
-                                            f"<span style='color:#B8860B;font-size:0.75rem;font-weight:600;'>💾 Tersimpan: Rp {int(r.get('Harga',0)):,.0f} / {str(r.get('Satuan',''))}</span>",
+                                            f"<span style='color:#B8860B;font-size:0.75rem;font-weight:600;'>💾 Tersimpan: Rp {harga_tersimpan:,.0f} / {satuan_tersimpan}</span>",
                                             unsafe_allow_html=True
                                         )
                                         st.markdown("")
@@ -898,18 +894,38 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     for p in add_b:
                                         rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
                                         final.append({"Nama": p, "Qty": 1, "Harga": float(rb['Harga']), "Sat": str(rb['Satuan'])})
-                                    save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty'] * x['Harga']} for x in final]
-                                    sheet.update_cell(real_row_idx, 5, str(save_data))
-                                    st.cache_data.clear()
-                                    clear_row_state(real_row_idx)
-                                    st.success(f"✅ Tersimpan! {len(save_data)} barang.")
-                                    time.sleep(0.8); st.rerun()
+                                    save_data = [
+                                        {
+                                            "Nama Barang": x['Nama'],
+                                            "Qty": x['Qty'],
+                                            "Harga": x['Harga'],
+                                            "Satuan": x['Sat'],
+                                            "Total_Row": x['Qty'] * x['Harga']
+                                        }
+                                        for x in final
+                                    ]
 
-                                try:
-                                    current_row_data = sheet.row_values(real_row_idx)
-                                    current_items    = ast.literal_eval(current_row_data[4]) if len(current_row_data) > 4 else items_list
-                                except:
-                                    current_items = items_list
+                                    with st.spinner("Menyimpan ke Google Sheets..."):
+                                        ok, msg = save_to_gsheet_verified(sheet, real_row_idx, save_data)
+
+                                    if ok:
+                                        # FIX: Simpan ke local cache agar tampilan langsung update
+                                        st.session_state.saved_items_cache[real_row_idx] = save_data
+                                        clear_row_state(real_row_idx)
+                                        st.success(f"✅ Tersimpan & terverifikasi! {len(save_data)} barang.")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    else:
+                                        st.error(f"⚠️ Simpan gagal: {msg}. Coba lagi.")
+
+                                # FIX: Gunakan saved_items_cache untuk quotation juga
+                                if real_row_idx in st.session_state.saved_items_cache:
+                                    current_items = st.session_state.saved_items_cache[real_row_idx]
+                                else:
+                                    # Baca fresh dari GSheet kalau tidak ada di cache
+                                    current_items = read_row_fresh(sheet, real_row_idx)
+                                    if not current_items:
+                                        current_items = items_list
 
                                 if current_items:
                                     f_df = pd.DataFrame(current_items)
@@ -946,6 +962,9 @@ elif menu == "👨‍💻 Sales Dashboard":
                                                  key=f"done_btn_{real_row_idx}",
                                                  type="primary", use_container_width=True):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
+                                        # Hapus dari local cache juga
+                                        if real_row_idx in st.session_state.saved_items_cache:
+                                            del st.session_state.saved_items_cache[real_row_idx]
                                         st.success(f"✅ Penawaran {customer_val} selesai.")
                                         st.rerun()
                     else:
