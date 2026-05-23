@@ -532,206 +532,187 @@ def draw_table_header(pdf):
 
 
 def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
-    # Hitung total halaman dulu (estimasi)
-    # Kita pakai 2-pass: pass pertama hitung halaman, pass kedua render
-    # Untuk simplisitas, kita hitung estimasi baris per halaman
-    rows_per_page_first = 16   # halaman pertama (ada header quotation)
-    rows_per_page_rest  = 22   # halaman berikutnya
-    n_rows = len(df_order)
-    if n_rows <= rows_per_page_first:
-        total_pages = 1
-    else:
-        leftover = n_rows - rows_per_page_first
-        total_pages = 1 + -(-leftover // rows_per_page_rest)  # ceiling division
+    # T&C block tingginya sekitar 58mm, area total ~35mm, margin bawah 25mm
+    # Gunakan 2-pass: render dulu tanpa total_pages, hitung, render ulang
+    def _render(pdf):
+        pdf.set_margins(10, 70, 10)
+        pdf.set_auto_page_break(auto=True, margin=28)
+        pdf.add_page()
 
-    pdf = PenawaranPDF(total_pages=total_pages)
-    pdf.set_margins(10, 70, 10)
-    pdf.set_auto_page_break(auto=True, margin=25)
-    pdf.add_page()
+        # ── Judul QUOTATION ──
+        pdf.set_y(62)
+        pdf.set_font('Arial', 'B', 26)
+        pdf.set_text_color(*COLOR_NAVY)
+        pdf.cell(0, 10, "QUOTATION", ln=1, align='R')
 
-    # ── Judul QUOTATION (kanan atas) ──
-    pdf.set_y(62)
-    pdf.set_font('Arial', 'B', 26)
-    pdf.set_text_color(*COLOR_NAVY)
-    pdf.cell(0, 10, "QUOTATION", ln=1, align='R')
+        pdf.set_draw_color(*COLOR_GOLD)
+        pdf.set_line_width(0.8)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+        pdf.ln(2)
 
-    # Garis gold di bawah judul
-    pdf.set_draw_color(*COLOR_GOLD)
-    pdf.set_line_width(0.8)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(2)
+        waktu_skrg  = datetime.utcnow() + timedelta(hours=7)
+        expiry_date = waktu_skrg + timedelta(days=7)
+        pdf.set_font('Arial', '', 8.5)
+        pdf.set_text_color(100, 100, 100)
+        pdf.cell(0, 5, f"No. Surat   : {no_surat}", ln=1, align='R')
+        pdf.cell(0, 5, f"Tanggal      : {waktu_skrg.strftime('%d %B %Y')}", ln=1, align='R')
+        pdf.cell(0, 5, f"Berlaku s/d  : {expiry_date.strftime('%d %B %Y')}", ln=1, align='R')
+        pdf.ln(4)
 
-    # Nomor & tanggal (kanan)
-    waktu_skrg  = datetime.utcnow() + timedelta(hours=7)
-    expiry_date = waktu_skrg + timedelta(days=7)
-    pdf.set_font('Arial', '', 8.5)
-    pdf.set_text_color(100, 100, 100)
-    pdf.cell(0, 5, f"No. Surat   : {no_surat}", ln=1, align='R')
-    pdf.cell(0, 5, f"Tanggal      : {waktu_skrg.strftime('%d %B %Y')}", ln=1, align='R')
-    pdf.cell(0, 5, f"Berlaku s/d  : {expiry_date.strftime('%d %B %Y')}", ln=1, align='R')
-    pdf.ln(4)
+        # ── Info Customer ──
+        pdf.set_x(10)
+        pdf.set_font('Arial', 'B', 7.5)
+        pdf.set_text_color(*COLOR_GOLD)
+        pdf.cell(90, 5, "DITUJUKAN KEPADA:", ln=1)
 
-    # ── Info Customer (kiri) ──
-    # Simpan posisi Y sebelum block customer
-    y_cust = pdf.get_y()
-    pdf.set_y(y_cust)
-    pdf.set_x(10)
+        pdf.set_x(10)
+        pdf.set_font('Arial', 'B', 13)
+        pdf.set_text_color(*COLOR_NAVY)
+        pdf.cell(90, 7, str(nama_cust).upper(), ln=1)
 
-    # Label "DITUJUKAN KEPADA"
-    pdf.set_font('Arial', 'B', 7.5)
-    pdf.set_text_color(*COLOR_GOLD)
-    pdf.cell(90, 5, "DITUJUKAN KEPADA:", ln=1)
+        pdf.set_x(10)
+        pdf.set_font('Arial', '', 9)
+        pdf.set_text_color(*COLOR_TEXT)
+        pdf.cell(90, 5, f"U/P: {pic}", ln=1)
+        pdf.ln(6)
 
-    pdf.set_x(10)
-    pdf.set_font('Arial', 'B', 13)
-    pdf.set_text_color(*COLOR_NAVY)
-    # Pastikan nama customer tidak melebihi lebar kolom kiri
-    pdf.cell(90, 7, str(nama_cust).upper(), ln=1)
+        # ── Tabel ──
+        draw_table_header(pdf)
+        pdf.set_font('Arial', '', 9)
+        pdf.set_text_color(*COLOR_TEXT)
 
-    pdf.set_x(10)
-    pdf.set_font('Arial', '', 9)
-    pdf.set_text_color(*COLOR_TEXT)
-    pdf.cell(90, 5, f"U/P: {pic}", ln=1)
+        for i, row in df_order.iterrows():
+            # Cek apakah baris berikutnya + area total + T&C masih muat
+            # Estimasi ruang yang dibutuhkan setelah tabel: ~100mm
+            if pdf.get_y() > 170:
+                pdf.add_page()
+                draw_table_header(pdf)
+                pdf.set_font('Arial', '', 9)
+                pdf.set_text_color(*COLOR_TEXT)
 
-    pdf.ln(6)
+            if i % 2 == 0:
+                pdf.set_fill_color(240, 245, 252)
+            else:
+                pdf.set_fill_color(255, 255, 255)
 
-    # ── Tabel ──
-    draw_table_header(pdf)
+            pdf.set_draw_color(180, 195, 215)
+            pdf.set_line_width(0.2)
 
-    pdf.set_font('Arial', '', 9)
-    pdf.set_text_color(*COLOR_TEXT)
-    pdf.set_line_width(0.2)
+            pdf.cell(10, 8, str(i + 1),               border=1, align='C', fill=True)
+            pdf.cell(82, 8, f" {str(row['Nama Barang'])}", border=1, align='L', fill=True)
+            pdf.cell(18, 8, str(int(row['Qty'])),      border=1, align='C', fill=True)
+            pdf.cell(20, 8, str(row['Satuan']),        border=1, align='C', fill=True)
+            pdf.cell(30, 8, f"Rp {row['Harga']:,.0f}", border=1, align='R', fill=True)
+            pdf.cell(30, 8, f"Rp {row['Total_Row']:,.0f}", border=1, align='R', fill=True)
+            pdf.ln()
 
-    for i, row in df_order.iterrows():
-        if pdf.get_y() > 248:
+        # ── Area Total ──
+        pdf.ln(4)
+        pdf.set_draw_color(*COLOR_GOLD)
+        pdf.set_line_width(0.6)
+        pdf.line(120, pdf.get_y(), 200, pdf.get_y())
+        pdf.ln(3)
+
+        pdf.set_font('Arial', '', 9)
+        pdf.set_text_color(*COLOR_TEXT)
+        pdf.set_x(120)
+        pdf.cell(50, 7, "Sub Total", align='L')
+        pdf.cell(30, 7, f"Rp {subtotal:,.0f}", align='R', ln=1)
+
+        pdf.set_x(120)
+        pdf.cell(50, 7, "PPN 11%", align='L')
+        pdf.cell(30, 7, f"Rp {ppn:,.0f}", align='R', ln=1)
+
+        pdf.set_draw_color(*COLOR_NAVY)
+        pdf.set_line_width(0.4)
+        pdf.line(120, pdf.get_y(), 200, pdf.get_y())
+        pdf.ln(1)
+
+        pdf.set_fill_color(*COLOR_NAVY)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font('Arial', 'B', 10)
+        pdf.set_x(120)
+        pdf.cell(50, 10, "  GRAND TOTAL", border=0, align='L', fill=True)
+        pdf.cell(30, 10, f"Rp {grand_total:,.0f}  ", border=0, align='R', fill=True, ln=1)
+
+        pdf.set_draw_color(*COLOR_GOLD)
+        pdf.set_line_width(0.8)
+        pdf.line(120, pdf.get_y(), 200, pdf.get_y())
+
+        # ── Cek ruang untuk T&C — tinggi blok T&C = 62mm ──
+        TC_HEIGHT = 62
+        BOTTOM_LIMIT = 297 - 28  # A4 - margin bawah = 269mm
+        if pdf.get_y() + 10 + TC_HEIGHT > BOTTOM_LIMIT:
             pdf.add_page()
-            draw_table_header(pdf)
-            pdf.set_font('Arial', '', 9)
-            pdf.set_text_color(*COLOR_TEXT)
-
-        # Alternating row — lebih kontras
-        if i % 2 == 0:
-            pdf.set_fill_color(240, 245, 252)   # biru muda cukup terlihat
+            pdf.set_y(68)
         else:
-            pdf.set_fill_color(255, 255, 255)
+            pdf.ln(10)
 
-        pdf.set_draw_color(180, 195, 215)
-        pdf.set_line_width(0.2)
+        # ── T&C + Marketing dalam 1 blok sejajar ──
+        y_tc = pdf.get_y()
 
-        nama_str  = str(row['Nama Barang'])
-        qty_str   = str(int(row['Qty']))
-        sat_str   = str(row['Satuan'])
-        harga_str = f"Rp {row['Harga']:,.0f}"
-        total_str = f"Rp {row['Total_Row']:,.0f}"
+        # Kotak T&C kiri
+        pdf.set_fill_color(248, 250, 253)
+        pdf.set_draw_color(*COLOR_NAVY)
+        pdf.set_line_width(0.4)
+        pdf.rect(10, y_tc, 120, TC_HEIGHT, 'DF')
 
-        pdf.cell(10,  8, str(i + 1),  border=1, align='C', fill=True)
-        pdf.cell(82,  8, f" {nama_str}", border=1, align='L', fill=True)
-        pdf.cell(18,  8, qty_str,     border=1, align='C', fill=True)
-        pdf.cell(20,  8, sat_str,     border=1, align='C', fill=True)
-        pdf.cell(30,  8, harga_str,   border=1, align='R', fill=True)
-        pdf.cell(30,  8, total_str,   border=1, align='R', fill=True)
-        pdf.ln()
+        pdf.set_y(y_tc + 3)
+        pdf.set_x(13)
+        pdf.set_font('Arial', 'B', 9)
+        pdf.set_text_color(*COLOR_NAVY)
+        pdf.cell(116, 5, "SYARAT & KETENTUAN:", ln=1)
 
-    # ── Area Total ──
-    pdf.ln(4)
+        pdf.set_draw_color(*COLOR_GOLD)
+        pdf.set_line_width(0.5)
+        pdf.line(13, pdf.get_y(), 127, pdf.get_y())
+        pdf.ln(2)
 
-    # Garis atas area total
-    pdf.set_draw_color(*COLOR_GOLD)
-    pdf.set_line_width(0.6)
-    pdf.line(120, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(3)
+        pdf.set_x(13)
+        pdf.set_font('Arial', '', 8.5)
+        pdf.set_text_color(50, 50, 50)
+        terms = (
+            "1. Harga dapat berubah sewaktu-waktu tanpa pemberitahuan.\n"
+            "2. Penawaran berlaku 7 hari dari tanggal surat.\n"
+            "3. Pengiriman 1 hari kerja setelah konfirmasi PO.\n"
+            "4. Pembayaran ditransfer HANYA ke rekening berikut:\n"
+            "   Bank       : Bank Mandiri\n"
+            "   No. Rek    : 1550010174996\n"
+            "   Atas Nama  : PT THEA THEO STATIONARY"
+        )
+        # Gunakan set_x sebelum multi_cell agar tidak overflow ke kanan
+        pdf.set_x(13)
+        pdf.multi_cell(114, 5.5, terms)
 
-    # Sub Total
-    pdf.set_font('Arial', '', 9)
-    pdf.set_text_color(*COLOR_TEXT)
-    pdf.set_x(120)
-    pdf.cell(50, 7, "Sub Total", align='L')
-    pdf.cell(30, 7, f"Rp {subtotal:,.0f}", align='R', ln=1)
+        # Info Marketing (kanan, sejajar T&C)
+        pdf.set_y(y_tc + 3)
+        pdf.set_x(138)
+        pdf.set_font('Arial', 'B', 8.5)
+        pdf.set_text_color(*COLOR_GOLD)
+        pdf.cell(60, 5, "MARKETING:", ln=1)
 
-    # PPN
-    pdf.set_x(120)
-    pdf.cell(50, 7, "PPN 11%", align='L')
-    pdf.cell(30, 7, f"Rp {ppn:,.0f}", align='R', ln=1)
+        pdf.set_x(138)
+        pdf.set_font('Arial', 'B', 12)
+        pdf.set_text_color(*COLOR_NAVY)
+        pdf.cell(60, 7, MARKETING_NAME.upper(), ln=1)
 
-    # Garis sebelum grand total
-    pdf.set_x(120)
-    pdf.set_draw_color(*COLOR_NAVY)
-    pdf.set_line_width(0.4)
-    pdf.line(120, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(1)
+        pdf.set_x(138)
+        pdf.set_font('Arial', '', 8.5)
+        pdf.set_text_color(*COLOR_TEXT)
+        pdf.cell(60, 5, f"WA    : {MARKETING_WA}", ln=1)
+        pdf.set_x(138)
+        pdf.cell(60, 5, f"Email : {MARKETING_EMAIL}", ln=1)
 
-    # Grand Total — highlight navy
-    pdf.set_fill_color(*COLOR_NAVY)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font('Arial', 'B', 10)
-    pdf.set_x(120)
-    pdf.cell(50, 10, "  GRAND TOTAL", border=0, align='L', fill=True)
-    pdf.cell(30, 10, f"Rp {grand_total:,.0f}  ", border=0, align='R', fill=True, ln=1)
+    # Pass 1: hitung jumlah halaman
+    pdf1 = PenawaranPDF(total_pages=99)
+    _render(pdf1)
+    total_pages = pdf1.page
 
-    # Garis gold bawah grand total
-    pdf.set_draw_color(*COLOR_GOLD)
-    pdf.set_line_width(0.8)
-    pdf.set_x(120)
-    pdf.line(120, pdf.get_y(), 200, pdf.get_y())
+    # Pass 2: render final dengan total_pages yang benar
+    pdf2 = PenawaranPDF(total_pages=total_pages)
+    _render(pdf2)
 
-    # ── Terms & Conditions ──
-    pdf.ln(10)
-
-    # Box T&C dengan border
-    y_tc = pdf.get_y()
-    pdf.set_fill_color(248, 250, 253)
-    pdf.set_draw_color(*COLOR_NAVY)
-    pdf.set_line_width(0.4)
-    pdf.rect(10, y_tc, 120, 52, 'DF')
-
-    pdf.set_y(y_tc + 3)
-    pdf.set_x(13)
-    pdf.set_font('Arial', 'B', 9)
-    pdf.set_text_color(*COLOR_NAVY)
-    pdf.cell(0, 5, "SYARAT & KETENTUAN:", ln=1)
-
-    # Garis gold di bawah judul T&C
-    pdf.set_draw_color(*COLOR_GOLD)
-    pdf.set_line_width(0.5)
-    pdf.line(13, pdf.get_y(), 127, pdf.get_y())
-    pdf.ln(2)
-
-    pdf.set_x(13)
-    pdf.set_font('Arial', '', 8.5)
-    pdf.set_text_color(50, 50, 50)
-    terms = (
-        "1. Harga dapat berubah sewaktu-waktu tanpa pemberitahuan.\n"
-        "2. Penawaran berlaku 7 hari dari tanggal surat.\n"
-        "3. Pengiriman 1 hari kerja setelah konfirmasi PO.\n"
-        "4. Pembayaran ditransfer HANYA ke rekening berikut:\n\n"
-        "   Bank       : Bank Mandiri\n"
-        "   No. Rek    : 1550010174996\n"
-        "   Atas Nama  : PT THEA THEO STATIONARY"
-    )
-    pdf.set_x(13)
-    pdf.multi_cell(114, 5.5, terms)
-
-    # ── Info Marketing (kanan, sejajar T&C) ──
-    pdf.set_y(y_tc + 3)
-    pdf.set_x(138)
-    pdf.set_font('Arial', 'B', 8.5)
-    pdf.set_text_color(*COLOR_GOLD)
-    pdf.cell(0, 5, "MARKETING:", ln=0)
-    pdf.ln(7)
-
-    pdf.set_x(138)
-    pdf.set_font('Arial', 'B', 11)
-    pdf.set_text_color(*COLOR_NAVY)
-    pdf.cell(0, 6, MARKETING_NAME.upper(), ln=1)
-
-    pdf.set_x(138)
-    pdf.set_font('Arial', '', 8.5)
-    pdf.set_text_color(*COLOR_TEXT)
-    pdf.cell(0, 5, f"WA  : {MARKETING_WA}", ln=1)
-    pdf.set_x(138)
-    pdf.cell(0, 5, f"Email: {MARKETING_EMAIL}", ln=1)
-
-    return pdf.output(dest='S').encode('latin-1')
+    return pdf2.output(dest='S').encode('latin-1')
 
 
 # =========================================================
