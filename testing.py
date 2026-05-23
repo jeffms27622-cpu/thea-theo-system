@@ -691,6 +691,14 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.set_text_color(*COLOR_GOLD)
         pdf.cell(60, 5, "MARKETING:", ln=1)
 
+        # Tanda tangan image
+        ttd_path = "ttd_clean.png"
+        if os.path.exists(ttd_path):
+            pdf.image(ttd_path, x=138, y=pdf.get_y() + 1, w=38)
+            pdf.set_y(pdf.get_y() + 22)
+        else:
+            pdf.ln(10)
+
         pdf.set_x(138)
         pdf.set_font('Arial', 'B', 12)
         pdf.set_text_color(*COLOR_NAVY)
