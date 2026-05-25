@@ -685,46 +685,58 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.multi_cell(114, 5.5, terms)
 
         # Info Marketing (kanan, sejajar T&C)
-        pdf.set_y(y_tc + 3)
+        # ── Blok Marketing (kanan T&C) ──
+        # Layout: MARKETING label → TTD+stempel (kecil, proporsional) → nama → WA → email
+        # Semua teks di x=138, TTD di x=135 agar sedikit ke kiri dari label
+        y_mkt = y_tc + 3
+
+        pdf.set_y(y_mkt)
         pdf.set_x(138)
         pdf.set_font('Arial', 'B', 8.5)
         pdf.set_text_color(*COLOR_GOLD)
         pdf.cell(60, 5, "MARKETING:", ln=1)
 
-        # Tanda tangan + stempel logo (digabung, simpan ke temp file)
+        # TTD height di PDF = 22mm, width proporsional
+        TTD_H_MM = 22
         ttd_path = "ttd_clean.png"
+        y_ttd_start = pdf.get_y() + 1
+
         if os.path.exists(ttd_path):
             try:
                 from PIL import Image as PILImage
                 import numpy as _np
                 ttd_img = PILImage.open(ttd_path).convert("RGBA")
+                ttd_w_px, ttd_h_px = ttd_img.size
+                # Hitung lebar di PDF proporsional terhadap tinggi 22mm
+                ttd_w_mm = TTD_H_MM * ttd_w_px / ttd_h_px
+
                 if os.path.exists("logo.png"):
                     logo_img = PILImage.open("logo.png").convert("RGBA")
-                    lw = int(ttd_img.width * 0.75)
+                    # Logo 65% lebar TTD, ditempel di tengah TTD
+                    lw = int(ttd_w_px * 0.65)
                     lh = int(logo_img.height * lw / logo_img.width)
                     logo_img = logo_img.resize((lw, lh), PILImage.LANCZOS)
                     logo_arr = _np.array(logo_img)
-                    logo_arr[:,:,3] = (logo_arr[:,:,3] * 0.82).astype(_np.uint8)
+                    logo_arr[:,:,3] = (logo_arr[:,:,3] * 0.80).astype(_np.uint8)
                     logo_faded = PILImage.fromarray(logo_arr)
-                    lx = (ttd_img.width - lw) // 2
-                    ly = max(0, (ttd_img.height - lh) // 2)
+                    lx = (ttd_w_px - lw) // 2
+                    ly = max(0, (ttd_h_px - lh) // 2)
                     canvas = ttd_img.copy()
                     canvas.paste(logo_faded, (lx, ly), logo_faded)
                     tmp_path = "/tmp/ttd_stamp_combined.png"
                     canvas.save(tmp_path)
-                    pdf.image(tmp_path, x=133, y=pdf.get_y() + 1, w=50)
+                    pdf.image(tmp_path, x=137, y=y_ttd_start, h=TTD_H_MM)
                 else:
-                    pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
-            except Exception as _e:
-                pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
-            pdf.set_y(pdf.get_y() + 30)
-        else:
-            pdf.ln(10)
+                    pdf.image(ttd_path, x=137, y=y_ttd_start, h=TTD_H_MM)
+            except Exception:
+                pdf.image(ttd_path, x=137, y=y_ttd_start, h=TTD_H_MM)
 
+        # Teks di bawah TTD
+        pdf.set_y(y_ttd_start + TTD_H_MM + 1)
         pdf.set_x(138)
-        pdf.set_font('Arial', 'B', 12)
+        pdf.set_font('Arial', 'B', 10)
         pdf.set_text_color(*COLOR_NAVY)
-        pdf.cell(60, 7, MARKETING_NAME.upper(), ln=1)
+        pdf.cell(60, 6, MARKETING_NAME.upper(), ln=1)
 
         pdf.set_x(138)
         pdf.set_font('Arial', '', 8.5)
