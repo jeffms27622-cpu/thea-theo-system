@@ -342,7 +342,7 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=600)
 def load_db():
     if os.path.exists("database_barang.csv"):
         try:
@@ -362,37 +362,8 @@ def item_key(row_idx, nama_barang):
     return f"r{row_idx}_{h}"
 
 def clear_row_state(real_row_idx):
-    keys_to_del = [k for k in list(st.session_state.keys()) if k.startswith(f"r{real_row_idx}_")]
-    for k in keys_to_del:
+    for k in [k for k in list(st.session_state.keys()) if k.startswith(f"r{real_row_idx}_")]:
         del st.session_state[k]
-
-def read_row_fresh(sheet, row_idx):
-    try:
-        time.sleep(0.5)
-        vals = sheet.row_values(row_idx)
-        if len(vals) > 4 and vals[4].strip():
-            return ast.literal_eval(vals[4])
-        return []
-    except Exception as e:
-        return []
-
-def save_to_gsheet_verified(sheet, row_idx, save_data):
-    try:
-        sheet.update_cell(row_idx, 5, str(save_data))
-        time.sleep(1.5)
-        verify = sheet.row_values(row_idx)
-        if len(verify) > 4:
-            try:
-                parsed = ast.literal_eval(verify[4])
-                if len(parsed) == len(save_data):
-                    return True, "OK"
-                else:
-                    return False, f"Jumlah item tidak cocok: {len(parsed)} vs {len(save_data)}"
-            except:
-                return False, "Gagal parse data setelah simpan"
-        return False, "Row kosong setelah simpan"
-    except Exception as e:
-        return False, str(e)
 
 
 # =========================================================
@@ -406,8 +377,6 @@ if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
 if "widget_id" not in st.session_state:
     st.session_state.widget_id = 0
-if "saved_items_cache" not in st.session_state:
-    st.session_state.saved_items_cache = {}
 
 
 # =========================================================
@@ -436,314 +405,76 @@ menu = st.session_state.active_menu
 
 
 # =========================================================
-# PDF GENERATOR  ← REVISI VISUAL
+# PDF GENERATOR
 # =========================================================
 class PenawaranPDF(FPDF):
-    def __init__(self, total_pages=1):
-        super().__init__()
-        self.total_pages = total_pages
-
     def header(self):
-        # Background navy penuh
-        self.set_fill_color(*COLOR_NAVY)
-        self.rect(0, 0, 210, 52, 'F')
-
-        # Strip putih area logo
-        self.set_fill_color(255, 255, 255)
-        self.rect(10, 6, 44, 40, 'F')
-
-        # Garis gold vertikal tebal sebagai pemisah
-        self.set_fill_color(*COLOR_GOLD)
-        self.rect(58, 0, 3, 52, 'F')
-
-        # Logo jika ada
-        if os.path.exists("logo.png"):
-            self.image("logo.png", 13, 10, 38)
-
-        # Nama perusahaan
-        self.set_y(10); self.set_x(66)
-        self.set_font('Arial', 'B', 17)
-        self.set_text_color(255, 255, 255)
-        self.cell(0, 8, COMPANY_NAME, ln=1)
-
-        # Slogan gold
-        self.set_x(66)
-        self.set_font('Arial', 'B', 8.5)
-        self.set_text_color(*COLOR_GOLD)
-        self.cell(0, 5, "  ".join(SLOGAN.upper()), ln=1)
-
-        # Garis tipis pemisah
-        self.set_fill_color(255, 255, 255)
-        self.rect(66, 26, 132, 0.3, 'F')
-
-        # Detail kontak
-        self.set_y(29); self.set_x(66)
-        self.set_font('Arial', '', 7.5)
-        self.set_text_color(210, 220, 235)
-        self.cell(0, 4.5, ADDR, ln=1)
-        self.set_x(66)
-        self.cell(0, 4.5, f"Office: {OFFICE_PHONE}  |  WA: {MARKETING_WA}", ln=1)
-        self.set_x(66)
-        self.cell(0, 4.5, f"Email: {MARKETING_EMAIL}", ln=1)
-
-        # Garis gold bawah header
-        self.set_fill_color(*COLOR_GOLD)
-        self.rect(0, 52, 210, 2.5, 'F')
-
-        self.set_y(62)
+        self.set_fill_color(*COLOR_NAVY); self.rect(0, 0, 210, 55, 'F')
+        self.set_fill_color(255, 255, 255); self.rect(10, 0, 50, 55, 'F')
+        self.set_fill_color(*COLOR_GOLD); self.rect(60, 0, 2, 55, 'F'); self.rect(64, 0, 0.5, 55, 'F')
+        if os.path.exists("logo.png"): self.image("logo.png", 15, 12, 40)
+        self.set_y(12); self.set_x(72)
+        self.set_font('Arial', 'B', 20); self.set_text_color(255, 255, 255); self.cell(0, 8, COMPANY_NAME, ln=1)
+        self.set_x(72); self.set_font('Arial', 'B', 10); self.set_text_color(184, 134, 11); self.cell(0, 6, "  ".join(SLOGAN.upper()), ln=1)
+        self.set_fill_color(255, 255, 255); self.rect(72, 28, 120, 0.2, 'F')
+        self.set_y(32); self.set_x(72)
+        self.set_font('Arial', '', 8); self.set_text_color(220, 220, 220); self.cell(0, 4, ADDR, ln=1)
+        self.set_x(72); self.cell(0, 4, f"Office: {OFFICE_PHONE}  |  WA: {MARKETING_WA}", ln=1)
+        self.set_x(72); self.cell(0, 4, f"Email: {MARKETING_EMAIL}", ln=1)
+        self.set_y(65)
 
     def footer(self):
-        self.set_y(-18)
-        # Garis gold atas footer
-        self.set_fill_color(*COLOR_GOLD)
-        self.rect(0, self.get_y(), 210, 1.5, 'F')
-
-        # Background navy footer
-        self.set_fill_color(*COLOR_NAVY)
-        self.rect(0, self.get_y() + 1.5, 210, 17, 'F')
-
-        self.set_y(-14)
-        self.set_font('Arial', 'B', 8)
-        self.set_text_color(255, 255, 255)
-        self.cell(0, 5, SLOGAN.upper(), 0, 1, 'C')
-
-        self.set_font('Arial', '', 7)
-        self.set_text_color(*COLOR_GOLD)
-        self.cell(0, 4,
-                  f"{COMPANY_NAME}  |  {ADDR}  |  Hal. {self.page_no()} / {self.total_pages}",
-                  0, 0, 'C')
-
+        self.set_y(-25); self.set_fill_color(*COLOR_NAVY); self.rect(0, 272, 210, 25, 'F')
+        self.set_fill_color(*COLOR_GOLD); self.rect(0, 292, 210, 5, 'F')
+        self.set_y(-18); self.set_font('Arial', 'B', 9); self.set_text_color(255, 255, 255)
+        self.cell(0, 5, "THANK YOU FOR YOUR BUSINESS", 0, 1, 'C')
+        self.set_font('Arial', '', 7); self.set_text_color(184, 134, 11)
+        self.cell(0, 4, f"Page {self.page_no()} | Generated by TTS System", 0, 0, 'C')
 
 def draw_table_header(pdf):
-    # Background header tabel navy
-    pdf.set_fill_color(*COLOR_NAVY)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font('Arial', 'B', 9)
-    pdf.set_draw_color(*COLOR_GOLD)
-    pdf.set_line_width(0.4)
-
-    pdf.cell(10,  10, 'NO',          border=1, align='C', fill=True)
-    pdf.cell(82,  10, 'DESKRIPSI',   border=1, align='C', fill=True)
-    pdf.cell(18,  10, 'QTY',         border=1, align='C', fill=True)
-    pdf.cell(20,  10, 'SATUAN',      border=1, align='C', fill=True)
-    pdf.cell(30,  10, 'HARGA',       border=1, align='C', fill=True)
-    pdf.cell(30,  10, 'TOTAL',       border=1, align='C', fill=True)
-    pdf.ln()
-
+    pdf.set_font('Arial', 'B', 9); pdf.set_text_color(255, 255, 255); pdf.set_fill_color(*COLOR_NAVY)
+    pdf.cell(10, 10, 'NO', 0, 0, 'C', True); pdf.cell(90, 10, 'DESCRIPTION', 0, 0, 'L', True)
+    pdf.cell(20, 10, 'QTY', 0, 0, 'C', True); pdf.cell(20, 10, 'UNIT', 0, 0, 'C', True)
+    pdf.cell(25, 10, 'PRICE', 0, 0, 'R', True); pdf.cell(25, 10, 'TOTAL', 0, 1, 'R', True)
 
 def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
-    # T&C block tingginya sekitar 58mm, area total ~35mm, margin bawah 25mm
-    # Gunakan 2-pass: render dulu tanpa total_pages, hitung, render ulang
-    def _render(pdf):
-        pdf.set_margins(10, 70, 10)
-        pdf.set_auto_page_break(auto=True, margin=28)
-        pdf.add_page()
-
-        # ── Judul QUOTATION ──
-        pdf.set_y(62)
-        pdf.set_font('Arial', 'B', 26)
-        pdf.set_text_color(*COLOR_NAVY)
-        pdf.cell(0, 10, "QUOTATION", ln=1, align='R')
-
-        pdf.set_draw_color(*COLOR_GOLD)
-        pdf.set_line_width(0.8)
-        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-        pdf.ln(2)
-
-        waktu_skrg  = datetime.utcnow() + timedelta(hours=7)
-        expiry_date = waktu_skrg + timedelta(days=7)
-        pdf.set_font('Arial', '', 8.5)
-        pdf.set_text_color(100, 100, 100)
-        pdf.cell(0, 5, f"No. Surat   : {no_surat}", ln=1, align='R')
-        pdf.cell(0, 5, f"Tanggal      : {waktu_skrg.strftime('%d %B %Y')}", ln=1, align='R')
-        pdf.cell(0, 5, f"Berlaku s/d  : {expiry_date.strftime('%d %B %Y')}", ln=1, align='R')
-        pdf.ln(4)
-
-        # ── Info Customer ──
-        pdf.set_x(10)
-        pdf.set_font('Arial', 'B', 7.5)
-        pdf.set_text_color(*COLOR_GOLD)
-        pdf.cell(90, 5, "DITUJUKAN KEPADA:", ln=1)
-
-        pdf.set_x(10)
-        pdf.set_font('Arial', 'B', 13)
-        pdf.set_text_color(*COLOR_NAVY)
-        pdf.cell(90, 7, str(nama_cust).upper(), ln=1)
-
-        pdf.set_x(10)
-        pdf.set_font('Arial', '', 9)
-        pdf.set_text_color(*COLOR_TEXT)
-        pdf.cell(90, 5, f"U/P: {pic}", ln=1)
-        pdf.ln(6)
-
-        # ── Tabel ──
-        draw_table_header(pdf)
-        pdf.set_font('Arial', '', 9)
-        pdf.set_text_color(*COLOR_TEXT)
-
-        for i, row in df_order.iterrows():
-            # Cek apakah baris berikutnya + area total + T&C masih muat
-            # Estimasi ruang yang dibutuhkan setelah tabel: ~100mm
-            if pdf.get_y() > 170:
-                pdf.add_page()
-                draw_table_header(pdf)
-                pdf.set_font('Arial', '', 9)
-                pdf.set_text_color(*COLOR_TEXT)
-
-            if i % 2 == 0:
-                pdf.set_fill_color(240, 245, 252)
-            else:
-                pdf.set_fill_color(255, 255, 255)
-
-            pdf.set_draw_color(180, 195, 215)
-            pdf.set_line_width(0.2)
-
-            pdf.cell(10, 8, str(i + 1),               border=1, align='C', fill=True)
-            pdf.cell(82, 8, f" {str(row['Nama Barang'])}", border=1, align='L', fill=True)
-            pdf.cell(18, 8, str(int(row['Qty'])),      border=1, align='C', fill=True)
-            pdf.cell(20, 8, str(row['Satuan']),        border=1, align='C', fill=True)
-            pdf.cell(30, 8, f"Rp {row['Harga']:,.0f}", border=1, align='R', fill=True)
-            pdf.cell(30, 8, f"Rp {row['Total_Row']:,.0f}", border=1, align='R', fill=True)
-            pdf.ln()
-
-        # ── Area Total ──
-        pdf.ln(4)
-        pdf.set_draw_color(*COLOR_GOLD)
-        pdf.set_line_width(0.6)
-        pdf.line(120, pdf.get_y(), 200, pdf.get_y())
-        pdf.ln(3)
-
-        pdf.set_font('Arial', '', 9)
-        pdf.set_text_color(*COLOR_TEXT)
-        pdf.set_x(120)
-        pdf.cell(50, 7, "Sub Total", align='L')
-        pdf.cell(30, 7, f"Rp {subtotal:,.0f}", align='R', ln=1)
-
-        pdf.set_x(120)
-        pdf.cell(50, 7, "PPN 11%", align='L')
-        pdf.cell(30, 7, f"Rp {ppn:,.0f}", align='R', ln=1)
-
-        pdf.set_draw_color(*COLOR_NAVY)
-        pdf.set_line_width(0.4)
-        pdf.line(120, pdf.get_y(), 200, pdf.get_y())
-        pdf.ln(1)
-
-        pdf.set_fill_color(*COLOR_NAVY)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font('Arial', 'B', 10)
-        pdf.set_x(120)
-        pdf.cell(50, 10, "  GRAND TOTAL", border=0, align='L', fill=True)
-        pdf.cell(30, 10, f"Rp {grand_total:,.0f}  ", border=0, align='R', fill=True, ln=1)
-
-        pdf.set_draw_color(*COLOR_GOLD)
-        pdf.set_line_width(0.8)
-        pdf.line(120, pdf.get_y(), 200, pdf.get_y())
-
-        # ── Cek ruang untuk T&C — tinggi blok T&C = 62mm ──
-        TC_HEIGHT = 62
-        BOTTOM_LIMIT = 297 - 28  # A4 - margin bawah = 269mm
-        if pdf.get_y() + 10 + TC_HEIGHT > BOTTOM_LIMIT:
-            pdf.add_page()
-            pdf.set_y(68)
-        else:
-            pdf.ln(10)
-
-        # ── T&C + Marketing dalam 1 blok sejajar ──
-        y_tc = pdf.get_y()
-
-        # Kotak T&C kiri
-        pdf.set_fill_color(248, 250, 253)
-        pdf.set_draw_color(*COLOR_NAVY)
-        pdf.set_line_width(0.4)
-        pdf.rect(10, y_tc, 120, TC_HEIGHT, 'DF')
-
-        pdf.set_y(y_tc + 3)
-        pdf.set_x(13)
-        pdf.set_font('Arial', 'B', 9)
-        pdf.set_text_color(*COLOR_NAVY)
-        pdf.cell(116, 5, "SYARAT & KETENTUAN:", ln=1)
-
-        pdf.set_draw_color(*COLOR_GOLD)
-        pdf.set_line_width(0.5)
-        pdf.line(13, pdf.get_y(), 127, pdf.get_y())
-        pdf.ln(2)
-
-        pdf.set_x(13)
-        pdf.set_font('Arial', '', 8.5)
-        pdf.set_text_color(50, 50, 50)
-        terms = (
-            "1. Harga dapat berubah sewaktu-waktu tanpa pemberitahuan.\n"
-            "2. Penawaran berlaku 7 hari dari tanggal surat.\n"
-            "3. Pengiriman 1 hari kerja setelah konfirmasi PO.\n"
-            "4. Pembayaran ditransfer HANYA ke rekening berikut:\n"
-            "   Bank       : Bank Mandiri\n"
-            "   No. Rek    : 1550010174996\n"
-            "   Atas Nama  : PT THEA THEO STATIONARY"
-        )
-        # Gunakan set_x sebelum multi_cell agar tidak overflow ke kanan
-        pdf.set_x(13)
-        pdf.multi_cell(114, 5.5, terms)
-
-        # Info Marketing (kanan, sejajar T&C)
-        pdf.set_y(y_tc + 3)
-        pdf.set_x(138)
-        pdf.set_font('Arial', 'B', 8.5)
-        pdf.set_text_color(*COLOR_GOLD)
-        pdf.cell(60, 5, "MARKETING:", ln=1)
-
-        # Tanda tangan + stempel logo (digabung on-the-fly)
-        ttd_path = "ttd_clean.png"
-        if os.path.exists(ttd_path):
-            try:
-                from PIL import Image as PILImage
-                import numpy as _np, io as _io
-                ttd_img = PILImage.open(ttd_path).convert("RGBA")
-                if os.path.exists("logo.png"):
-                    logo_img = PILImage.open("logo.png").convert("RGBA")
-                    lw = int(ttd_img.width * 0.45)
-                    lh = int(logo_img.height * lw / logo_img.width)
-                    logo_img = logo_img.resize((lw, lh), PILImage.LANCZOS)
-                    logo_arr = _np.array(logo_img)
-                    logo_arr[:,:,3] = (logo_arr[:,:,3] * 0.30).astype(_np.uint8)
-                    logo_faded = PILImage.fromarray(logo_arr)
-                    lx = (ttd_img.width - lw) // 2
-                    ly = max(0, ttd_img.height - lh - 5)
-                    canvas = ttd_img.copy()
-                    canvas.paste(logo_faded, (lx, ly), logo_faded)
-                    buf = _io.BytesIO()
-                    canvas.save(buf, format="PNG")
-                    buf.seek(0)
-                    pdf.image(buf, x=133, y=pdf.get_y() + 1, w=50)
-                else:
-                    pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
-            except Exception:
-                pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
-            pdf.set_y(pdf.get_y() + 30)
-        else:
-            pdf.ln(10)
-
-        pdf.set_x(138)
-        pdf.set_font('Arial', 'B', 12)
-        pdf.set_text_color(*COLOR_NAVY)
-        pdf.cell(60, 7, MARKETING_NAME.upper(), ln=1)
-
-        pdf.set_x(138)
-        pdf.set_font('Arial', '', 8.5)
-        pdf.set_text_color(*COLOR_TEXT)
-        pdf.cell(60, 5, f"WA    : {MARKETING_WA}", ln=1)
-        pdf.set_x(138)
-        pdf.cell(60, 5, f"Email : {MARKETING_EMAIL}", ln=1)
-
-    # Pass 1: hitung jumlah halaman
-    pdf1 = PenawaranPDF(total_pages=99)
-    _render(pdf1)
-    total_pages = pdf1.page
-
-    # Pass 2: render final dengan total_pages yang benar
-    pdf2 = PenawaranPDF(total_pages=total_pages)
-    _render(pdf2)
-
-    return pdf2.output(dest='S').encode('latin-1')
+    pdf = PenawaranPDF(); pdf.set_margins(10, 70, 10); pdf.set_auto_page_break(auto=True, margin=30); pdf.add_page()
+    pdf.set_y(70); pdf.set_font('Arial', 'B', 24); pdf.set_text_color(*COLOR_NAVY); pdf.cell(0, 10, "QUOTATION", ln=1, align='R')
+    pdf.set_font('Arial', '', 9); pdf.set_text_color(120, 120, 120); pdf.cell(0, 5, f"Reference: {no_surat}", ln=1, align='R')
+    waktu_skrg = datetime.utcnow() + timedelta(hours=7)
+    pdf.cell(0, 5, f"Date: {waktu_skrg.strftime('%d %B %Y')}", ln=1, align='R')
+    pdf.set_y(70); pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_GOLD); pdf.cell(0, 5, "PREPARED FOR:", ln=1)
+    pdf.set_font('Arial', 'B', 13); pdf.set_text_color(*COLOR_TEXT); pdf.cell(0, 7, str(nama_cust).upper(), ln=1)
+    pdf.set_font('Arial', '', 10); pdf.cell(0, 5, f"Attention: {pic}", ln=1); pdf.ln(10)
+    draw_table_header(pdf)
+    pdf.set_font('Arial', '', 9); pdf.set_text_color(*COLOR_TEXT)
+    fill = False
+    for i, row in df_order.iterrows():
+        if pdf.get_y() > 240:
+            pdf.add_page(); draw_table_header(pdf); pdf.set_font('Arial', '', 9); pdf.set_text_color(*COLOR_TEXT)
+        pdf.set_fill_color(248, 249, 252) if fill else pdf.set_fill_color(255, 255, 255)
+        pdf.cell(10, 8, str(i+1), 0, 0, 'C', True); pdf.cell(90, 8, f" {row['Nama Barang']}", 0, 0, 'L', True)
+        pdf.cell(20, 8, str(int(row['Qty'])), 0, 0, 'C', True); pdf.cell(20, 8, str(row['Satuan']), 0, 0, 'C', True)
+        pdf.cell(25, 8, f"{row['Harga']:,.0f} ", 0, 0, 'R', True); pdf.cell(25, 8, f"{row['Total_Row']:,.0f} ", 0, 1, 'R', True)
+        pdf.set_draw_color(184, 134, 11); pdf.set_line_width(0.1); pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+        fill = not fill
+    if pdf.get_y() > 220: pdf.add_page()
+    pdf.ln(5); pdf.set_x(130); pdf.set_font('Arial', 'B', 10)
+    pdf.cell(45, 8, "Sub Total", 0, 0, 'L'); pdf.cell(25, 8, f" {subtotal:,.0f}", 0, 1, 'R')
+    pdf.set_x(130); pdf.cell(45, 8, "VAT (PPN 11%)", 0, 0, 'L'); pdf.cell(25, 8, f" {ppn:,.0f}", 0, 1, 'R')
+    pdf.set_x(130); pdf.set_fill_color(*COLOR_NAVY); pdf.set_text_color(255, 255, 255)
+    pdf.cell(70, 10, f" TOTAL IDR {grand_total:,.0f} ", 0, 1, 'R', True)
+    pdf.ln(10); pdf.set_font('Arial', 'B', 9); pdf.set_text_color(*COLOR_NAVY); pdf.cell(0, 5, "TERMS & CONDITIONS:", ln=1)
+    pdf.set_font('Arial', '', 8); pdf.set_text_color(100, 100, 100)
+    pdf.multi_cell(0, 5, "Notes & Payment Terms:\n1. Prices are subject to change without notice.\n2. Validity: 7 Days from date of quotation.\n3. Delivery: Within 1 working day after PO confirmation.\n4. Payments must be transferred ONLY to the following account:\n   Bank Name     : Bank Mandiri\n   Account No.   : 1550010174996\n   Account Name  : PT THEA THEO STATIONARY")
+    pdf.ln(10); pdf.set_font('Arial', '', 10); pdf.set_text_color(*COLOR_TEXT)
+    pdf.cell(130, 5, "", 0, 0); pdf.cell(60, 5, "Yours Faithfully,", 0, 1, 'C')
+    pdf.ln(15)
+    pdf.set_font('Arial', 'B', 10); pdf.set_text_color(*COLOR_NAVY)
+    pdf.cell(130, 5, "", 0, 0); pdf.cell(60, 5, MARKETING_NAME.upper(), 0, 1, 'C')
+    pdf.set_font('Arial', '', 9); pdf.set_text_color(100, 100, 100)
+    pdf.cell(130, 5, "", 0, 0); pdf.cell(60, 5, "Sales Consultant", 0, 1, 'C')
+    return pdf.output(dest='S').encode('latin-1')
 
 
 # =========================================================
@@ -930,7 +661,7 @@ elif menu == "📝 Admin Sales":
 elif menu == "👨‍💻 Sales Dashboard":
     render_header("Sales Dashboard", f"Kelola antrean · {MARKETING_NAME}", "🔐 Admin Only")
 
-    # ── BELUM LOGIN ──
+    # ── BELUM LOGIN: hanya tampilkan form password, TIDAK ADA akses lain ──
     if not st.session_state.admin_logged_in:
         st.markdown("<br>", unsafe_allow_html=True)
         _, mid_col, _ = st.columns([1, 2, 1])
@@ -959,19 +690,15 @@ elif menu == "👨‍💻 Sales Dashboard":
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── SUDAH LOGIN ──
+    # ── SUDAH LOGIN: tampilkan dashboard + update DB (semua di balik password) ──
     else:
-        col_inf, col_out, col_ref = st.columns([3, 1, 1])
+        col_inf, col_out = st.columns([4, 1])
         col_inf.success(f"✅ Login sebagai **{MARKETING_NAME}**")
         if col_out.button("🚪 Logout", use_container_width=True, key="btn_logout"):
             st.session_state.admin_logged_in = False
             st.rerun()
-        if col_ref.button("🔄 Refresh", use_container_width=True, key="btn_refresh"):
-            st.session_state.saved_items_cache = {}
-            st.cache_data.clear()
-            st.rerun()
 
-        # ── Update Database Barang ──
+        # ── Update Database Barang — HANYA tampil setelah login berhasil ──
         with st.expander("📁 Update Database Barang (.csv)", expanded=False):
             st.caption("Upload file CSV baru untuk mengganti database produk.")
             up_f2 = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="csv_up_login")
@@ -1037,27 +764,18 @@ elif menu == "👨‍💻 Sales Dashboard":
                                 except:
                                     items_list = []
 
-                                if real_row_idx in st.session_state.saved_items_cache:
-                                    items_list = st.session_state.saved_items_cache[real_row_idx]
-
                                 render_section_title("📝 Edit Daftar Barang")
                                 st.caption("💡 Ubah **Pos** untuk urutan. Centang 🗑️ untuk hapus.")
 
                                 for i, r in enumerate(items_list):
                                     nama_item = r['Nama Barang']
                                     u_k = item_key(real_row_idx, nama_item)
-                                    if f"h_{u_k}" not in st.session_state:
-                                        st.session_state[f"h_{u_k}"] = int(float(r.get('Harga', 0)))
-                                    if f"s_{u_k}" not in st.session_state:
-                                        st.session_state[f"s_{u_k}"] = str(r.get('Satuan', 'Pcs')).strip()
-                                    if f"q_{u_k}" not in st.session_state:
-                                        st.session_state[f"q_{u_k}"] = int(r.get('Qty', 1))
-                                    if f"p_{u_k}" not in st.session_state:
-                                        st.session_state[f"p_{u_k}"] = float(i + 1)
-                                    if f"m_{u_k}" not in st.session_state:
-                                        st.session_state[f"m_{u_k}"] = "Pcs/Tetap"
-                                    if f"isi_{u_k}" not in st.session_state:
-                                        st.session_state[f"isi_{u_k}"] = 10
+                                    if f"h_{u_k}" not in st.session_state: st.session_state[f"h_{u_k}"] = int(float(r.get('Harga', 0)))
+                                    if f"s_{u_k}" not in st.session_state: st.session_state[f"s_{u_k}"] = str(r.get('Satuan', 'Pcs')).strip()
+                                    if f"q_{u_k}" not in st.session_state: st.session_state[f"q_{u_k}"] = int(r.get('Qty', 1))
+                                    if f"p_{u_k}" not in st.session_state: st.session_state[f"p_{u_k}"] = float(i + 1)
+                                    if f"m_{u_k}" not in st.session_state: st.session_state[f"m_{u_k}"] = "Pcs/Tetap"
+                                    if f"isi_{u_k}" not in st.session_state: st.session_state[f"isi_{u_k}"] = 10
 
                                 temp_up   = []
                                 list_mode = ["Pcs/Tetap", "Lusin (12)", "Dus", "Box", "Pack", "Set", "Rim"]
@@ -1070,12 +788,10 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     satuan_master= str(row_master['Satuan'].values[0]).strip() if not row_master.empty else str(r.get('Satuan', 'Pcs'))
 
                                     with st.container(border=True):
-                                        harga_tersimpan  = st.session_state.get(f"h_{u_k}", int(float(r.get('Harga', 0))))
-                                        satuan_tersimpan = st.session_state.get(f"s_{u_k}", str(r.get('Satuan', '')))
                                         st.markdown(
                                             f"<span style='color:#002855;font-weight:700;font-size:0.95rem;'>{nama_item}</span><br>"
                                             f"<span style='color:#5a7a9a;font-size:0.75rem;'>📋 Master: Rp {harga_master:,.0f} / {satuan_master}</span><br>"
-                                            f"<span style='color:#B8860B;font-size:0.75rem;font-weight:600;'>💾 Tersimpan: Rp {harga_tersimpan:,.0f} / {satuan_tersimpan}</span>",
+                                            f"<span style='color:#B8860B;font-size:0.75rem;font-weight:600;'>💾 Tersimpan: Rp {int(r.get('Harga',0)):,.0f} / {str(r.get('Satuan',''))}</span>",
                                             unsafe_allow_html=True
                                         )
                                         st.markdown("")
@@ -1120,35 +836,18 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     for p in add_b:
                                         rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
                                         final.append({"Nama": p, "Qty": 1, "Harga": float(rb['Harga']), "Sat": str(rb['Satuan'])})
-                                    save_data = [
-                                        {
-                                            "Nama Barang": x['Nama'],
-                                            "Qty": x['Qty'],
-                                            "Harga": x['Harga'],
-                                            "Satuan": x['Sat'],
-                                            "Total_Row": x['Qty'] * x['Harga']
-                                        }
-                                        for x in final
-                                    ]
+                                    save_data = [{"Nama Barang": x['Nama'], "Qty": x['Qty'], "Harga": x['Harga'], "Satuan": x['Sat'], "Total_Row": x['Qty'] * x['Harga']} for x in final]
+                                    sheet.update_cell(real_row_idx, 5, str(save_data))
+                                    st.cache_data.clear()
+                                    clear_row_state(real_row_idx)
+                                    st.success(f"✅ Tersimpan! {len(save_data)} barang.")
+                                    time.sleep(0.8); st.rerun()
 
-                                    with st.spinner("Menyimpan ke Google Sheets..."):
-                                        ok, msg = save_to_gsheet_verified(sheet, real_row_idx, save_data)
-
-                                    if ok:
-                                        st.session_state.saved_items_cache[real_row_idx] = save_data
-                                        clear_row_state(real_row_idx)
-                                        st.success(f"✅ Tersimpan & terverifikasi! {len(save_data)} barang.")
-                                        time.sleep(1)
-                                        st.rerun()
-                                    else:
-                                        st.error(f"⚠️ Simpan gagal: {msg}. Coba lagi.")
-
-                                if real_row_idx in st.session_state.saved_items_cache:
-                                    current_items = st.session_state.saved_items_cache[real_row_idx]
-                                else:
-                                    current_items = read_row_fresh(sheet, real_row_idx)
-                                    if not current_items:
-                                        current_items = items_list
+                                try:
+                                    current_row_data = sheet.row_values(real_row_idx)
+                                    current_items    = ast.literal_eval(current_row_data[4]) if len(current_row_data) > 4 else items_list
+                                except:
+                                    current_items = items_list
 
                                 if current_items:
                                     f_df = pd.DataFrame(current_items)
@@ -1185,8 +884,6 @@ elif menu == "👨‍💻 Sales Dashboard":
                                                  key=f"done_btn_{real_row_idx}",
                                                  type="primary", use_container_width=True):
                                         sheet.update_cell(real_row_idx, 6, "Processed")
-                                        if real_row_idx in st.session_state.saved_items_cache:
-                                            del st.session_state.saved_items_cache[real_row_idx]
                                         st.success(f"✅ Penawaran {customer_val} selesai.")
                                         st.rerun()
                     else:
