@@ -700,14 +700,14 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
                 ttd_img = PILImage.open(ttd_path).convert("RGBA")
                 if os.path.exists("logo.png"):
                     logo_img = PILImage.open("logo.png").convert("RGBA")
-                    lw = int(ttd_img.width * 0.50)
+                    lw = int(ttd_img.width * 0.75)
                     lh = int(logo_img.height * lw / logo_img.width)
                     logo_img = logo_img.resize((lw, lh), PILImage.LANCZOS)
                     logo_arr = _np.array(logo_img)
-                    logo_arr[:,:,3] = (logo_arr[:,:,3] * 0.65).astype(_np.uint8)
+                    logo_arr[:,:,3] = (logo_arr[:,:,3] * 0.82).astype(_np.uint8)
                     logo_faded = PILImage.fromarray(logo_arr)
                     lx = (ttd_img.width - lw) // 2
-                    ly = max(0, ttd_img.height - lh - 5)
+                    ly = max(0, (ttd_img.height - lh) // 2)
                     canvas = ttd_img.copy()
                     canvas.paste(logo_faded, (lx, ly), logo_faded)
                     tmp_path = "/tmp/ttd_stamp_combined.png"
