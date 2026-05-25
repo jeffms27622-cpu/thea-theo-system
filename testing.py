@@ -697,7 +697,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.cell(60, 5, "MARKETING:", ln=1)
 
         # TTD height di PDF = 22mm, width proporsional
-        TTD_H_MM = 22
+        TTD_H_MM = 35
         ttd_path = "ttd_clean.png"
         y_ttd_start = pdf.get_y() + 1
 
