@@ -640,7 +640,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.line(120, pdf.get_y(), 200, pdf.get_y())
 
         # ── Cek ruang untuk T&C — tinggi blok T&C = 62mm ──
-        TC_HEIGHT = 62
+        TC_HEIGHT = 55
         BOTTOM_LIMIT = 297 - 28  # A4 - margin bawah = 269mm
         if pdf.get_y() + 10 + TC_HEIGHT > BOTTOM_LIMIT:
             pdf.add_page()
@@ -697,7 +697,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.cell(60, 5, "MARKETING:", ln=1)
 
         # TTD height di PDF = 22mm, width proporsional
-        TTD_H_MM = 35
+        TTD_H_MM = 42
         ttd_path = "ttd_clean.png"
         y_ttd_start = pdf.get_y() + 1
 
@@ -712,17 +712,9 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
 
                 if os.path.exists("logo.png"):
                     logo_img = PILImage.open("logo.png").convert("RGBA")
-                    # Logo proporsional: maks lebar 80% TTD DAN maks tinggi 45% TTD
-                    max_lw = int(ttd_w_px * 0.80)
-                    max_lh = int(ttd_h_px * 0.45)
-                    # Scale berdasarkan aspek ratio logo
-                    logo_ratio = logo_img.width / logo_img.height
-                    lw_from_h = int(max_lh * logo_ratio)
-                    lh_from_w = int(max_lw / logo_ratio)
-                    if lw_from_h <= max_lw:
-                        lw, lh = lw_from_h, max_lh
-                    else:
-                        lw, lh = max_lw, lh_from_w
+                    # Logo 60% lebar TTD, proporsional
+                    lw = int(ttd_w_px * 0.60)
+                    lh = int(logo_img.height * lw / logo_img.width)
                     logo_img = logo_img.resize((lw, lh), PILImage.LANCZOS)
                     logo_arr = _np.array(logo_img)
                     logo_arr[:,:,3] = (logo_arr[:,:,3] * 0.80).astype(_np.uint8)
