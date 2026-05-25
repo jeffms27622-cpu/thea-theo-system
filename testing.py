@@ -704,7 +704,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
                     lh = int(logo_img.height * lw / logo_img.width)
                     logo_img = logo_img.resize((lw, lh), PILImage.LANCZOS)
                     logo_arr = _np.array(logo_img)
-                    logo_arr[:,:,3] = (logo_arr[:,:,3] * 0.28).astype(_np.uint8)
+                    logo_arr[:,:,3] = (logo_arr[:,:,3] * 0.65).astype(_np.uint8)
                     logo_faded = PILImage.fromarray(logo_arr)
                     lx = (ttd_img.width - lw) // 2
                     ly = max(0, ttd_img.height - lh - 5)
