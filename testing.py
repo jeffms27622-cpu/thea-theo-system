@@ -712,9 +712,17 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
 
                 if os.path.exists("logo.png"):
                     logo_img = PILImage.open("logo.png").convert("RGBA")
-                    # Logo proporsional: tinggi 60% tinggi TTD
-                    lh = int(ttd_h_px * 0.60)
-                    lw = int(logo_img.width * lh / logo_img.height)
+                    # Logo proporsional: maks lebar 80% TTD DAN maks tinggi 45% TTD
+                    max_lw = int(ttd_w_px * 0.80)
+                    max_lh = int(ttd_h_px * 0.45)
+                    # Scale berdasarkan aspek ratio logo
+                    logo_ratio = logo_img.width / logo_img.height
+                    lw_from_h = int(max_lh * logo_ratio)
+                    lh_from_w = int(max_lw / logo_ratio)
+                    if lw_from_h <= max_lw:
+                        lw, lh = lw_from_h, max_lh
+                    else:
+                        lw, lh = max_lw, lh_from_w
                     logo_img = logo_img.resize((lw, lh), PILImage.LANCZOS)
                     logo_arr = _np.array(logo_img)
                     logo_arr[:,:,3] = (logo_arr[:,:,3] * 0.80).astype(_np.uint8)
