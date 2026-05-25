@@ -691,11 +691,34 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.set_text_color(*COLOR_GOLD)
         pdf.cell(60, 5, "MARKETING:", ln=1)
 
-        # Tanda tangan image
+        # Tanda tangan + stempel logo (digabung on-the-fly)
         ttd_path = "ttd_clean.png"
         if os.path.exists(ttd_path):
-            pdf.image(ttd_path, x=138, y=pdf.get_y() + 1, w=38)
-            pdf.set_y(pdf.get_y() + 22)
+            try:
+                from PIL import Image as PILImage
+                import numpy as _np, io as _io
+                ttd_img = PILImage.open(ttd_path).convert("RGBA")
+                if os.path.exists("logo.png"):
+                    logo_img = PILImage.open("logo.png").convert("RGBA")
+                    lw = int(ttd_img.width * 0.45)
+                    lh = int(logo_img.height * lw / logo_img.width)
+                    logo_img = logo_img.resize((lw, lh), PILImage.LANCZOS)
+                    logo_arr = _np.array(logo_img)
+                    logo_arr[:,:,3] = (logo_arr[:,:,3] * 0.30).astype(_np.uint8)
+                    logo_faded = PILImage.fromarray(logo_arr)
+                    lx = (ttd_img.width - lw) // 2
+                    ly = max(0, ttd_img.height - lh - 5)
+                    canvas = ttd_img.copy()
+                    canvas.paste(logo_faded, (lx, ly), logo_faded)
+                    buf = _io.BytesIO()
+                    canvas.save(buf, format="PNG")
+                    buf.seek(0)
+                    pdf.image(buf, x=133, y=pdf.get_y() + 1, w=50)
+                else:
+                    pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
+            except Exception:
+                pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
+            pdf.set_y(pdf.get_y() + 30)
         else:
             pdf.ln(10)
 
