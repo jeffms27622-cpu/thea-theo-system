@@ -1173,7 +1173,7 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     st.metric("PPN 11%", f"Rp {tax:,.0f}")
                                     st.markdown("<br>", unsafe_allow_html=True)
 
-                                    no_s = st.text_input("📄 Nomor Surat:", value="/S-TTS/V/2026", key=f"ns_print_{real_row_idx}")
+                                    no_s = st.text_input("📄 Nomor Surat:", value="/S-TTS/VI/2026", key=f"ns_print_{real_row_idx}")
 
                                     b1, b2 = st.columns(2)
                                     pdf_data = generate_pdf(no_s, customer_val, up_val, f_df, subt, tax, gtot)
