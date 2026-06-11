@@ -810,36 +810,13 @@ elif menu == "📝 Admin Sales":
 
     render_section_title("📦 Tambah Barang ke Keranjang")
     with st.container(border=True):
-        # ── FIX 1: text_input search dulu, baru selectbox subset kecil ──
-        keyword = st.text_input(
-            "🔍 Cari nama barang:",
-            placeholder="Ketik min. 2 huruf, contoh: spidol, hvs, map...",
-            key=f"search_kw_{st.session_state.widget_id}"
+        # ── Selectbox tunggal persis seperti semula, tapi list-nya pure Python
+        # yang sudah di-cache → tidak rebuild tiap rerun, jauh lebih ringan ──
+        pilihan_barang = st.selectbox(
+            "🔍 Cari & Pilih Nama Barang:",
+            options=[""] + NAMA_BARANG_LIST,
+            key=f"pilih_brg_{st.session_state.widget_id}"
         )
-
-        pilihan_barang = ""
-
-        if len(keyword) >= 2:
-            kw_lower = keyword.lower()
-            filtered_names = [n for n in NAMA_BARANG_LIST if kw_lower in n.lower()]
-
-            if not filtered_names:
-                st.warning("⚠️ Barang tidak ditemukan. Coba kata kunci lain.")
-            elif len(filtered_names) == 1:
-                pilihan_barang = filtered_names[0]
-                st.success(f"✅ Ditemukan: **{pilihan_barang}**")
-            else:
-                st.caption(f"Ditemukan {len(filtered_names)} barang — pilih salah satu:")
-                pilihan_barang = st.selectbox(
-                    "Pilih barang:",
-                    options=[""] + filtered_names[:80],
-                    key=f"pilih_brg_{st.session_state.widget_id}"
-                )
-        else:
-            st.markdown("""<div style="text-align:center; padding:20px 0; color:#7a9ab8;">
-                <div style="font-size:2rem; margin-bottom:8px;">🔍</div>
-                <div style="font-size:0.88rem; color:#5a7a9a;">Ketik minimal 2 huruf untuk mencari barang</div>
-            </div>""", unsafe_allow_html=True)
 
         if pilihan_barang and pilihan_barang != "":
             row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
@@ -1116,24 +1093,12 @@ elif menu == "👨‍💻 Sales Dashboard":
 
                                 st.markdown("---")
 
-                                # ── FIX 1: multiselect tambah barang pakai search dulu ──
-                                add_kw = st.text_input(
-                                    "🔍 Cari barang untuk ditambahkan:",
-                                    placeholder="Ketik min. 2 huruf...",
-                                    key=f"add_kw_{real_row_idx}"
+                                add_b = st.multiselect(
+                                    "➕ Tambah Barang Baru:",
+                                    options=NAMA_BARANG_LIST,
+                                    key=f"add_new_{real_row_idx}",
+                                    placeholder="Pilih barang untuk ditambahkan..."
                                 )
-                                add_b = []
-                                if len(add_kw) >= 2:
-                                    add_filtered = [n for n in NAMA_BARANG_LIST if add_kw.lower() in n.lower()]
-                                    if add_filtered:
-                                        add_b = st.multiselect(
-                                            f"➕ Tambah Barang ({len(add_filtered)} hasil):",
-                                            options=add_filtered[:80],
-                                            key=f"add_new_{real_row_idx}",
-                                            placeholder="Pilih barang untuk ditambahkan..."
-                                        )
-                                    else:
-                                        st.caption("Barang tidak ditemukan.")
 
                                 if st.button("💾 SIMPAN PERUBAHAN DATA", key=f"btn_save_{real_row_idx}", use_container_width=True):
                                     final = sorted([x for x in temp_up if not x['del']], key=lambda x: x['pos'])
