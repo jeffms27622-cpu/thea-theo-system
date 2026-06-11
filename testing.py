@@ -331,9 +331,13 @@ def get_creds():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     return Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
 
-def connect_gsheet():
+# ── FIX 2: cache_resource untuk koneksi GSheets — koneksi dibuat sekali, reused ──
+@st.cache_resource
+def get_sheet():
     try:
-        client = gspread.authorize(get_creds())
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+        client = gspread.authorize(creds)
         sheet = client.open("Antrean Penawaran TTS").sheet1
         if not sheet.get_all_values():
             sheet.append_row(["Waktu", "Customer", "UP", "WA", "Pesanan", "Status", "Sales"])
@@ -357,6 +361,9 @@ def load_db():
 
 df_barang = load_db()
 
+# ── FIX 1: precompute list nama barang sekali saja ──
+NAMA_BARANG_LIST = df_barang['Nama Barang'].tolist()
+
 def item_key(row_idx, nama_barang):
     h = hashlib.md5(nama_barang.encode()).hexdigest()[:8]
     return f"r{row_idx}_{h}"
@@ -368,18 +375,18 @@ def clear_row_state(real_row_idx):
 
 def read_row_fresh(sheet, row_idx):
     try:
-        time.sleep(0.5)
         vals = sheet.row_values(row_idx)
         if len(vals) > 4 and vals[4].strip():
             return ast.literal_eval(vals[4])
         return []
-    except Exception as e:
+    except Exception:
         return []
 
 def save_to_gsheet_verified(sheet, row_idx, save_data):
     try:
         sheet.update_cell(row_idx, 5, str(save_data))
-        time.sleep(1.5)
+        # FIX 3: kurangi sleep seminimal mungkin, hanya untuk GSheets propagation
+        time.sleep(0.8)
         verify = sheet.row_values(row_idx)
         if len(verify) > 4:
             try:
@@ -436,7 +443,7 @@ menu = st.session_state.active_menu
 
 
 # =========================================================
-# PDF GENERATOR  ← REVISI VISUAL
+# PDF GENERATOR
 # =========================================================
 class PenawaranPDF(FPDF):
     def __init__(self, total_pages=1):
@@ -444,39 +451,31 @@ class PenawaranPDF(FPDF):
         self.total_pages = total_pages
 
     def header(self):
-        # Background navy penuh
         self.set_fill_color(*COLOR_NAVY)
         self.rect(0, 0, 210, 52, 'F')
 
-        # Strip putih area logo
         self.set_fill_color(255, 255, 255)
         self.rect(10, 6, 44, 40, 'F')
 
-        # Garis gold vertikal tebal sebagai pemisah
         self.set_fill_color(*COLOR_GOLD)
         self.rect(58, 0, 3, 52, 'F')
 
-        # Logo jika ada
         if os.path.exists("logo.png"):
             self.image("logo.png", 13, 10, 38)
 
-        # Nama perusahaan
         self.set_y(10); self.set_x(66)
         self.set_font('Arial', 'B', 17)
         self.set_text_color(255, 255, 255)
         self.cell(0, 8, COMPANY_NAME, ln=1)
 
-        # Slogan gold
         self.set_x(66)
         self.set_font('Arial', 'B', 8.5)
         self.set_text_color(*COLOR_GOLD)
         self.cell(0, 5, "  ".join(SLOGAN.upper()), ln=1)
 
-        # Garis tipis pemisah
         self.set_fill_color(255, 255, 255)
         self.rect(66, 26, 132, 0.3, 'F')
 
-        # Detail kontak
         self.set_y(29); self.set_x(66)
         self.set_font('Arial', '', 7.5)
         self.set_text_color(210, 220, 235)
@@ -486,7 +485,6 @@ class PenawaranPDF(FPDF):
         self.set_x(66)
         self.cell(0, 4.5, f"Email: {MARKETING_EMAIL}", ln=1)
 
-        # Garis gold bawah header
         self.set_fill_color(*COLOR_GOLD)
         self.rect(0, 52, 210, 2.5, 'F')
 
@@ -494,11 +492,9 @@ class PenawaranPDF(FPDF):
 
     def footer(self):
         self.set_y(-18)
-        # Garis gold atas footer
         self.set_fill_color(*COLOR_GOLD)
         self.rect(0, self.get_y(), 210, 1.5, 'F')
 
-        # Background navy footer
         self.set_fill_color(*COLOR_NAVY)
         self.rect(0, self.get_y() + 1.5, 210, 17, 'F')
 
@@ -515,7 +511,6 @@ class PenawaranPDF(FPDF):
 
 
 def draw_table_header(pdf):
-    # Background header tabel navy
     pdf.set_fill_color(*COLOR_NAVY)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font('Arial', 'B', 9)
@@ -532,14 +527,11 @@ def draw_table_header(pdf):
 
 
 def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
-    # T&C block tingginya sekitar 58mm, area total ~35mm, margin bawah 25mm
-    # Gunakan 2-pass: render dulu tanpa total_pages, hitung, render ulang
     def _render(pdf):
         pdf.set_margins(10, 70, 10)
         pdf.set_auto_page_break(auto=True, margin=28)
         pdf.add_page()
 
-        # ── Judul QUOTATION ──
         pdf.set_y(62)
         pdf.set_font('Arial', 'B', 26)
         pdf.set_text_color(*COLOR_NAVY)
@@ -559,7 +551,6 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.cell(0, 5, f"Berlaku s/d  : {expiry_date.strftime('%d %B %Y')}", ln=1, align='R')
         pdf.ln(4)
 
-        # ── Info Customer ──
         pdf.set_x(10)
         pdf.set_font('Arial', 'B', 7.5)
         pdf.set_text_color(*COLOR_GOLD)
@@ -576,14 +567,11 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.cell(90, 5, f"U/P: {pic}", ln=1)
         pdf.ln(6)
 
-        # ── Tabel ──
         draw_table_header(pdf)
         pdf.set_font('Arial', '', 9)
         pdf.set_text_color(*COLOR_TEXT)
 
         for i, row in df_order.iterrows():
-            # Cek apakah baris berikutnya + area total + T&C masih muat
-            # Estimasi ruang yang dibutuhkan setelah tabel: ~100mm
             if pdf.get_y() > 170:
                 pdf.add_page()
                 draw_table_header(pdf)
@@ -606,7 +594,6 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
             pdf.cell(30, 8, f"Rp {row['Total_Row']:,.0f}", border=1, align='R', fill=True)
             pdf.ln()
 
-        # ── Area Total ──
         pdf.ln(4)
         pdf.set_draw_color(*COLOR_GOLD)
         pdf.set_line_width(0.6)
@@ -639,19 +626,16 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.set_line_width(0.8)
         pdf.line(120, pdf.get_y(), 200, pdf.get_y())
 
-        # ── Cek ruang untuk T&C — tinggi blok T&C = 62mm ──
-        TC_HEIGHT = 55
-        BOTTOM_LIMIT = 297 - 28  # A4 - margin bawah = 269mm
+        TC_HEIGHT = 62
+        BOTTOM_LIMIT = 297 - 28
         if pdf.get_y() + 10 + TC_HEIGHT > BOTTOM_LIMIT:
             pdf.add_page()
             pdf.set_y(68)
         else:
             pdf.ln(10)
 
-        # ── T&C + Marketing dalam 1 blok sejajar ──
         y_tc = pdf.get_y()
 
-        # Kotak T&C kiri
         pdf.set_fill_color(248, 250, 253)
         pdf.set_draw_color(*COLOR_NAVY)
         pdf.set_line_width(0.4)
@@ -680,63 +664,48 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
             "   No. Rek    : 1550010174996\n"
             "   Atas Nama  : PT THEA THEO STATIONARY"
         )
-        # Gunakan set_x sebelum multi_cell agar tidak overflow ke kanan
         pdf.set_x(13)
         pdf.multi_cell(114, 5.5, terms)
 
-        # Info Marketing (kanan, sejajar T&C)
-        # ── Blok Marketing (kanan T&C) ──
-        # Layout: MARKETING label → TTD+stempel (kecil, proporsional) → nama → WA → email
-        # Semua teks di x=138, TTD di x=135 agar sedikit ke kiri dari label
-        y_mkt = y_tc + 3
-
-        pdf.set_y(y_mkt)
+        pdf.set_y(y_tc + 3)
         pdf.set_x(138)
         pdf.set_font('Arial', 'B', 8.5)
         pdf.set_text_color(*COLOR_GOLD)
         pdf.cell(60, 5, "MARKETING:", ln=1)
 
-        # TTD height di PDF = 22mm, width proporsional
-        TTD_H_MM = 42
         ttd_path = "ttd_clean.png"
-        y_ttd_start = pdf.get_y() + 1
-
         if os.path.exists(ttd_path):
             try:
                 from PIL import Image as PILImage
                 import numpy as _np
                 ttd_img = PILImage.open(ttd_path).convert("RGBA")
-                ttd_w_px, ttd_h_px = ttd_img.size
-                # Hitung lebar di PDF proporsional terhadap tinggi 22mm
-                ttd_w_mm = TTD_H_MM * ttd_w_px / ttd_h_px
-
                 if os.path.exists("logo.png"):
                     logo_img = PILImage.open("logo.png").convert("RGBA")
-                    # Logo 60% lebar TTD, proporsional
-                    lw = int(ttd_w_px * 0.60)
+                    lw = int(ttd_img.width * 0.75)
                     lh = int(logo_img.height * lw / logo_img.width)
                     logo_img = logo_img.resize((lw, lh), PILImage.LANCZOS)
                     logo_arr = _np.array(logo_img)
-                    logo_arr[:,:,3] = (logo_arr[:,:,3] * 0.80).astype(_np.uint8)
+                    logo_arr[:,:,3] = (logo_arr[:,:,3] * 0.82).astype(_np.uint8)
                     logo_faded = PILImage.fromarray(logo_arr)
-                    lx = (ttd_w_px - lw) // 2
-                    ly = max(0, (ttd_h_px - lh) // 2)
+                    lx = (ttd_img.width - lw) // 2
+                    ly = max(0, (ttd_img.height - lh) // 2)
                     canvas = ttd_img.copy()
                     canvas.paste(logo_faded, (lx, ly), logo_faded)
                     tmp_path = "/tmp/ttd_stamp_combined.png"
                     canvas.save(tmp_path)
-                    pdf.image(tmp_path, x=137, y=y_ttd_start, h=TTD_H_MM)
+                    pdf.image(tmp_path, x=133, y=pdf.get_y() + 1, w=50)
                 else:
-                    pdf.image(ttd_path, x=137, y=y_ttd_start, h=TTD_H_MM)
+                    pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
             except Exception:
-                pdf.image(ttd_path, x=137, y=y_ttd_start, h=TTD_H_MM)
+                pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
+            pdf.set_y(pdf.get_y() + 30)
+        else:
+            pdf.ln(10)
 
-        # Teks di bawah TTD
-        pdf.set_y(y_ttd_start + TTD_H_MM + 1)
         pdf.set_x(138)
-        pdf.set_font('Arial', 'B', 10)
+        pdf.set_font('Arial', 'B', 12)
         pdf.set_text_color(*COLOR_NAVY)
-        pdf.cell(60, 6, MARKETING_NAME.upper(), ln=1)
+        pdf.cell(60, 7, MARKETING_NAME.upper(), ln=1)
 
         pdf.set_x(138)
         pdf.set_font('Arial', '', 8.5)
@@ -745,12 +714,10 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.set_x(138)
         pdf.cell(60, 5, f"Email : {MARKETING_EMAIL}", ln=1)
 
-    # Pass 1: hitung jumlah halaman
     pdf1 = PenawaranPDF(total_pages=99)
     _render(pdf1)
     total_pages = pdf1.page
 
-    # Pass 2: render final dengan total_pages yang benar
     pdf2 = PenawaranPDF(total_pages=total_pages)
     _render(pdf2)
 
@@ -843,12 +810,38 @@ elif menu == "📝 Admin Sales":
 
     render_section_title("📦 Tambah Barang ke Keranjang")
     with st.container(border=True):
-        pilihan_barang = st.selectbox(
-            "🔍 Cari & Pilih Nama Barang:",
-            options=[""] + df_barang['Nama Barang'].tolist(),
-            key=f"pilih_brg_{st.session_state.widget_id}"
+        # ── FIX 1: text_input search dulu, baru selectbox subset kecil ──
+        keyword = st.text_input(
+            "🔍 Cari nama barang:",
+            placeholder="Ketik min. 2 huruf, contoh: spidol, hvs, map...",
+            key=f"search_kw_{st.session_state.widget_id}"
         )
-        if pilihan_barang != "":
+
+        pilihan_barang = ""
+
+        if len(keyword) >= 2:
+            kw_lower = keyword.lower()
+            filtered_names = [n for n in NAMA_BARANG_LIST if kw_lower in n.lower()]
+
+            if not filtered_names:
+                st.warning("⚠️ Barang tidak ditemukan. Coba kata kunci lain.")
+            elif len(filtered_names) == 1:
+                pilihan_barang = filtered_names[0]
+                st.success(f"✅ Ditemukan: **{pilihan_barang}**")
+            else:
+                st.caption(f"Ditemukan {len(filtered_names)} barang — pilih salah satu:")
+                pilihan_barang = st.selectbox(
+                    "Pilih barang:",
+                    options=[""] + filtered_names[:80],
+                    key=f"pilih_brg_{st.session_state.widget_id}"
+                )
+        else:
+            st.markdown("""<div style="text-align:center; padding:20px 0; color:#7a9ab8;">
+                <div style="font-size:2rem; margin-bottom:8px;">🔍</div>
+                <div style="font-size:0.88rem; color:#5a7a9a;">Ketik minimal 2 huruf untuk mencari barang</div>
+            </div>""", unsafe_allow_html=True)
+
+        if pilihan_barang and pilihan_barang != "":
             row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
             h_master = float(row_m['Harga']); satuan_db = str(row_m['Satuan']).strip()
 
@@ -885,12 +878,9 @@ elif menu == "📝 Admin Sales":
                     "Total_Row": float(qty_c * h_jual_c)
                 })
                 st.session_state.widget_id += 1
-                st.toast(f"✅ Ditambahkan: {pilihan_barang}"); time.sleep(0.2); st.rerun()
-        else:
-            st.markdown("""<div style="text-align:center; padding:20px 0; color:#7a9ab8;">
-                <div style="font-size:2rem; margin-bottom:8px;">🔍</div>
-                <div style="font-size:0.88rem; color:#5a7a9a;">Ketik atau klik dropdown di atas untuk mencari barang</div>
-            </div>""", unsafe_allow_html=True)
+                # FIX 3: hapus time.sleep sebelum rerun
+                st.toast(f"✅ Ditambahkan: {pilihan_barang}")
+                st.rerun()
 
     if st.session_state.cart:
         render_section_title(f"🛒 Keranjang ({len(st.session_state.cart)} item)")
@@ -924,12 +914,15 @@ elif menu == "📝 Admin Sales":
             if not nama_toko:
                 st.error("⚠️ Nama Toko/Perusahaan wajib diisi!")
             else:
-                sheet = connect_gsheet()
+                sheet = get_sheet()
                 if sheet:
                     wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
                     sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(st.session_state.cart), "Pending", MARKETING_NAME])
-                    st.balloons(); st.success(f"✅ Penawaran untuk **{nama_toko}** berhasil terkirim!")
-                    st.session_state.cart = []; time.sleep(1); st.rerun()
+                    st.balloons()
+                    st.success(f"✅ Penawaran untuk **{nama_toko}** berhasil terkirim!")
+                    st.session_state.cart = []
+                    # FIX 3: hapus time.sleep sebelum rerun
+                    st.rerun()
 
         if st.button("🗑️ Kosongkan Keranjang", use_container_width=True):
             st.session_state.cart = []; st.rerun()
@@ -980,6 +973,7 @@ elif menu == "👨‍💻 Sales Dashboard":
         if col_ref.button("🔄 Refresh", use_container_width=True, key="btn_refresh"):
             st.session_state.saved_items_cache = {}
             st.cache_data.clear()
+            # FIX 2: cache_resource tidak ikut di-clear agar koneksi tetap hidup
             st.rerun()
 
         # ── Update Database Barang ──
@@ -992,9 +986,11 @@ elif menu == "👨‍💻 Sales Dashboard":
                         f.write(up_f2.getbuffer())
                     st.cache_data.clear()
                     st.success("✅ Database berhasil diperbarui!")
-                    time.sleep(1); st.rerun()
+                    # FIX 3: hapus time.sleep sebelum rerun
+                    st.rerun()
 
-        sheet = connect_gsheet()
+        # FIX 2: pakai get_sheet() yang sudah di-cache
+        sheet = get_sheet()
         if sheet:
             try:
                 all_vals = sheet.get_all_values()
@@ -1119,12 +1115,25 @@ elif menu == "👨‍💻 Sales Dashboard":
                                         temp_up.append({"del": td, "pos": np_, "Nama": nama_item, "Qty": nq, "Harga": nh, "Sat": ns})
 
                                 st.markdown("---")
-                                add_b = st.multiselect(
-                                    "➕ Tambah Barang Baru:",
-                                    options=df_barang['Nama Barang'].tolist(),
-                                    key=f"add_new_{real_row_idx}",
-                                    placeholder="Pilih barang untuk ditambahkan..."
+
+                                # ── FIX 1: multiselect tambah barang pakai search dulu ──
+                                add_kw = st.text_input(
+                                    "🔍 Cari barang untuk ditambahkan:",
+                                    placeholder="Ketik min. 2 huruf...",
+                                    key=f"add_kw_{real_row_idx}"
                                 )
+                                add_b = []
+                                if len(add_kw) >= 2:
+                                    add_filtered = [n for n in NAMA_BARANG_LIST if add_kw.lower() in n.lower()]
+                                    if add_filtered:
+                                        add_b = st.multiselect(
+                                            f"➕ Tambah Barang ({len(add_filtered)} hasil):",
+                                            options=add_filtered[:80],
+                                            key=f"add_new_{real_row_idx}",
+                                            placeholder="Pilih barang untuk ditambahkan..."
+                                        )
+                                    else:
+                                        st.caption("Barang tidak ditemukan.")
 
                                 if st.button("💾 SIMPAN PERUBAHAN DATA", key=f"btn_save_{real_row_idx}", use_container_width=True):
                                     final = sorted([x for x in temp_up if not x['del']], key=lambda x: x['pos'])
@@ -1149,7 +1158,7 @@ elif menu == "👨‍💻 Sales Dashboard":
                                         st.session_state.saved_items_cache[real_row_idx] = save_data
                                         clear_row_state(real_row_idx)
                                         st.success(f"✅ Tersimpan & terverifikasi! {len(save_data)} barang.")
-                                        time.sleep(1)
+                                        # FIX 3: hapus time.sleep sebelum rerun
                                         st.rerun()
                                     else:
                                         st.error(f"⚠️ Simpan gagal: {msg}. Coba lagi.")
