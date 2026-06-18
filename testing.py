@@ -11,6 +11,7 @@ import time
 import hashlib
 
 MARKETING_NAME = "Asin"
+MARKETING_TITLE = "Spv Sales & Marketing"
 MARKETING_WA = "0815-8199-775"
 MARKETING_EMAIL = "alattulis.tts@gmail.com"
 COMPANY_NAME = "PT. THEA THEO STATIONARY"
@@ -331,13 +332,9 @@ def get_creds():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     return Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
 
-# ── FIX 2: cache_resource untuk koneksi GSheets — koneksi dibuat sekali, reused ──
-@st.cache_resource
-def get_sheet():
+def connect_gsheet():
     try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-        client = gspread.authorize(creds)
+        client = gspread.authorize(get_creds())
         sheet = client.open("Antrean Penawaran TTS").sheet1
         if not sheet.get_all_values():
             sheet.append_row(["Waktu", "Customer", "UP", "WA", "Pesanan", "Status", "Sales"])
@@ -361,9 +358,6 @@ def load_db():
 
 df_barang = load_db()
 
-# ── FIX 1: precompute list nama barang sekali saja ──
-NAMA_BARANG_LIST = df_barang['Nama Barang'].tolist()
-
 def item_key(row_idx, nama_barang):
     h = hashlib.md5(nama_barang.encode()).hexdigest()[:8]
     return f"r{row_idx}_{h}"
@@ -375,18 +369,18 @@ def clear_row_state(real_row_idx):
 
 def read_row_fresh(sheet, row_idx):
     try:
+        time.sleep(0.5)
         vals = sheet.row_values(row_idx)
         if len(vals) > 4 and vals[4].strip():
             return ast.literal_eval(vals[4])
         return []
-    except Exception:
+    except Exception as e:
         return []
 
 def save_to_gsheet_verified(sheet, row_idx, save_data):
     try:
         sheet.update_cell(row_idx, 5, str(save_data))
-        # FIX 3: kurangi sleep seminimal mungkin, hanya untuk GSheets propagation
-        time.sleep(0.8)
+        time.sleep(1.5)
         verify = sheet.row_values(row_idx)
         if len(verify) > 4:
             try:
@@ -667,6 +661,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.set_x(13)
         pdf.multi_cell(114, 5.5, terms)
 
+        # Info Marketing (kanan, sejajar T&C)
         pdf.set_y(y_tc + 3)
         pdf.set_x(138)
         pdf.set_font('Arial', 'B', 8.5)
@@ -696,7 +691,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
                     pdf.image(tmp_path, x=133, y=pdf.get_y() + 1, w=50)
                 else:
                     pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
-            except Exception:
+            except Exception as _e:
                 pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
             pdf.set_y(pdf.get_y() + 30)
         else:
@@ -707,6 +702,12 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.set_text_color(*COLOR_NAVY)
         pdf.cell(60, 7, MARKETING_NAME.upper(), ln=1)
 
+        # Jabatan
+        pdf.set_x(138)
+        pdf.set_font('Arial', 'I', 8.5)
+        pdf.set_text_color(*COLOR_TEXT)
+        pdf.cell(60, 4.5, MARKETING_TITLE, ln=1)
+
         pdf.set_x(138)
         pdf.set_font('Arial', '', 8.5)
         pdf.set_text_color(*COLOR_TEXT)
@@ -714,10 +715,12 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.set_x(138)
         pdf.cell(60, 5, f"Email : {MARKETING_EMAIL}", ln=1)
 
+    # Pass 1: hitung jumlah halaman
     pdf1 = PenawaranPDF(total_pages=99)
     _render(pdf1)
     total_pages = pdf1.page
 
+    # Pass 2: render final
     pdf2 = PenawaranPDF(total_pages=total_pages)
     _render(pdf2)
 
@@ -766,6 +769,11 @@ def generate_excel(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_tota
         worksheet.write(row_idx, 4, "Sub Total", fmt_total_label); worksheet.write(row_idx, 5, subtotal, fmt_money); row_idx += 1
         worksheet.write(row_idx, 4, "VAT (PPN 11%)", fmt_total_label); worksheet.write(row_idx, 5, ppn, fmt_money); row_idx += 1
         worksheet.write(row_idx, 4, "GRAND TOTAL", fmt_total_label); worksheet.write(row_idx, 5, grand_total, fmt_grand_total)
+
+        # Jabatan di Excel
+        worksheet.write(row_idx + 3, 0, MARKETING_NAME, workbook.add_format({'bold': True}))
+        worksheet.write(row_idx + 4, 0, MARKETING_TITLE, workbook.add_format({'italic': True, 'font_color': '#002855'}))
+
     return output.getvalue()
 
 
@@ -776,7 +784,7 @@ if menu == "🏠 Home":
     render_header(COMPANY_NAME, SLOGAN, f"📍 {ADDR.split(',')[0]}")
 
     c1, c2 = st.columns(2)
-    c1.metric("🧑‍💼 Marketing", MARKETING_NAME)
+    c1.metric("🧑‍💼 Marketing", f"{MARKETING_NAME} · {MARKETING_TITLE}")
     c2.metric("📞 WhatsApp", MARKETING_WA)
     c3, c4 = st.columns(2)
     c3.metric("📧 Email", "alattulis.tts")
@@ -810,15 +818,12 @@ elif menu == "📝 Admin Sales":
 
     render_section_title("📦 Tambah Barang ke Keranjang")
     with st.container(border=True):
-        # ── Selectbox tunggal persis seperti semula, tapi list-nya pure Python
-        # yang sudah di-cache → tidak rebuild tiap rerun, jauh lebih ringan ──
         pilihan_barang = st.selectbox(
             "🔍 Cari & Pilih Nama Barang:",
-            options=[""] + NAMA_BARANG_LIST,
+            options=[""] + df_barang['Nama Barang'].tolist(),
             key=f"pilih_brg_{st.session_state.widget_id}"
         )
-
-        if pilihan_barang and pilihan_barang != "":
+        if pilihan_barang != "":
             row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
             h_master = float(row_m['Harga']); satuan_db = str(row_m['Satuan']).strip()
 
@@ -855,9 +860,12 @@ elif menu == "📝 Admin Sales":
                     "Total_Row": float(qty_c * h_jual_c)
                 })
                 st.session_state.widget_id += 1
-                # FIX 3: hapus time.sleep sebelum rerun
-                st.toast(f"✅ Ditambahkan: {pilihan_barang}")
-                st.rerun()
+                st.toast(f"✅ Ditambahkan: {pilihan_barang}"); time.sleep(0.2); st.rerun()
+        else:
+            st.markdown("""<div style="text-align:center; padding:20px 0; color:#7a9ab8;">
+                <div style="font-size:2rem; margin-bottom:8px;">🔍</div>
+                <div style="font-size:0.88rem; color:#5a7a9a;">Ketik atau klik dropdown di atas untuk mencari barang</div>
+            </div>""", unsafe_allow_html=True)
 
     if st.session_state.cart:
         render_section_title(f"🛒 Keranjang ({len(st.session_state.cart)} item)")
@@ -891,15 +899,12 @@ elif menu == "📝 Admin Sales":
             if not nama_toko:
                 st.error("⚠️ Nama Toko/Perusahaan wajib diisi!")
             else:
-                sheet = get_sheet()
+                sheet = connect_gsheet()
                 if sheet:
                     wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
                     sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(st.session_state.cart), "Pending", MARKETING_NAME])
-                    st.balloons()
-                    st.success(f"✅ Penawaran untuk **{nama_toko}** berhasil terkirim!")
-                    st.session_state.cart = []
-                    # FIX 3: hapus time.sleep sebelum rerun
-                    st.rerun()
+                    st.balloons(); st.success(f"✅ Penawaran untuk **{nama_toko}** berhasil terkirim!")
+                    st.session_state.cart = []; time.sleep(1); st.rerun()
 
         if st.button("🗑️ Kosongkan Keranjang", use_container_width=True):
             st.session_state.cart = []; st.rerun()
@@ -909,9 +914,8 @@ elif menu == "📝 Admin Sales":
 # SALES DASHBOARD
 # =========================================================
 elif menu == "👨‍💻 Sales Dashboard":
-    render_header("Sales Dashboard", f"Kelola antrean · {MARKETING_NAME}", "🔐 Admin Only")
+    render_header("Sales Dashboard", f"Kelola antrean · {MARKETING_NAME} · {MARKETING_TITLE}", "🔐 Admin Only")
 
-    # ── BELUM LOGIN ──
     if not st.session_state.admin_logged_in:
         st.markdown("<br>", unsafe_allow_html=True)
         _, mid_col, _ = st.columns([1, 2, 1])
@@ -940,20 +944,17 @@ elif menu == "👨‍💻 Sales Dashboard":
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── SUDAH LOGIN ──
     else:
         col_inf, col_out, col_ref = st.columns([3, 1, 1])
-        col_inf.success(f"✅ Login sebagai **{MARKETING_NAME}**")
+        col_inf.success(f"✅ Login sebagai **{MARKETING_NAME}** — {MARKETING_TITLE}")
         if col_out.button("🚪 Logout", use_container_width=True, key="btn_logout"):
             st.session_state.admin_logged_in = False
             st.rerun()
         if col_ref.button("🔄 Refresh", use_container_width=True, key="btn_refresh"):
             st.session_state.saved_items_cache = {}
             st.cache_data.clear()
-            # FIX 2: cache_resource tidak ikut di-clear agar koneksi tetap hidup
             st.rerun()
 
-        # ── Update Database Barang ──
         with st.expander("📁 Update Database Barang (.csv)", expanded=False):
             st.caption("Upload file CSV baru untuk mengganti database produk.")
             up_f2 = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="csv_up_login")
@@ -963,11 +964,9 @@ elif menu == "👨‍💻 Sales Dashboard":
                         f.write(up_f2.getbuffer())
                     st.cache_data.clear()
                     st.success("✅ Database berhasil diperbarui!")
-                    # FIX 3: hapus time.sleep sebelum rerun
-                    st.rerun()
+                    time.sleep(1); st.rerun()
 
-        # FIX 2: pakai get_sheet() yang sudah di-cache
-        sheet = get_sheet()
+        sheet = connect_gsheet()
         if sheet:
             try:
                 all_vals = sheet.get_all_values()
@@ -1092,10 +1091,9 @@ elif menu == "👨‍💻 Sales Dashboard":
                                         temp_up.append({"del": td, "pos": np_, "Nama": nama_item, "Qty": nq, "Harga": nh, "Sat": ns})
 
                                 st.markdown("---")
-
                                 add_b = st.multiselect(
                                     "➕ Tambah Barang Baru:",
-                                    options=NAMA_BARANG_LIST,
+                                    options=df_barang['Nama Barang'].tolist(),
                                     key=f"add_new_{real_row_idx}",
                                     placeholder="Pilih barang untuk ditambahkan..."
                                 )
@@ -1123,7 +1121,7 @@ elif menu == "👨‍💻 Sales Dashboard":
                                         st.session_state.saved_items_cache[real_row_idx] = save_data
                                         clear_row_state(real_row_idx)
                                         st.success(f"✅ Tersimpan & terverifikasi! {len(save_data)} barang.")
-                                        # FIX 3: hapus time.sleep sebelum rerun
+                                        time.sleep(1)
                                         st.rerun()
                                     else:
                                         st.error(f"⚠️ Simpan gagal: {msg}. Coba lagi.")
