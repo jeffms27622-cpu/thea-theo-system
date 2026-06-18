@@ -666,7 +666,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.set_x(138)
         pdf.set_font('Arial', 'B', 8.5)
         pdf.set_text_color(*COLOR_GOLD)
-        pdf.cell(60, 5, "MARKETING:", ln=1)
+        pdf.cell(60, 5, "Hormat Kami,", ln=1)
 
         ttd_path = "ttd_clean.png"
         if os.path.exists(ttd_path):
