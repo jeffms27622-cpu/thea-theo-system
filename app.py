@@ -11,6 +11,7 @@ import time
 import hashlib
 
 MARKETING_NAME = "Asin"
+MARKETING_TITLE = "Spv Sales & Marketing"
 MARKETING_WA = "0815-8199-775"
 MARKETING_EMAIL = "alattulis.tts@gmail.com"
 COMPANY_NAME = "PT. THEA THEO STATIONARY"
@@ -436,7 +437,7 @@ menu = st.session_state.active_menu
 
 
 # =========================================================
-# PDF GENERATOR  ← REVISI VISUAL
+# PDF GENERATOR
 # =========================================================
 class PenawaranPDF(FPDF):
     def __init__(self, total_pages=1):
@@ -444,39 +445,31 @@ class PenawaranPDF(FPDF):
         self.total_pages = total_pages
 
     def header(self):
-        # Background navy penuh
         self.set_fill_color(*COLOR_NAVY)
         self.rect(0, 0, 210, 52, 'F')
 
-        # Strip putih area logo
         self.set_fill_color(255, 255, 255)
         self.rect(10, 6, 44, 40, 'F')
 
-        # Garis gold vertikal tebal sebagai pemisah
         self.set_fill_color(*COLOR_GOLD)
         self.rect(58, 0, 3, 52, 'F')
 
-        # Logo jika ada
         if os.path.exists("logo.png"):
             self.image("logo.png", 13, 10, 38)
 
-        # Nama perusahaan
         self.set_y(10); self.set_x(66)
         self.set_font('Arial', 'B', 17)
         self.set_text_color(255, 255, 255)
         self.cell(0, 8, COMPANY_NAME, ln=1)
 
-        # Slogan gold
         self.set_x(66)
         self.set_font('Arial', 'B', 8.5)
         self.set_text_color(*COLOR_GOLD)
         self.cell(0, 5, "  ".join(SLOGAN.upper()), ln=1)
 
-        # Garis tipis pemisah
         self.set_fill_color(255, 255, 255)
         self.rect(66, 26, 132, 0.3, 'F')
 
-        # Detail kontak
         self.set_y(29); self.set_x(66)
         self.set_font('Arial', '', 7.5)
         self.set_text_color(210, 220, 235)
@@ -486,7 +479,6 @@ class PenawaranPDF(FPDF):
         self.set_x(66)
         self.cell(0, 4.5, f"Email: {MARKETING_EMAIL}", ln=1)
 
-        # Garis gold bawah header
         self.set_fill_color(*COLOR_GOLD)
         self.rect(0, 52, 210, 2.5, 'F')
 
@@ -494,11 +486,9 @@ class PenawaranPDF(FPDF):
 
     def footer(self):
         self.set_y(-18)
-        # Garis gold atas footer
         self.set_fill_color(*COLOR_GOLD)
         self.rect(0, self.get_y(), 210, 1.5, 'F')
 
-        # Background navy footer
         self.set_fill_color(*COLOR_NAVY)
         self.rect(0, self.get_y() + 1.5, 210, 17, 'F')
 
@@ -515,7 +505,6 @@ class PenawaranPDF(FPDF):
 
 
 def draw_table_header(pdf):
-    # Background header tabel navy
     pdf.set_fill_color(*COLOR_NAVY)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font('Arial', 'B', 9)
@@ -532,14 +521,11 @@ def draw_table_header(pdf):
 
 
 def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
-    # T&C block tingginya sekitar 58mm, area total ~35mm, margin bawah 25mm
-    # Gunakan 2-pass: render dulu tanpa total_pages, hitung, render ulang
     def _render(pdf):
         pdf.set_margins(10, 70, 10)
         pdf.set_auto_page_break(auto=True, margin=28)
         pdf.add_page()
 
-        # ── Judul QUOTATION ──
         pdf.set_y(62)
         pdf.set_font('Arial', 'B', 26)
         pdf.set_text_color(*COLOR_NAVY)
@@ -559,7 +545,6 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.cell(0, 5, f"Berlaku s/d  : {expiry_date.strftime('%d %B %Y')}", ln=1, align='R')
         pdf.ln(4)
 
-        # ── Info Customer ──
         pdf.set_x(10)
         pdf.set_font('Arial', 'B', 7.5)
         pdf.set_text_color(*COLOR_GOLD)
@@ -576,14 +561,11 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.cell(90, 5, f"U/P: {pic}", ln=1)
         pdf.ln(6)
 
-        # ── Tabel ──
         draw_table_header(pdf)
         pdf.set_font('Arial', '', 9)
         pdf.set_text_color(*COLOR_TEXT)
 
         for i, row in df_order.iterrows():
-            # Cek apakah baris berikutnya + area total + T&C masih muat
-            # Estimasi ruang yang dibutuhkan setelah tabel: ~100mm
             if pdf.get_y() > 170:
                 pdf.add_page()
                 draw_table_header(pdf)
@@ -606,7 +588,6 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
             pdf.cell(30, 8, f"Rp {row['Total_Row']:,.0f}", border=1, align='R', fill=True)
             pdf.ln()
 
-        # ── Area Total ──
         pdf.ln(4)
         pdf.set_draw_color(*COLOR_GOLD)
         pdf.set_line_width(0.6)
@@ -639,19 +620,16 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.set_line_width(0.8)
         pdf.line(120, pdf.get_y(), 200, pdf.get_y())
 
-        # ── Cek ruang untuk T&C — tinggi blok T&C = 62mm ──
         TC_HEIGHT = 62
-        BOTTOM_LIMIT = 297 - 28  # A4 - margin bawah = 269mm
+        BOTTOM_LIMIT = 297 - 28
         if pdf.get_y() + 10 + TC_HEIGHT > BOTTOM_LIMIT:
             pdf.add_page()
             pdf.set_y(68)
         else:
             pdf.ln(10)
 
-        # ── T&C + Marketing dalam 1 blok sejajar ──
         y_tc = pdf.get_y()
 
-        # Kotak T&C kiri
         pdf.set_fill_color(248, 250, 253)
         pdf.set_draw_color(*COLOR_NAVY)
         pdf.set_line_width(0.4)
@@ -680,7 +658,6 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
             "   No. Rek    : 1550010174996\n"
             "   Atas Nama  : PT THEA THEO STATIONARY"
         )
-        # Gunakan set_x sebelum multi_cell agar tidak overflow ke kanan
         pdf.set_x(13)
         pdf.multi_cell(114, 5.5, terms)
 
@@ -689,9 +666,8 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.set_x(138)
         pdf.set_font('Arial', 'B', 8.5)
         pdf.set_text_color(*COLOR_GOLD)
-        pdf.cell(60, 5, "MARKETING:", ln=1)
+        pdf.cell(60, 5, "Hormat Kami,", ln=1)
 
-        # Tanda tangan + stempel logo (digabung, simpan ke temp file)
         ttd_path = "ttd_clean.png"
         if os.path.exists(ttd_path):
             try:
@@ -726,6 +702,12 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.set_text_color(*COLOR_NAVY)
         pdf.cell(60, 7, MARKETING_NAME.upper(), ln=1)
 
+        # Jabatan
+        pdf.set_x(138)
+        pdf.set_font('Arial', 'I', 8.5)
+        pdf.set_text_color(*COLOR_TEXT)
+        pdf.cell(60, 4.5, MARKETING_TITLE, ln=1)
+
         pdf.set_x(138)
         pdf.set_font('Arial', '', 8.5)
         pdf.set_text_color(*COLOR_TEXT)
@@ -738,7 +720,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
     _render(pdf1)
     total_pages = pdf1.page
 
-    # Pass 2: render final dengan total_pages yang benar
+    # Pass 2: render final
     pdf2 = PenawaranPDF(total_pages=total_pages)
     _render(pdf2)
 
@@ -787,6 +769,11 @@ def generate_excel(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_tota
         worksheet.write(row_idx, 4, "Sub Total", fmt_total_label); worksheet.write(row_idx, 5, subtotal, fmt_money); row_idx += 1
         worksheet.write(row_idx, 4, "VAT (PPN 11%)", fmt_total_label); worksheet.write(row_idx, 5, ppn, fmt_money); row_idx += 1
         worksheet.write(row_idx, 4, "GRAND TOTAL", fmt_total_label); worksheet.write(row_idx, 5, grand_total, fmt_grand_total)
+
+        # Jabatan di Excel
+        worksheet.write(row_idx + 3, 0, MARKETING_NAME, workbook.add_format({'bold': True}))
+        worksheet.write(row_idx + 4, 0, MARKETING_TITLE, workbook.add_format({'italic': True, 'font_color': '#002855'}))
+
     return output.getvalue()
 
 
@@ -797,7 +784,7 @@ if menu == "🏠 Home":
     render_header(COMPANY_NAME, SLOGAN, f"📍 {ADDR.split(',')[0]}")
 
     c1, c2 = st.columns(2)
-    c1.metric("🧑‍💼 Marketing", MARKETING_NAME)
+    c1.metric("🧑‍💼 Marketing", f"{MARKETING_NAME} · {MARKETING_TITLE}")
     c2.metric("📞 WhatsApp", MARKETING_WA)
     c3, c4 = st.columns(2)
     c3.metric("📧 Email", "alattulis.tts")
@@ -927,9 +914,8 @@ elif menu == "📝 Admin Sales":
 # SALES DASHBOARD
 # =========================================================
 elif menu == "👨‍💻 Sales Dashboard":
-    render_header("Sales Dashboard", f"Kelola antrean · {MARKETING_NAME}", "🔐 Admin Only")
+    render_header("Sales Dashboard", f"Kelola antrean · {MARKETING_NAME} · {MARKETING_TITLE}", "🔐 Admin Only")
 
-    # ── BELUM LOGIN ──
     if not st.session_state.admin_logged_in:
         st.markdown("<br>", unsafe_allow_html=True)
         _, mid_col, _ = st.columns([1, 2, 1])
@@ -958,10 +944,9 @@ elif menu == "👨‍💻 Sales Dashboard":
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── SUDAH LOGIN ──
     else:
         col_inf, col_out, col_ref = st.columns([3, 1, 1])
-        col_inf.success(f"✅ Login sebagai **{MARKETING_NAME}**")
+        col_inf.success(f"✅ Login sebagai **{MARKETING_NAME}** — {MARKETING_TITLE}")
         if col_out.button("🚪 Logout", use_container_width=True, key="btn_logout"):
             st.session_state.admin_logged_in = False
             st.rerun()
@@ -970,7 +955,6 @@ elif menu == "👨‍💻 Sales Dashboard":
             st.cache_data.clear()
             st.rerun()
 
-        # ── Update Database Barang ──
         with st.expander("📁 Update Database Barang (.csv)", expanded=False):
             st.caption("Upload file CSV baru untuk mengganti database produk.")
             up_f2 = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="csv_up_login")
