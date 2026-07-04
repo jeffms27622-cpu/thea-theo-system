@@ -332,6 +332,7 @@ def get_creds():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     return Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
 
+@st.cache_resource(show_spinner=False)
 def connect_gsheet():
     try:
         client = gspread.authorize(get_creds())
@@ -369,7 +370,6 @@ def clear_row_state(real_row_idx):
 
 def read_row_fresh(sheet, row_idx):
     try:
-        time.sleep(0.5)
         vals = sheet.row_values(row_idx)
         if len(vals) > 4 and vals[4].strip():
             return ast.literal_eval(vals[4])
@@ -380,7 +380,7 @@ def read_row_fresh(sheet, row_idx):
 def save_to_gsheet_verified(sheet, row_idx, save_data):
     try:
         sheet.update_cell(row_idx, 5, str(save_data))
-        time.sleep(1.5)
+        time.sleep(0.8)
         verify = sheet.row_values(row_idx)
         if len(verify) > 4:
             try:
@@ -903,6 +903,7 @@ elif menu == "📝 Admin Sales":
                 if sheet:
                     wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
                     sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(st.session_state.cart), "Pending", MARKETING_NAME])
+                    st.session_state.pop("gs_all_vals", None)
                     st.balloons(); st.success(f"✅ Penawaran untuk **{nama_toko}** berhasil terkirim!")
                     st.session_state.cart = []; time.sleep(1); st.rerun()
 
@@ -952,6 +953,7 @@ elif menu == "👨‍💻 Sales Dashboard":
             st.rerun()
         if col_ref.button("🔄 Refresh", use_container_width=True, key="btn_refresh"):
             st.session_state.saved_items_cache = {}
+            st.session_state.pop("gs_all_vals", None)
             st.cache_data.clear()
             st.rerun()
 
@@ -969,7 +971,12 @@ elif menu == "👨‍💻 Sales Dashboard":
         sheet = connect_gsheet()
         if sheet:
             try:
-                all_vals = sheet.get_all_values()
+                # Ambil semua baris HANYA sekali per sesi (bukan setiap rerun akibat
+                # klik checkbox/qty/dsb). Cache dibuang manual lewat tombol Refresh,
+                # atau otomatis setelah ada aksi yang mengubah data (simpan/selesai).
+                if "gs_all_vals" not in st.session_state:
+                    st.session_state.gs_all_vals = sheet.get_all_values()
+                all_vals = st.session_state.gs_all_vals
                 if len(all_vals) > 1:
                     raw_headers   = all_vals[0]
                     clean_headers = [h.strip().lstrip('\ufeff') for h in raw_headers]
@@ -1119,6 +1126,7 @@ elif menu == "👨‍💻 Sales Dashboard":
 
                                     if ok:
                                         st.session_state.saved_items_cache[real_row_idx] = save_data
+                                        st.session_state.pop("gs_all_vals", None)
                                         clear_row_state(real_row_idx)
                                         st.success(f"✅ Tersimpan & terverifikasi! {len(save_data)} barang.")
                                         time.sleep(1)
@@ -1132,6 +1140,10 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     current_items = read_row_fresh(sheet, real_row_idx)
                                     if not current_items:
                                         current_items = items_list
+                                    # Simpan ke cache SEKARANG juga, supaya rerun berikutnya
+                                    # (misal: klik checkbox/qty di item lain) tidak memicu
+                                    # API call + baca ulang row ini dari Google Sheets lagi.
+                                    st.session_state.saved_items_cache[real_row_idx] = current_items
 
                                 if current_items:
                                     f_df = pd.DataFrame(current_items)
@@ -1145,7 +1157,7 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     st.metric("PPN 11%", f"Rp {tax:,.0f}")
                                     st.markdown("<br>", unsafe_allow_html=True)
 
-                                    no_s = st.text_input("📄 Nomor Surat:", value="/S-TTS/VI/2026", key=f"ns_print_{real_row_idx}")
+                                    no_s = st.text_input("📄 Nomor Surat:", value="/S-TTS/VII/2026", key=f"ns_print_{real_row_idx}")
 
                                     b1, b2 = st.columns(2)
                                     pdf_data = generate_pdf(no_s, customer_val, up_val, f_df, subt, tax, gtot)
@@ -1170,6 +1182,7 @@ elif menu == "👨‍💻 Sales Dashboard":
                                         sheet.update_cell(real_row_idx, 6, "Processed")
                                         if real_row_idx in st.session_state.saved_items_cache:
                                             del st.session_state.saved_items_cache[real_row_idx]
+                                        st.session_state.pop("gs_all_vals", None)
                                         st.success(f"✅ Penawaran {customer_val} selesai.")
                                         st.rerun()
                     else:
