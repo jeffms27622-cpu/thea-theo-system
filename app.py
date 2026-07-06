@@ -344,18 +344,67 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
+REQUIRED_DB_COLS = ['Nama Barang', 'Harga', 'Satuan']
+
+def _normalize_col(c):
+    # buang BOM, spasi berlebih, underscore -> spasi, lalu title-case biar konsisten
+    c = str(c).replace('\ufeff', '').strip()
+    c = c.replace('_', ' ')
+    c = ' '.join(c.split())
+    return c
+
+def _try_read_csv(path, sep):
+    kwargs = dict(engine='python', on_bad_lines='skip')
+    if sep is not None:
+        kwargs['sep'] = sep
+    else:
+        kwargs['sep'] = None
+    return pd.read_csv(path, **kwargs)
+
 @st.cache_data(ttl=300)
 def load_db():
-    if os.path.exists("database_barang.csv"):
+    empty_df = pd.DataFrame(columns=REQUIRED_DB_COLS)
+    if not os.path.exists("database_barang.csv"):
+        return empty_df
+
+    last_err = None
+    # coba auto-detect delimiter dulu, lalu fallback ke delimiter umum
+    for sep in (None, ',', ';', '\t'):
         try:
-            df = pd.read_csv("database_barang.csv", sep=None, engine='python', on_bad_lines='skip')
-            df.columns = df.columns.str.strip()
-            if 'Harga' in df.columns:
+            df = _try_read_csv("database_barang.csv", sep)
+            df.columns = [_normalize_col(c) for c in df.columns]
+
+            # cocokkan nama kolom secara case-insensitive terhadap yang wajib ada
+            col_map = {c.lower(): c for c in df.columns}
+            rename_dict = {}
+            for req in REQUIRED_DB_COLS:
+                if req.lower() in col_map:
+                    rename_dict[col_map[req.lower()]] = req
+            df = df.rename(columns=rename_dict)
+
+            if all(req in df.columns for req in REQUIRED_DB_COLS):
                 df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce').fillna(0)
-            return df
+                df['Nama Barang'] = df['Nama Barang'].astype(str).str.strip()
+                df['Satuan'] = df['Satuan'].astype(str).str.strip()
+                return df
         except Exception as e:
-            st.error(f"Gagal membaca CSV: {e}")
-    return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
+            last_err = e
+            continue
+
+    # Semua percobaan gagal / kolom wajib tidak ketemu -> jangan crash,
+    # tampilkan pesan yang jelas supaya gampang di-debug.
+    try:
+        preview_cols = list(pd.read_csv("database_barang.csv", sep=None, engine='python',
+                                         on_bad_lines='skip', nrows=0).columns)
+    except Exception:
+        preview_cols = []
+    st.error(
+        "⚠️ Gagal membaca database_barang.csv: kolom wajib "
+        f"{REQUIRED_DB_COLS} tidak ditemukan. Kolom yang terbaca: {preview_cols}. "
+        "Pastikan header CSV persis bernama 'Nama Barang', 'Harga', 'Satuan' "
+        "(boleh beda kapital, tapi ejaan & spasinya harus sama)."
+    )
+    return empty_df
 
 df_barang = load_db()
 
