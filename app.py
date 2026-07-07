@@ -432,11 +432,19 @@ _ALL_NAMA_BARANG = df_barang['Nama Barang'].tolist()
 
 def search_barang(searchterm: str):
     """Dipanggil st_searchbox setelah user berhenti ngetik sejenak (debounce).
-    Cuma balikin maksimal 25 hasil paling relevan."""
+    Prioritas: substring match (semua barang yang mengandung kata kuncinya
+    ikut muncul, gak dipotong berdasar skor kemiripan). Fuzzy match dipakai
+    cuma sebagai cadangan kalau gak ada yang match persis (typo dsb)."""
     if not searchterm or len(searchterm) < 2:
         return []
-    matches = process.extract(searchterm, _ALL_NAMA_BARANG, scorer=fuzz.WRatio, limit=25)
-    return [m[0] for m in matches if m[1] > 35]
+    kw = searchterm.strip().lower()
+
+    substring_matches = [n for n in _ALL_NAMA_BARANG if kw in n.lower()]
+    if substring_matches:
+        return substring_matches[:100]
+
+    fuzzy_matches = process.extract(searchterm, _ALL_NAMA_BARANG, scorer=fuzz.WRatio, limit=50)
+    return [m[0] for m in fuzzy_matches if m[1] > 35]
 
 def item_key(row_idx, nama_barang):
     h = hashlib.md5(nama_barang.encode()).hexdigest()[:8]
