@@ -6,3 +6,5 @@ gspread
 google-auth
 google-api-python-client
 xlsxwriter
+streamlit-searchbox
+rapidfuzz
