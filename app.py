@@ -9,7 +9,6 @@ from google.oauth2.service_account import Credentials
 import io
 import time
 import hashlib
-from streamlit_searchbox import st_searchbox
 from rapidfuzz import process, fuzz
 
 MARKETING_NAME = "Asin"
@@ -425,19 +424,19 @@ def load_db():
 
 df_barang = load_db()
 
-# Daftar nama barang di-cache sekali di memori (bukan dikirim utuh ke browser).
-# Dipakai oleh search_barang() di bawah supaya dropdown pencarian gak berat
-# walau database_barang.csv isinya ribuan baris.
+# Daftar nama barang di-cache sekali di memori (bukan dikirim utuh ke browser
+# lewat satu selectbox raksasa). Dipakai buat nyaring cepat sebelum ditampilkan
+# ke selectbox biasa, supaya dropdown gak berat walau database_barang.csv
+# isinya ribuan baris.
 _ALL_NAMA_BARANG = df_barang['Nama Barang'].tolist()
 
-def search_barang(searchterm: str):
-    """Dipanggil oleh st_searchbox setelah user berhenti ngetik sejenak (debounce).
-    Cuma balikin maksimal 20 hasil paling relevan, jadi browser gak perlu nyaring
-    ribuan item sendiri tiap kali ada huruf baru yang diketik."""
-    if not searchterm or len(searchterm) < 2:
+def cari_barang(keyword, limit=25, min_score=35):
+    """Cari nama barang paling relevan (fuzzy match), dibatasi jumlahnya
+    supaya selectbox yang ditampilkan tetap ringan."""
+    if not keyword or len(keyword) < 2:
         return []
-    matches = process.extract(searchterm, _ALL_NAMA_BARANG, scorer=fuzz.WRatio, limit=20)
-    return [m[0] for m in matches if m[1] > 35]
+    matches = process.extract(keyword, _ALL_NAMA_BARANG, scorer=fuzz.WRatio, limit=limit)
+    return [m[0] for m in matches if m[1] > min_score]
 
 def item_key(row_idx, nama_barang):
     h = hashlib.md5(nama_barang.encode()).hexdigest()[:8]
@@ -898,28 +897,23 @@ elif menu == "📝 Admin Sales":
 
     render_section_title("📦 Tambah Barang ke Keranjang")
     with st.container(border=True):
-        pilihan_barang = st_searchbox(
-            search_barang,
-            placeholder="Ketik nama barang (min. 2 huruf)...",
-            label="🔍 Cari & Pilih Nama Barang:",
-            key=f"searchbox_brg_{st.session_state.widget_id}",
-            clear_on_submit=False,
-            debounce=200,
-            style_overrides={
-                "searchbox": {
-                    "menuList": {"backgroundColor": "white"},
-                    "singleValue": {"color": "#1e1e1e"},
-                    "option": {
-                        "color": "#1e1e1e",
-                        "backgroundColor": "white",
-                        "highlightColor": "#B8860B",
-                    },
-                },
-                "dropdown": {"fill": "#002855"},
-                "clear": {"clearable": "after-submit"},
-            },
+        search_kw = st.text_input(
+            "🔍 Cari Nama Barang:",
+            placeholder="Ketik minimal 2 huruf, mis: 'kertas hvs'...",
+            key=f"search_kw_{st.session_state.widget_id}"
         )
-        if pilihan_barang:
+
+        hasil_cari = cari_barang(search_kw)
+
+        if search_kw and len(search_kw) >= 2 and not hasil_cari:
+            st.warning("Barang tidak ditemukan. Coba kata kunci lain.")
+
+        pilihan_barang = st.selectbox(
+            "📋 Pilih Barang dari Hasil Pencarian:",
+            options=[""] + hasil_cari,
+            key=f"pilih_brg_{st.session_state.widget_id}"
+        )
+        if pilihan_barang != "":
             row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
             h_master = float(row_m['Harga']); satuan_db = str(row_m['Satuan']).strip()
 
