@@ -161,9 +161,24 @@ ul[role="listbox"] li {
     padding: 12px 16px !important; font-size: 0.95rem !important;
 }
 
-[data-baseweb="select"] input {
+/* ── FIX: teks pencarian di dropdown (selectbox/multiselect) jadi putih/samar ──
+   BaseWeb kadang nge-set warna teks input pakai -webkit-text-fill-color yang
+   menang duluan dibanding `color` biasa, jadi harus ditimpa juga. */
+[data-baseweb="select"] input,
+[data-baseweb="select"] input[type="text"],
+[data-testid="stSelectbox"] input,
+[data-testid="stMultiSelect"] input,
+div[data-baseweb="select"] div input {
     color: #1e1e1e !important;
+    -webkit-text-fill-color: #1e1e1e !important;
     background: white !important;
+    caret-color: #1e1e1e !important;
+}
+[data-baseweb="select"] input::placeholder,
+[data-testid="stSelectbox"] input::placeholder,
+[data-testid="stMultiSelect"] input::placeholder {
+    color: #9fb3c8 !important;
+    -webkit-text-fill-color: #9fb3c8 !important;
 }
 
 section.main .stTextInput > label,
