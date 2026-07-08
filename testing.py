@@ -1132,16 +1132,17 @@ elif menu == "👨‍💻 Sales Dashboard":
             st.cache_data.clear()
             st.rerun()
 
-        with st.expander("📁 Update Database Barang (.csv)", expanded=False):
-            st.caption("Upload file CSV baru untuk mengganti database produk.")
-            up_f2 = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="csv_up_login")
-            if up_f2:
-                if st.button("🚀 Update Database Sekarang", key="btn_csv_login", type="primary"):
-                    with open("database_barang.csv", "wb") as f:
-                        f.write(up_f2.getbuffer())
-                    st.cache_data.clear()
-                    st.success("✅ Database berhasil diperbarui!")
-                    time.sleep(1); st.rerun()
+        if st.session_state.auth_user == "asin":
+            with st.expander("📁 Update Database Barang (.csv)", expanded=False):
+                st.caption("Upload file CSV baru untuk mengganti database produk.")
+                up_f2 = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="csv_up_login")
+                if up_f2:
+                    if st.button("🚀 Update Database Sekarang", key="btn_csv_login", type="primary"):
+                        with open("database_barang.csv", "wb") as f:
+                            f.write(up_f2.getbuffer())
+                        st.cache_data.clear()
+                        st.success("✅ Database berhasil diperbarui!")
+                        time.sleep(1); st.rerun()
 
         sheet = connect_gsheet()
         if sheet:
