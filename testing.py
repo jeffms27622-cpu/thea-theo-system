@@ -9,27 +9,65 @@ from google.oauth2.service_account import Credentials
 import io
 import time
 import hashlib
+from streamlit_searchbox import st_searchbox
+from rapidfuzz import process, fuzz
 
-MARKETING_NAME = "Asin"
-MARKETING_TITLE = "Spv Sales & Marketing"
-MARKETING_WA = "0815-8199-775"
-MARKETING_EMAIL = "alattulis.tts@gmail.com"
 COMPANY_NAME = "PT. THEA THEO STATIONARY"
 SLOGAN = "Office & School Supplies Solution"
 ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 OFFICE_PHONE = "(021) 55780659"
 
-if "ADMIN_PASSWORD" in st.secrets:
-    ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
-else:
-    ADMIN_PASSWORD = "admin"
+# ── Akun Sales & Marketing (login per-orang, password beda-beda) ──
+# Idealnya diisi lewat st.secrets["users"] di Streamlit Cloud, contoh format
+# .streamlit/secrets.toml:
+#
+# [users.asin]
+# password = "xxxxx"
+# name = "Asin"
+# title = "Spv Sales & Marketing"
+# wa = "0815-8199-775"
+# email = "alattulis.tts@gmail.com"
+#
+# [users.artini]
+# password = "yyyyy"
+# name = "Artini"
+# title = "Sales Executive"
+# wa = "08xx-xxxx-xxxx"
+# email = "artini.tts@gmail.com"
+#
+# [users.topan]
+# password = "zzzzz"
+# name = "Topan"
+# title = "Sales Executive"
+# wa = "08xx-xxxx-xxxx"
+# email = "topan.tts@gmail.com"
+def _load_users():
+    if "users" in st.secrets:
+        return {uname: dict(cfg) for uname, cfg in st.secrets["users"].items()}
+    # Fallback dev-only kalau secrets belum diisi. GANTI password ini sebelum deploy!
+    return {
+        "asin": {
+            "password": "asin123", "name": "Asin", "title": "Spv Sales & Marketing",
+            "wa": "0815-8199-775", "email": "alattulis.tts@gmail.com",
+        },
+        "artini": {
+            "password": "artini123", "name": "Artini", "title": "Sales Executive",
+            "wa": "08xx-xxxx-xxxx", "email": "artini.tts@gmail.com",
+        },
+        "topan": {
+            "password": "topan123", "name": "Topan", "title": "Sales Executive",
+            "wa": "08xx-xxxx-xxxx", "email": "topan.tts@gmail.com",
+        },
+    }
+
+USERS = _load_users()
 
 COLOR_NAVY = (0, 40, 85)
 COLOR_GOLD = (184, 134, 11)
 COLOR_TEXT = (30, 30, 30)
 
 st.set_page_config(
-    page_title=f"{COMPANY_NAME} - {MARKETING_NAME}",
+    page_title=COMPANY_NAME,
     layout="wide",
     page_icon="📎",
     initial_sidebar_state="collapsed",
@@ -161,9 +199,24 @@ ul[role="listbox"] li {
     padding: 12px 16px !important; font-size: 0.95rem !important;
 }
 
-[data-baseweb="select"] input {
+/* ── FIX: teks pencarian di dropdown (selectbox/multiselect) jadi putih/samar ──
+   BaseWeb kadang nge-set warna teks input pakai -webkit-text-fill-color yang
+   menang duluan dibanding `color` biasa, jadi harus ditimpa juga. */
+[data-baseweb="select"] input,
+[data-baseweb="select"] input[type="text"],
+[data-testid="stSelectbox"] input,
+[data-testid="stMultiSelect"] input,
+div[data-baseweb="select"] div input {
     color: #1e1e1e !important;
+    -webkit-text-fill-color: #1e1e1e !important;
     background: white !important;
+    caret-color: #1e1e1e !important;
+}
+[data-baseweb="select"] input::placeholder,
+[data-testid="stSelectbox"] input::placeholder,
+[data-testid="stMultiSelect"] input::placeholder {
+    color: #9fb3c8 !important;
+    -webkit-text-fill-color: #9fb3c8 !important;
 }
 
 section.main .stTextInput > label,
@@ -344,20 +397,90 @@ def connect_gsheet():
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
+REQUIRED_DB_COLS = ['Nama Barang', 'Harga', 'Satuan']
+
+def _normalize_col(c):
+    # buang BOM, spasi berlebih, underscore -> spasi, lalu title-case biar konsisten
+    c = str(c).replace('\ufeff', '').strip()
+    c = c.replace('_', ' ')
+    c = ' '.join(c.split())
+    return c
+
+def _try_read_csv(path, sep):
+    kwargs = dict(engine='python', on_bad_lines='skip')
+    if sep is not None:
+        kwargs['sep'] = sep
+    else:
+        kwargs['sep'] = None
+    return pd.read_csv(path, **kwargs)
+
 @st.cache_data(ttl=300)
 def load_db():
-    if os.path.exists("database_barang.csv"):
+    empty_df = pd.DataFrame(columns=REQUIRED_DB_COLS)
+    if not os.path.exists("database_barang.csv"):
+        return empty_df
+
+    last_err = None
+    # coba auto-detect delimiter dulu, lalu fallback ke delimiter umum
+    for sep in (None, ',', ';', '\t'):
         try:
-            df = pd.read_csv("database_barang.csv", sep=None, engine='python', on_bad_lines='skip')
-            df.columns = df.columns.str.strip()
-            if 'Harga' in df.columns:
+            df = _try_read_csv("database_barang.csv", sep)
+            df.columns = [_normalize_col(c) for c in df.columns]
+
+            # cocokkan nama kolom secara case-insensitive terhadap yang wajib ada
+            col_map = {c.lower(): c for c in df.columns}
+            rename_dict = {}
+            for req in REQUIRED_DB_COLS:
+                if req.lower() in col_map:
+                    rename_dict[col_map[req.lower()]] = req
+            df = df.rename(columns=rename_dict)
+
+            if all(req in df.columns for req in REQUIRED_DB_COLS):
                 df['Harga'] = pd.to_numeric(df['Harga'], errors='coerce').fillna(0)
-            return df
+                df['Nama Barang'] = df['Nama Barang'].astype(str).str.strip()
+                df['Satuan'] = df['Satuan'].astype(str).str.strip()
+                return df
         except Exception as e:
-            st.error(f"Gagal membaca CSV: {e}")
-    return pd.DataFrame(columns=['Nama Barang', 'Harga', 'Satuan'])
+            last_err = e
+            continue
+
+    # Semua percobaan gagal / kolom wajib tidak ketemu -> jangan crash,
+    # tampilkan pesan yang jelas supaya gampang di-debug.
+    try:
+        preview_cols = list(pd.read_csv("database_barang.csv", sep=None, engine='python',
+                                         on_bad_lines='skip', nrows=0).columns)
+    except Exception:
+        preview_cols = []
+    st.error(
+        "⚠️ Gagal membaca database_barang.csv: kolom wajib "
+        f"{REQUIRED_DB_COLS} tidak ditemukan. Kolom yang terbaca: {preview_cols}. "
+        "Pastikan header CSV persis bernama 'Nama Barang', 'Harga', 'Satuan' "
+        "(boleh beda kapital, tapi ejaan & spasinya harus sama)."
+    )
+    return empty_df
 
 df_barang = load_db()
+
+# Daftar nama barang di-cache sekali di memori. Dipakai oleh search_barang()
+# supaya st_searchbox gak perlu ngirim ribuan nama barang sekaligus ke browser
+# tiap kali ada huruf baru yang diketik.
+_ALL_NAMA_BARANG = df_barang['Nama Barang'].tolist()
+
+def search_barang(searchterm: str):
+    """Dipanggil st_searchbox setelah user berhenti ngetik sejenak (debounce).
+    Prioritas: substring match (semua barang yang mengandung kata kuncinya
+    ikut muncul, gak dipotong berdasar skor kemiripan). Fuzzy match dipakai
+    cuma sebagai cadangan kalau gak ada yang match persis (typo dsb)."""
+    if not searchterm or len(searchterm) < 2:
+        return []
+    kw = searchterm.strip().lower()
+
+    substring_matches = [n for n in _ALL_NAMA_BARANG if kw in n.lower()]
+    if substring_matches:
+        return substring_matches[:100]
+
+    fuzzy_matches = process.extract(searchterm, _ALL_NAMA_BARANG, scorer=fuzz.WRatio, limit=50)
+    return [m[0] for m in fuzzy_matches if m[1] > 35]
 
 def item_key(row_idx, nama_barang):
     h = hashlib.md5(nama_barang.encode()).hexdigest()[:8]
@@ -403,12 +526,59 @@ if "active_menu" not in st.session_state:
     st.session_state.active_menu = "🏠 Home"
 if "cart" not in st.session_state:
     st.session_state.cart = []
-if "admin_logged_in" not in st.session_state:
-    st.session_state.admin_logged_in = False
+if "auth_user" not in st.session_state:
+    st.session_state.auth_user = None
 if "widget_id" not in st.session_state:
     st.session_state.widget_id = 0
 if "saved_items_cache" not in st.session_state:
     st.session_state.saved_items_cache = {}
+
+
+# =========================================================
+# AUTH: login per-orang (dipakai gerbang untuk Admin Sales & Dashboard)
+# =========================================================
+def current_profile():
+    """Ambil identitas Sales yang lagi login. Kosong kalau belum login."""
+    u = st.session_state.auth_user
+    if u and u in USERS:
+        cfg = USERS[u]
+        return cfg.get("name", ""), cfg.get("title", ""), cfg.get("wa", ""), cfg.get("email", "")
+    return "", "", "", ""
+
+MARKETING_NAME, MARKETING_TITLE, MARKETING_WA, MARKETING_EMAIL = current_profile()
+
+def require_login():
+    """Tampilkan form login kalau belum ada yang login. Return True kalau sudah login.
+    Satu login ini berlaku untuk Admin Sales maupun Dashboard (identitas yang sama)."""
+    if st.session_state.auth_user:
+        return True
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    _, mid_col, _ = st.columns([1, 2, 1])
+    with mid_col:
+        st.markdown('<div class="pwd-box">', unsafe_allow_html=True)
+        st.markdown("""
+        <div style="text-align:center; margin-bottom:24px;">
+            <div style="font-size:2.8rem;">🔐</div>
+            <div style="font-family:'Playfair Display',serif;font-size:1.15rem;color:#002855;font-weight:700;margin-top:10px;">Login Sales</div>
+            <div style="font-size:0.82rem;color:#7a9ab8;margin-top:6px;">Masuk dengan akun kamu untuk lanjut</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        uname_input = st.text_input("👤 Username", placeholder="mis. asin", key="login_uname_field")
+        pwd_input = st.text_input("🔑 Password", type="password", placeholder="Masukkan password...", key="login_pwd_field")
+
+        if st.button("🚀 MASUK", use_container_width=True, type="primary", key="btn_login_unified"):
+            uname_clean = uname_input.strip().lower()
+            cfg = USERS.get(uname_clean)
+            if cfg and pwd_input == cfg.get("password"):
+                st.session_state.auth_user = uname_clean
+                st.rerun()
+            else:
+                st.error("❌ Username / password salah. Coba lagi.")
+
+        st.markdown('</div>', unsafe_allow_html=True)
+    return False
 
 
 # =========================================================
@@ -783,12 +953,18 @@ def generate_excel(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_tota
 if menu == "🏠 Home":
     render_header(COMPANY_NAME, SLOGAN, f"📍 {ADDR.split(',')[0]}")
 
-    c1, c2 = st.columns(2)
-    c1.metric("🧑‍💼 Marketing", f"{MARKETING_NAME} · {MARKETING_TITLE}")
-    c2.metric("📞 WhatsApp", MARKETING_WA)
-    c3, c4 = st.columns(2)
-    c3.metric("📧 Email", "alattulis.tts")
-    c4.metric("🏢 Kantor", OFFICE_PHONE)
+    if st.session_state.auth_user:
+        c1, c2 = st.columns(2)
+        c1.metric("🧑‍💼 Login sebagai", f"{MARKETING_NAME} · {MARKETING_TITLE}")
+        c2.metric("📞 WhatsApp", MARKETING_WA)
+        c3, c4 = st.columns(2)
+        c3.metric("📧 Email", MARKETING_EMAIL)
+        c4.metric("🏢 Kantor", OFFICE_PHONE)
+    else:
+        c1, c2 = st.columns(2)
+        c1.metric("🏢 Kantor", OFFICE_PHONE)
+        c2.metric("📧 Email", "alattulis.tts")
+        st.info("💡 Login diperlukan untuk membuka **Admin Sales** dan **Dashboard**.")
 
     st.markdown("<br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
@@ -809,6 +985,15 @@ if menu == "🏠 Home":
 elif menu == "📝 Admin Sales":
     render_header("Form Penawaran", "Buat & kirim penawaran baru", "📋 Admin Sales")
 
+    if not require_login():
+        st.stop()
+
+    col_who, col_out = st.columns([4, 1])
+    col_who.success(f"✅ Login sebagai **{MARKETING_NAME}** — {MARKETING_TITLE}")
+    if col_out.button("🚪 Logout", use_container_width=True, key="btn_logout_admin"):
+        st.session_state.auth_user = None
+        st.rerun()
+
     render_section_title("👤 Data Pelanggan")
     with st.container(border=True):
         col1, col2, col3 = st.columns(3)
@@ -818,12 +1003,27 @@ elif menu == "📝 Admin Sales":
 
     render_section_title("📦 Tambah Barang ke Keranjang")
     with st.container(border=True):
-        pilihan_barang = st.selectbox(
-            "🔍 Cari & Pilih Nama Barang:",
-            options=[""] + df_barang['Nama Barang'].tolist(),
-            key=f"pilih_brg_{st.session_state.widget_id}"
+        pilihan_barang = st_searchbox(
+            search_barang,
+            placeholder="Ketik nama barang (min. 2 huruf)...",
+            label="🔍 Cari & Pilih Nama Barang:",
+            key=f"searchbox_brg_{st.session_state.widget_id}",
+            clear_on_submit=False,
+            style_overrides={
+                "clear": {"width": 18, "height": 18, "icon": "cross", "clearable": "after-submit"},
+                "dropdown": {"width": 26, "height": 26, "fill": "#002855"},
+                "searchbox": {
+                    "menuList": {"backgroundColor": "white"},
+                    "singleValue": {"color": "#1e1e1e"},
+                    "option": {
+                        "color": "#1e1e1e",
+                        "backgroundColor": "white",
+                        "highlightColor": "#B8860B",
+                    },
+                },
+            },
         )
-        if pilihan_barang != "":
+        if pilihan_barang:
             row_m = df_barang[df_barang['Nama Barang'] == pilihan_barang].iloc[0]
             h_master = float(row_m['Harga']); satuan_db = str(row_m['Satuan']).strip()
 
@@ -915,41 +1115,16 @@ elif menu == "📝 Admin Sales":
 # SALES DASHBOARD
 # =========================================================
 elif menu == "👨‍💻 Sales Dashboard":
-    render_header("Sales Dashboard", f"Kelola antrean · {MARKETING_NAME} · {MARKETING_TITLE}", "🔐 Admin Only")
+    render_header("Sales Dashboard", "Kelola antrean penawaran", "🔐 Login Diperlukan")
 
-    if not st.session_state.admin_logged_in:
-        st.markdown("<br>", unsafe_allow_html=True)
-        _, mid_col, _ = st.columns([1, 2, 1])
-        with mid_col:
-            st.markdown('<div class="pwd-box">', unsafe_allow_html=True)
-            st.markdown("""
-            <div style="text-align:center; margin-bottom:24px;">
-                <div style="font-size:2.8rem;">🔐</div>
-                <div style="font-family:'Playfair Display',serif;font-size:1.15rem;color:#002855;font-weight:700;margin-top:10px;">Login Admin</div>
-                <div style="font-size:0.82rem;color:#7a9ab8;margin-top:6px;">Masukkan password untuk mengakses dashboard</div>
-            </div>
-            """, unsafe_allow_html=True)
+    if not require_login():
+        st.stop()
 
-            pwd_input = st.text_input(
-                "🔑 Password Admin",
-                type="password",
-                placeholder="Masukkan password...",
-                key="pwd_field_main"
-            )
-            if st.button("🚀 MASUK KE DASHBOARD", use_container_width=True, type="primary", key="btn_login_main"):
-                if pwd_input == ADMIN_PASSWORD:
-                    st.session_state.admin_logged_in = True
-                    st.rerun()
-                else:
-                    st.error("❌ Password salah. Coba lagi.")
-
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    else:
+    if True:  # menjaga indentasi blok lama (dulu bagian 'else' dari cek password)
         col_inf, col_out, col_ref = st.columns([3, 1, 1])
         col_inf.success(f"✅ Login sebagai **{MARKETING_NAME}** — {MARKETING_TITLE}")
         if col_out.button("🚪 Logout", use_container_width=True, key="btn_logout"):
-            st.session_state.admin_logged_in = False
+            st.session_state.auth_user = None
             st.rerun()
         if col_ref.button("🔄 Refresh", use_container_width=True, key="btn_refresh"):
             st.session_state.saved_items_cache = {}
