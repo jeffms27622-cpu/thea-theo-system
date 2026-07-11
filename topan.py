@@ -866,11 +866,18 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         pdf.cell(60, 5, "Hormat Kami,", ln=1)
 
         ttd_path = TTD_PATH
+        # Batas ukuran tanda tangan di PDF (mm). Gambar di-scale proporsional
+        # supaya PAS di dalam kotak ini — baik yang landscape (lebar) maupun
+        # portrait (memanjang ke bawah) gak akan numpuk sama teks di bawahnya.
+        TTD_MAX_W, TTD_MAX_H = 50, 24
+        ttd_render_h = 0
         if os.path.exists(ttd_path):
             try:
                 from PIL import Image as PILImage
                 import numpy as _np
                 ttd_img = PILImage.open(ttd_path).convert("RGBA")
+                img_to_draw = ttd_path
+
                 if os.path.exists("logo.png"):
                     logo_img = PILImage.open("logo.png").convert("RGBA")
                     lw = int(ttd_img.width * 0.75)
@@ -885,14 +892,25 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
                     canvas.paste(logo_faded, (lx, ly), logo_faded)
                     tmp_path = f"/tmp/ttd_stamp_combined_{os.path.splitext(os.path.basename(ttd_path))[0]}.png"
                     canvas.save(tmp_path)
-                    pdf.image(tmp_path, x=133, y=pdf.get_y() + 1, w=50)
-                else:
-                    pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
+                    img_to_draw = tmp_path
+
+                # Hitung ukuran render supaya proporsional & muat di bounding box
+                aspect_h_per_w = ttd_img.height / ttd_img.width
+                render_w = TTD_MAX_W
+                render_h = render_w * aspect_h_per_w
+                if render_h > TTD_MAX_H:
+                    render_h = TTD_MAX_H
+                    render_w = render_h / aspect_h_per_w
+
+                pdf.image(img_to_draw, x=133, y=pdf.get_y() + 1, w=render_w, h=render_h)
+                ttd_render_h = render_h
             except Exception as _e:
-                pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
-            pdf.set_y(pdf.get_y() + 30)
+                pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=TTD_MAX_W)
+                ttd_render_h = TTD_MAX_H
+            pdf.set_y(pdf.get_y() + max(ttd_render_h, 10) + 4)
         else:
             pdf.ln(10)
+
 
         pdf.set_x(138)
         pdf.set_font('Arial', 'B', 12)
