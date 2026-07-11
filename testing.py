@@ -1,16 +1,4 @@
-import streamlit as st
-import pandas as pd
-import ast
-from datetime import datetime, timedelta
-from fpdf import FPDF
-import os
-import gspread
-from google.oauth2.service_account import Credentials
-import io
-import time
-import hashlib
-from streamlit_searchbox import st_searchbox
-from rapidfuzz import process, fuzz
+zz
 
 COMPANY_NAME = "PT. THEA THEO STATIONARY"
 SLOGAN = "Office & School Supplies Solution"
