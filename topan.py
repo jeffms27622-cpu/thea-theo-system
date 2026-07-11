@@ -869,7 +869,7 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
         # Batas ukuran tanda tangan di PDF (mm). Gambar di-scale proporsional
         # supaya PAS di dalam kotak ini — baik yang landscape (lebar) maupun
         # portrait (memanjang ke bawah) gak akan numpuk sama teks di bawahnya.
-        TTD_MAX_W, TTD_MAX_H = 50, 24
+        TTD_MAX_W, TTD_MAX_H = 50, 34
         ttd_render_h = 0
         if os.path.exists(ttd_path):
             try:
