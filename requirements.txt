@@ -10,3 +10,4 @@ xlsxwriter==3.2.9
 fpdf==1.7.2
 streamlit-searchbox==0.1.24
 setuptools>=70
+rapidfuzz==3.14.5
