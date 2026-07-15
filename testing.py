@@ -14,19 +14,30 @@ from rapidfuzz import process, fuzz
 import qrcode
 import urllib.parse
 
-MARKETING_NAME = "Asin"
-MARKETING_TITLE = "Spv Sales & Marketing"
-MARKETING_WA = "0815-8199-775"
-MARKETING_EMAIL = "alattulis.tts@gmail.com"
 COMPANY_NAME = "PT. THEA THEO STATIONARY"
 SLOGAN = "Office & School Supplies Solution"
 ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 OFFICE_PHONE = "(021) 55780659"
 
-if "ADMIN_PASSWORD" in st.secrets:
-    ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
-else:
-    ADMIN_PASSWORD = "admin"
+def _load_users():
+    if "users" in st.secrets:
+        return {uname: dict(cfg) for uname, cfg in st.secrets["users"].items()}
+    return {
+        "asin": {
+            "password": "asin123", "name": "Asin", "title": "Spv Sales & Marketing",
+            "wa": "0815-8199-775", "email": "alattulis.tts@gmail.com",
+        },
+        "artini": {
+            "password": "artini123", "name": "Artini", "title": "Sales Executive",
+            "wa": "08xx-xxxx-xxxx", "email": "artini.tts@gmail.com",
+        },
+        "topan": {
+            "password": "topan123", "name": "Topan", "title": "Sales Executive",
+            "wa": "08xx-xxxx-xxxx", "email": "topan.tts@gmail.com",
+        },
+    }
+
+USERS = _load_users()
 
 COLOR_NAVY = (0, 40, 85)
 COLOR_GOLD = (184, 134, 11)
@@ -36,7 +47,7 @@ COLOR_RED = (180, 40, 40)
 COLOR_LIGHT = (240, 245, 252)
 
 st.set_page_config(
-    page_title=f"{COMPANY_NAME} - {MARKETING_NAME}",
+    page_title=COMPANY_NAME,
     layout="wide",
     page_icon="📎",
     initial_sidebar_state="collapsed",
@@ -168,9 +179,6 @@ ul[role="listbox"] li {
     padding: 12px 16px !important; font-size: 0.95rem !important;
 }
 
-/* ── FIX: teks pencarian di dropdown (selectbox/multiselect) jadi putih/samar ──
-   BaseWeb kadang nge-set warna teks input pakai -webkit-text-fill-color yang
-   menang duluan dibanding `color` biasa, jadi harus ditimpa juga. */
 [data-baseweb="select"] input,
 [data-baseweb="select"] input[type="text"],
 [data-testid="stSelectbox"] input,
@@ -354,22 +362,38 @@ def get_creds():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     return Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
 
+SHEET_HEADERS = ["Waktu", "Customer", "UP", "WA", "Pesanan", "Status", "Sales"]
+
 @st.cache_resource(show_spinner=False)
-def connect_gsheet():
+def get_user_worksheet(username):
+    """Buka (atau buat baru kalau belum ada) tab Google Sheets khusus milik `username`.
+    Data lama di 'Sheet1' TIDAK ikut dipindah/disentuh — tab baru mulai kosong.
+    Di-cache per-username, jadi gak nembak API Google Sheets berulang tiap rerun."""
     try:
         client = gspread.authorize(get_creds())
-        sheet = client.open("Antrean Penawaran TTS").sheet1
-        if not sheet.get_all_values():
-            sheet.append_row(["Waktu", "Customer", "UP", "WA", "Pesanan", "Status", "Sales"])
-        return sheet
+        spreadsheet = client.open("Antrean Penawaran TTS")
     except Exception as e:
         st.error(f"Koneksi GSheets Gagal: {e}")
         return None
 
+    cfg = USERS.get(username, {})
+    display_name = str(cfg.get("name", username)).strip().replace(" ", "_")
+    sheet_title = f"Antrean_{display_name}"
+
+    try:
+        ws = spreadsheet.worksheet(sheet_title)
+    except gspread.WorksheetNotFound:
+        ws = spreadsheet.add_worksheet(title=sheet_title, rows=500, cols=len(SHEET_HEADERS))
+        ws.append_row(SHEET_HEADERS)
+
+    if not ws.get_all_values():
+        ws.append_row(SHEET_HEADERS)
+
+    return ws
+
 REQUIRED_DB_COLS = ['Nama Barang', 'Harga', 'Satuan']
 
 def _normalize_col(c):
-    # buang BOM, spasi berlebih, underscore -> spasi, lalu title-case biar konsisten
     c = str(c).replace('\ufeff', '').strip()
     c = c.replace('_', ' ')
     c = ' '.join(c.split())
@@ -390,13 +414,11 @@ def load_db():
         return empty_df
 
     last_err = None
-    # coba auto-detect delimiter dulu, lalu fallback ke delimiter umum
     for sep in (None, ',', ';', '\t'):
         try:
             df = _try_read_csv("database_barang.csv", sep)
             df.columns = [_normalize_col(c) for c in df.columns]
 
-            # cocokkan nama kolom secara case-insensitive terhadap yang wajib ada
             col_map = {c.lower(): c for c in df.columns}
             rename_dict = {}
             for req in REQUIRED_DB_COLS:
@@ -413,8 +435,6 @@ def load_db():
             last_err = e
             continue
 
-    # Semua percobaan gagal / kolom wajib tidak ketemu -> jangan crash,
-    # tampilkan pesan yang jelas supaya gampang di-debug.
     try:
         preview_cols = list(pd.read_csv("database_barang.csv", sep=None, engine='python',
                                          on_bad_lines='skip', nrows=0).columns)
@@ -430,16 +450,9 @@ def load_db():
 
 df_barang = load_db()
 
-# Daftar nama barang di-cache sekali di memori. Dipakai oleh search_barang()
-# supaya st_searchbox gak perlu ngirim ribuan nama barang sekaligus ke browser
-# tiap kali ada huruf baru yang diketik.
 _ALL_NAMA_BARANG = df_barang['Nama Barang'].tolist()
 
 def search_barang(searchterm: str):
-    """Dipanggil st_searchbox setelah user berhenti ngetik sejenak (debounce).
-    Prioritas: substring match (semua barang yang mengandung kata kuncinya
-    ikut muncul, gak dipotong berdasar skor kemiripan). Fuzzy match dipakai
-    cuma sebagai cadangan kalau gak ada yang match persis (typo dsb)."""
     if not searchterm or len(searchterm) < 2:
         return []
     kw = searchterm.strip().lower()
@@ -495,12 +508,64 @@ if "active_menu" not in st.session_state:
     st.session_state.active_menu = "🏠 Home"
 if "cart" not in st.session_state:
     st.session_state.cart = []
-if "admin_logged_in" not in st.session_state:
-    st.session_state.admin_logged_in = False
+if "auth_user" not in st.session_state:
+    st.session_state.auth_user = None
 if "widget_id" not in st.session_state:
     st.session_state.widget_id = 0
 if "saved_items_cache" not in st.session_state:
     st.session_state.saved_items_cache = {}
+
+
+# =========================================================
+# AUTH: login per-orang (dipakai gerbang untuk Admin Sales & Dashboard)
+# =========================================================
+def current_profile():
+    u = st.session_state.auth_user
+    if u and u in USERS:
+        cfg = USERS[u]
+        return cfg.get("name", ""), cfg.get("title", ""), cfg.get("wa", ""), cfg.get("email", "")
+    return "", "", "", ""
+
+MARKETING_NAME, MARKETING_TITLE, MARKETING_WA, MARKETING_EMAIL = current_profile()
+
+TTD_FILES = {
+    "asin": "ttd_clean.png",
+    "artini": "ttd_artini.png",
+    "topan": "ttd_topan.png",
+}
+_ttd_candidate = TTD_FILES.get(st.session_state.auth_user, "ttd_clean.png")
+TTD_PATH = _ttd_candidate if os.path.exists(_ttd_candidate) else "ttd_clean.png"
+
+def require_login():
+    if st.session_state.auth_user:
+        return True
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    _, mid_col, _ = st.columns([1, 2, 1])
+    with mid_col:
+        st.markdown('<div class="pwd-box">', unsafe_allow_html=True)
+        st.markdown("""
+        <div style="text-align:center; margin-bottom:24px;">
+            <div style="font-size:2.8rem;">🔐</div>
+            <div style="font-family:'Playfair Display',serif;font-size:1.15rem;color:#002855;font-weight:700;margin-top:10px;">Login Sales</div>
+            <div style="font-size:0.82rem;color:#7a9ab8;margin-top:6px;">Masuk dengan akun kamu untuk lanjut</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        uname_input = st.text_input("👤 Username", placeholder="mis. asin", key="login_uname_field")
+        pwd_input = st.text_input("🔑 Password", type="password", placeholder="Masukkan password...", key="login_pwd_field")
+
+        if st.button("🚀 MASUK", use_container_width=True, type="primary", key="btn_login_unified"):
+            uname_clean = uname_input.strip().lower()
+            cfg = USERS.get(uname_clean)
+            if cfg and pwd_input == cfg.get("password"):
+                st.session_state.auth_user = uname_clean
+                st.rerun()
+            else:
+                st.error("❌ Username / password salah. Coba lagi.")
+
+        st.markdown('</div>', unsafe_allow_html=True)
+    return False
 
 
 # =========================================================
@@ -681,7 +746,6 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, diskon_pct, disko
         pdf.cell(0, 5, f"Tanggal      : {waktu_skrg.strftime('%d %B %Y')}", ln=1, align='R')
         pdf.cell(0, 5, f"Berlaku s/d  : {expiry_date.strftime('%d %B %Y')}", ln=1, align='R')
 
-        # Badge masa berlaku
         badge_color = COLOR_GREEN if sisa_hari > 3 else COLOR_RED
         badge_text  = f"BERLAKU {sisa_hari} HARI"
         pdf.set_font('Arial', 'B', 7)
@@ -708,7 +772,6 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, diskon_pct, disko
         pdf.set_text_color(*COLOR_TEXT)
         pdf.cell(90, 5, f"U/P: {pic}", ln=1)
 
-        # QR konfirmasi WA di pojok kanan atas area pelanggan
         if qr_path and os.path.exists(qr_path):
             pdf.image(qr_path, x=172, y=y_top, w=24)
             pdf.set_xy(160, y_top + 24)
@@ -799,7 +862,6 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, diskon_pct, disko
         pdf.set_line_width(0.8)
         pdf.line(115, pdf.get_y(), 200, pdf.get_y())
 
-        # Catatan tambahan (opsional)
         if catatan and catatan.strip():
             pdf.ln(6)
             y_note = pdf.get_y()
@@ -868,12 +930,16 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, diskon_pct, disko
         pdf.set_text_color(*COLOR_GOLD)
         pdf.cell(60, 5, "Hormat Kami,", ln=1)
 
-        ttd_path = "ttd_clean.png"
+        ttd_path = TTD_PATH
+        TTD_MAX_W, TTD_MAX_H = 50, 45
+        ttd_render_h = 0
         if os.path.exists(ttd_path):
             try:
                 from PIL import Image as PILImage
                 import numpy as _np
                 ttd_img = PILImage.open(ttd_path).convert("RGBA")
+                img_to_draw = ttd_path
+
                 if os.path.exists("logo.png"):
                     logo_img = PILImage.open("logo.png").convert("RGBA")
                     lw = int(ttd_img.width * 0.75)
@@ -886,23 +952,32 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, diskon_pct, disko
                     ly = max(0, (ttd_img.height - lh) // 2)
                     canvas = ttd_img.copy()
                     canvas.paste(logo_faded, (lx, ly), logo_faded)
-                    tmp_path = "/tmp/ttd_stamp_combined.png"
+                    tmp_path = f"/tmp/ttd_stamp_combined_{os.path.splitext(os.path.basename(ttd_path))[0]}.png"
                     canvas.save(tmp_path)
-                    pdf.image(tmp_path, x=133, y=pdf.get_y() + 1, w=50)
-                else:
-                    pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
+                    img_to_draw = tmp_path
+
+                aspect_h_per_w = ttd_img.height / ttd_img.width
+                render_w = TTD_MAX_W
+                render_h = render_w * aspect_h_per_w
+                if render_h > TTD_MAX_H:
+                    render_h = TTD_MAX_H
+                    render_w = render_h / aspect_h_per_w
+
+                pdf.image(img_to_draw, x=133, y=pdf.get_y() + 1, w=render_w, h=render_h)
+                ttd_render_h = render_h
             except Exception as _e:
-                pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=50)
-            pdf.set_y(pdf.get_y() + 30)
+                pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=TTD_MAX_W)
+                ttd_render_h = TTD_MAX_H
+            pdf.set_y(pdf.get_y() + max(ttd_render_h, 10) + 4)
         else:
             pdf.ln(10)
+
 
         pdf.set_x(138)
         pdf.set_font('Arial', 'B', 12)
         pdf.set_text_color(*COLOR_NAVY)
         pdf.cell(60, 7, MARKETING_NAME.upper(), ln=1)
 
-        # Jabatan
         pdf.set_x(138)
         pdf.set_font('Arial', 'I', 8.5)
         pdf.set_text_color(*COLOR_TEXT)
@@ -920,12 +995,10 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, diskon_pct, disko
         pdf.set_text_color(150, 150, 150)
         pdf.cell(60, 4, f"Kode Verifikasi: {kode_verif}", ln=1)
 
-    # Pass 1: hitung jumlah halaman
     pdf1 = PenawaranPDF(total_pages=99)
     _render(pdf1)
     total_pages = pdf1.page
 
-    # Pass 2: render final
     pdf2 = PenawaranPDF(total_pages=total_pages)
     _render(pdf2)
 
@@ -980,7 +1053,6 @@ def generate_excel(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_tota
         worksheet.write(row_idx, 4, "VAT (PPN 11%)", fmt_total_label); worksheet.write(row_idx, 5, ppn, fmt_money); row_idx += 1
         worksheet.write(row_idx, 4, "GRAND TOTAL", fmt_total_label); worksheet.write(row_idx, 5, grand_total, fmt_grand_total)
 
-        # Jabatan di Excel
         worksheet.write(row_idx + 3, 0, MARKETING_NAME, workbook.add_format({'bold': True}))
         worksheet.write(row_idx + 4, 0, MARKETING_TITLE, workbook.add_format({'italic': True, 'font_color': '#002855'}))
 
@@ -993,12 +1065,18 @@ def generate_excel(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_tota
 if menu == "🏠 Home":
     render_header(COMPANY_NAME, SLOGAN, f"📍 {ADDR.split(',')[0]}")
 
-    c1, c2 = st.columns(2)
-    c1.metric("🧑‍💼 Marketing", f"{MARKETING_NAME} · {MARKETING_TITLE}")
-    c2.metric("📞 WhatsApp", MARKETING_WA)
-    c3, c4 = st.columns(2)
-    c3.metric("📧 Email", "alattulis.tts")
-    c4.metric("🏢 Kantor", OFFICE_PHONE)
+    if st.session_state.auth_user:
+        c1, c2 = st.columns(2)
+        c1.metric("🧑‍💼 Login sebagai", f"{MARKETING_NAME} · {MARKETING_TITLE}")
+        c2.metric("📞 WhatsApp", MARKETING_WA)
+        c3, c4 = st.columns(2)
+        c3.metric("📧 Email", MARKETING_EMAIL)
+        c4.metric("🏢 Kantor", OFFICE_PHONE)
+    else:
+        c1, c2 = st.columns(2)
+        c1.metric("🏢 Kantor", OFFICE_PHONE)
+        c2.metric("📧 Email", "alattulis.tts")
+        st.info("💡 Login diperlukan untuk membuka **Admin Sales** dan **Dashboard**.")
 
     st.markdown("<br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
@@ -1018,6 +1096,15 @@ if menu == "🏠 Home":
 # =========================================================
 elif menu == "📝 Admin Sales":
     render_header("Form Penawaran", "Buat & kirim penawaran baru", "📋 Admin Sales")
+
+    if not require_login():
+        st.stop()
+
+    col_who, col_out = st.columns([4, 1])
+    col_who.success(f"✅ Login sebagai **{MARKETING_NAME}** — {MARKETING_TITLE}")
+    if col_out.button("🚪 Logout", use_container_width=True, key="btn_logout_admin"):
+        st.session_state.auth_user = None
+        st.rerun()
 
     render_section_title("👤 Data Pelanggan")
     with st.container(border=True):
@@ -1124,7 +1211,7 @@ elif menu == "📝 Admin Sales":
             if not nama_toko:
                 st.error("⚠️ Nama Toko/Perusahaan wajib diisi!")
             else:
-                sheet = connect_gsheet()
+                sheet = get_user_worksheet(st.session_state.auth_user)
                 if sheet:
                     wkt = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M")
                     sheet.append_row([wkt, nama_toko, up_nama, wa_nomor, str(st.session_state.cart), "Pending", MARKETING_NAME])
@@ -1140,41 +1227,16 @@ elif menu == "📝 Admin Sales":
 # SALES DASHBOARD
 # =========================================================
 elif menu == "👨‍💻 Sales Dashboard":
-    render_header("Sales Dashboard", f"Kelola antrean · {MARKETING_NAME} · {MARKETING_TITLE}", "🔐 Admin Only")
+    render_header("Sales Dashboard", "Kelola antrean penawaran", "🔐 Login Diperlukan")
 
-    if not st.session_state.admin_logged_in:
-        st.markdown("<br>", unsafe_allow_html=True)
-        _, mid_col, _ = st.columns([1, 2, 1])
-        with mid_col:
-            st.markdown('<div class="pwd-box">', unsafe_allow_html=True)
-            st.markdown("""
-            <div style="text-align:center; margin-bottom:24px;">
-                <div style="font-size:2.8rem;">🔐</div>
-                <div style="font-family:'Playfair Display',serif;font-size:1.15rem;color:#002855;font-weight:700;margin-top:10px;">Login Admin</div>
-                <div style="font-size:0.82rem;color:#7a9ab8;margin-top:6px;">Masukkan password untuk mengakses dashboard</div>
-            </div>
-            """, unsafe_allow_html=True)
+    if not require_login():
+        st.stop()
 
-            pwd_input = st.text_input(
-                "🔑 Password Admin",
-                type="password",
-                placeholder="Masukkan password...",
-                key="pwd_field_main"
-            )
-            if st.button("🚀 MASUK KE DASHBOARD", use_container_width=True, type="primary", key="btn_login_main"):
-                if pwd_input == ADMIN_PASSWORD:
-                    st.session_state.admin_logged_in = True
-                    st.rerun()
-                else:
-                    st.error("❌ Password salah. Coba lagi.")
-
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    else:
+    if True:  # menjaga indentasi blok lama (dulu bagian 'else' dari cek password)
         col_inf, col_out, col_ref = st.columns([3, 1, 1])
         col_inf.success(f"✅ Login sebagai **{MARKETING_NAME}** — {MARKETING_TITLE}")
         if col_out.button("🚪 Logout", use_container_width=True, key="btn_logout"):
-            st.session_state.admin_logged_in = False
+            st.session_state.auth_user = None
             st.rerun()
         if col_ref.button("🔄 Refresh", use_container_width=True, key="btn_refresh"):
             st.session_state.saved_items_cache = {}
@@ -1182,23 +1244,21 @@ elif menu == "👨‍💻 Sales Dashboard":
             st.cache_data.clear()
             st.rerun()
 
-        with st.expander("📁 Update Database Barang (.csv)", expanded=False):
-            st.caption("Upload file CSV baru untuk mengganti database produk.")
-            up_f2 = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="csv_up_login")
-            if up_f2:
-                if st.button("🚀 Update Database Sekarang", key="btn_csv_login", type="primary"):
-                    with open("database_barang.csv", "wb") as f:
-                        f.write(up_f2.getbuffer())
-                    st.cache_data.clear()
-                    st.success("✅ Database berhasil diperbarui!")
-                    time.sleep(1); st.rerun()
+        if st.session_state.auth_user == "asin":
+            with st.expander("📁 Update Database Barang (.csv)", expanded=False):
+                st.caption("Upload file CSV baru untuk mengganti database produk.")
+                up_f2 = st.file_uploader("Pilih file CSV baru:", type=["csv"], key="csv_up_login")
+                if up_f2:
+                    if st.button("🚀 Update Database Sekarang", key="btn_csv_login", type="primary"):
+                        with open("database_barang.csv", "wb") as f:
+                            f.write(up_f2.getbuffer())
+                        st.cache_data.clear()
+                        st.success("✅ Database berhasil diperbarui!")
+                        time.sleep(1); st.rerun()
 
-        sheet = connect_gsheet()
+        sheet = get_user_worksheet(st.session_state.auth_user)
         if sheet:
             try:
-                # Ambil semua baris HANYA sekali per sesi (bukan setiap rerun akibat
-                # klik checkbox/qty/dsb). Cache dibuang manual lewat tombol Refresh,
-                # atau otomatis setelah ada aksi yang mengubah data (simpan/selesai).
                 if "gs_all_vals" not in st.session_state:
                     st.session_state.gs_all_vals = sheet.get_all_values()
                 all_vals = st.session_state.gs_all_vals
@@ -1212,12 +1272,9 @@ elif menu == "👨‍💻 Sales Dashboard":
                     for col in required_cols:
                         df_gs[col] = df_gs[col].astype(str).str.strip()
 
-                    pending = df_gs[
-                        (df_gs['Status'].str.lower() == 'pending') &
-                        (df_gs['Sales'] == MARKETING_NAME)
-                    ]
+                    pending = df_gs[df_gs['Status'].str.lower() == 'pending']
 
-                    total_all     = len(df_gs[df_gs['Sales'] == MARKETING_NAME])
+                    total_all     = len(df_gs)
                     total_pending = len(pending)
                     total_done    = total_all - total_pending
 
@@ -1369,9 +1426,6 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     current_items = read_row_fresh(sheet, real_row_idx)
                                     if not current_items:
                                         current_items = items_list
-                                    # Simpan ke cache SEKARANG juga, supaya rerun berikutnya
-                                    # (misal: klik checkbox/qty di item lain) tidak memicu
-                                    # API call + baca ulang row ini dari Google Sheets lagi.
                                     st.session_state.saved_items_cache[real_row_idx] = current_items
 
                                 if current_items:
