@@ -40,7 +40,7 @@ OFFICE_PHONE = "(021) 55780659"
 # name = "Topan"
 # title = "Sales Executive"
 # wa = "08xx-xxxx-xxxx"
-# email = "topan.tts@gmail.com"
+# email = "topan.@gmail.com"
 def _load_users():
     if "users" in st.secrets:
         return {uname: dict(cfg) for uname, cfg in st.secrets["users"].items()}
@@ -1377,7 +1377,7 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     st.metric("PPN 11%", f"Rp {tax:,.0f}")
                                     st.markdown("<br>", unsafe_allow_html=True)
 
-                                    no_s = st.text_input("📄 Nomor Surat:", value="/S-TTS/VII/2026", key=f"ns_print_{real_row_idx}")
+                                    no_s = st.text_input("📄 Nomor Surat:", value="/S-TTS/VIII/2026", key=f"ns_print_{real_row_idx}")
 
                                     b1, b2 = st.columns(2)
                                     pdf_data = generate_pdf(no_s, customer_val, up_val, f_df, subt, tax, gtot)
