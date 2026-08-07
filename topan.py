@@ -24,7 +24,7 @@ OFFICE_PHONE = "(021) 55780659"
 # [users.asin]
 # password = "xxxxx"
 # name = "Asin"
-# title = "Spv Sales & Marketing"
+# title = "Koordinator Sales & Marketing"
 # wa = "0815-8199-775"
 # email = "alattulis.tts@gmail.com"
 #
@@ -47,7 +47,7 @@ def _load_users():
     # Fallback dev-only kalau secrets belum diisi. GANTI password ini sebelum deploy!
     return {
         "asin": {
-            "password": "asin123", "name": "Asin", "title": "Spv Sales & Marketing",
+            "password": "asin123", "name": "Asin", "title": "Koordinator Sales & Marketing",
             "wa": "0815-8199-775", "email": "alattulis.tts@gmail.com",
         },
         "artini": {
