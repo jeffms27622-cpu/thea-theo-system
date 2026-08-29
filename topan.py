@@ -1379,18 +1379,27 @@ elif menu == "👨‍💻 Sales Dashboard":
 
                                     no_s = st.text_input("📄 Nomor Surat:", value="/S-TTS/VIII/2026", key=f"ns_print_{real_row_idx}")
 
+                                    # ── Timestamp buat bedain tiap file hasil revisi ──
+                                    # Ditaruh di sini (bukan pas generate) supaya nama file
+                                    # ke-lock ke waktu render terakhir, jadi tiap kali habis
+                                    # klik Simpan Perubahan lalu download ulang, namanya beda.
+                                    waktu_file = (datetime.utcnow() + timedelta(hours=7)).strftime("%d%m%y_%H%M")
+                                    safe_cust  = "".join(
+                                        c for c in str(customer_val) if c.isalnum() or c in (" ", "-", "_")
+                                    ).strip().replace(" ", "_")
+
                                     b1, b2 = st.columns(2)
                                     pdf_data = generate_pdf(no_s, customer_val, up_val, f_df, subt, tax, gtot)
                                     b1.download_button(
                                         label="📩 PDF", data=pdf_data,
-                                        file_name=f"Quo_{customer_val}.pdf",
+                                        file_name=f"Quo_{safe_cust}_{waktu_file}.pdf",
                                         key=f"btn_p_{real_row_idx}",
                                         use_container_width=True, type="primary"
                                     )
                                     xls_data = generate_excel(no_s, customer_val, up_val, f_df, subt, tax, gtot)
                                     b2.download_button(
                                         label="📊 Excel", data=xls_data,
-                                        file_name=f"{customer_val}.xlsx",
+                                        file_name=f"Quo_{safe_cust}_{waktu_file}.xlsx",
                                         key=f"btn_x_{real_row_idx}",
                                         use_container_width=True
                                     )
