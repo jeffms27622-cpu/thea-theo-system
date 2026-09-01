@@ -1377,7 +1377,7 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     st.metric("PPN 11%", f"Rp {tax:,.0f}")
                                     st.markdown("<br>", unsafe_allow_html=True)
 
-                                    no_s = st.text_input("📄 Nomor Surat:", value="/S-TTS/VIII/2026", key=f"ns_print_{real_row_idx}")
+                                    no_s = st.text_input("📄 Nomor Surat:", value="/S-TTS/IX/2026", key=f"ns_print_{real_row_idx}")
 
                                     # ── Timestamp buat bedain tiap file hasil revisi ──
                                     # Ditaruh di sini (bukan pas generate) supaya nama file
