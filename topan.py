@@ -851,8 +851,8 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
             "2. Penawaran berlaku 7 hari dari tanggal surat.\n"
             "3. Pengiriman 1 hari kerja setelah konfirmasi PO.\n"
             "4. Pembayaran ditransfer HANYA ke rekening berikut:\n"
-            "   Bank       : Bank Mandiri\n"
-            "   No. Rek    : 1550010174996\n"
+            "   Bank       : Bank BCA\n"
+            "   No. Rek    : 658 033 8818\n"
             "   Atas Nama  : PT THEA THEO STATIONARY"
         )
         pdf.set_x(13)
