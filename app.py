@@ -19,6 +19,29 @@ ADDR = "Komp. Ruko Modernland Cipondoh Blok. AR No. 27, Tangerang"
 OFFICE_PHONE = "(021) 55780659"
 
 # ── Akun Sales & Marketing (login per-orang, password beda-beda) ──
+# Idealnya diisi lewat st.secrets["users"] di Streamlit Cloud, contoh format
+# .streamlit/secrets.toml:
+#
+# [users.asin]
+# password = "xxxxx"
+# name = "Asin"
+# title = "Koordinator Sales & Marketing"
+# wa = "0815-8199-775"
+# email = "alattulis.tts@gmail.com"
+#
+# [users.artini]
+# password = "yyyyy"
+# name = "Artini"
+# title = "Sales Executive"
+# wa = "08xx-xxxx-xxxx"
+# email = "artini.tts@gmail.com"
+#
+# [users.topan]
+# password = "zzzzz"
+# name = "Topan"
+# title = "Sales Executive"
+# wa = "08xx-xxxx-xxxx"
+# email = "topan.tts@gmail.com"
 def _load_users():
     if "users" in st.secrets:
         return {uname: dict(cfg) for uname, cfg in st.secrets["users"].items()}
@@ -39,9 +62,15 @@ def _load_users():
 
 USERS = _load_users()
 
-COLOR_NAVY = (0, 40, 85)
-COLOR_GOLD = (184, 134, 11)
-COLOR_TEXT = (30, 30, 30)
+# ── Palet Warna Korporat Internasional (Untuk UI & PDF) ──
+COLOR_NAVY       = (0, 32, 68)       # Deep Executive Navy
+COLOR_NAVY_LIGHT = (15, 55, 100)     # Secondary Royal Navy
+COLOR_GOLD       = (184, 134, 11)    # Classic Corporate Gold
+COLOR_GOLD_SOFT  = (250, 244, 228)   # Soft Champagne Gold Tint
+COLOR_SLATE_BG   = (244, 247, 251)   # Light Platinum / Ice Gray
+COLOR_BORDER     = (205, 215, 228)   # Crisp Hairline Border
+COLOR_TEXT       = (28, 35, 45)      # Charcoal Dark Text
+COLOR_MUTED      = (100, 112, 128)   # Muted Slate Gray
 
 ROMAN_MONTHS = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"]
 
@@ -722,7 +751,6 @@ with st.container(border=True):
             st.session_state.active_menu = "👨‍💻 Sales Dashboard"
             st.rerun()
 
-# Tampilkan bar profil ringkas jika sedang login
 if st.session_state.auth_user:
     u_col1, u_col2 = st.columns([5, 1])
     with u_col1:
@@ -748,240 +776,620 @@ menu = st.session_state.active_menu
 
 
 # =========================================================
-# PDF GENERATOR
+# PDF GENERATOR (INTERNATIONAL CORPORATE EDITION)
 # =========================================================
+def _pdf_safe(text):
+    """Pastikan semua karakter aman untuk encoding latin-1 bawaan FPDF."""
+    if text is None:
+        return ""
+    replacements = {
+        "\u2013": "-", "\u2014": "-", "\u2018": "'", "\u2019": "'",
+        "\u201c": '"', "\u201d": '"', "\u2022": "-", "\u2026": "...",
+        "\u00a0": " ", "\u2212": "-"
+    }
+    s = str(text)
+    for k, v in replacements.items():
+        s = s.replace(k, v)
+    return s.encode("latin-1", "replace").decode("latin-1")
+
+
+def angka_ke_terbilang(n):
+    """Konversi angka nominal ke kalimat Terbilang Bahasa Indonesia."""
+    n = int(round(abs(n)))
+    if n == 0:
+        return "Nol"
+    satuan = [
+        "", "Satu", "Dua", "Tiga", "Empat", "Lima",
+        "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"
+    ]
+
+    def _konversi(x):
+        if x < 12:
+            return satuan[x]
+        elif x < 20:
+            return _konversi(x - 10) + " Belas"
+        elif x < 100:
+            hasil = _konversi(x // 10) + " Puluh"
+            if x % 10 > 0:
+                hasil += " " + _konversi(x % 10)
+            return hasil
+        elif x < 200:
+            hasil = "Seratus"
+            if x - 100 > 0:
+                hasil += " " + _konversi(x - 100)
+            return hasil
+        elif x < 1000:
+            hasil = _konversi(x // 100) + " Ratus"
+            if x % 100 > 0:
+                hasil += " " + _konversi(x % 100)
+            return hasil
+        elif x < 2000:
+            hasil = "Seribu"
+            if x - 1000 > 0:
+                hasil += " " + _konversi(x - 1000)
+            return hasil
+        elif x < 1_000_000:
+            hasil = _konversi(x // 1000) + " Ribu"
+            if x % 1000 > 0:
+                hasil += " " + _konversi(x % 1000)
+            return hasil
+        elif x < 1_000_000_000:
+            hasil = _konversi(x // 1_000_000) + " Juta"
+            if x % 1_000_000 > 0:
+                hasil += " " + _konversi(x % 1_000_000)
+            return hasil
+        elif x < 1_000_000_000_000:
+            hasil = _konversi(x // 1_000_000_000) + " Miliar"
+            if x % 1_000_000_000 > 0:
+                hasil += " " + _konversi(x % 1_000_000_000)
+            return hasil
+        else:
+            return str(x)
+
+    return " ".join(_konversi(n).split()) + " Rupiah"
+
+
 class PenawaranPDF(FPDF):
-    def __init__(self, total_pages=1):
+    def __init__(self, total_pages=1, no_surat=""):
         super().__init__()
         self.total_pages = total_pages
+        self.no_surat = no_surat
+
+    def cell(self, w=0, h=0, txt='', border=0, ln=0, align='', fill=False, link=''):
+        super().cell(w, h, _pdf_safe(txt), border, ln, align, fill, link)
+
+    def multi_cell(self, w, h, txt='', border=0, align='J', fill=False):
+        super().multi_cell(w, h, _pdf_safe(txt), border, align, fill)
 
     def header(self):
+        # 1. Background Banner Utama (Deep Executive Navy)
         self.set_fill_color(*COLOR_NAVY)
-        self.rect(0, 0, 210, 52, 'F')
+        self.rect(0, 0, 210, 44, 'F')
 
-        self.set_fill_color(255, 255, 255)
-        self.rect(10, 6, 44, 40, 'F')
-
+        # 2. Aksen Garis Atas & Bawah Emas (International Luxury Trim)
         self.set_fill_color(*COLOR_GOLD)
-        self.rect(58, 0, 3, 52, 'F')
+        self.rect(0, 0, 210, 2.2, 'F')
+        self.rect(0, 44, 210, 1.5, 'F')
+        self.set_fill_color(*COLOR_NAVY_LIGHT)
+        self.rect(0, 45.5, 210, 0.8, 'F')
+
+        # 3. Kotak Logo Eksklusif di Kiri
+        self.set_fill_color(255, 255, 255)
+        self.rect(10, 6.5, 33, 32, 'F')
+        self.set_draw_color(*COLOR_GOLD)
+        self.set_line_width(0.4)
+        self.rect(10, 6.5, 33, 32, 'D')
 
         if os.path.exists("logo.png"):
-            self.image("logo.png", 13, 10, 38)
+            self.image("logo.png", 12.5, 9, 28)
+        else:
+            self.set_xy(10, 13)
+            self.set_font('Arial', 'B', 16)
+            self.set_text_color(*COLOR_NAVY)
+            self.cell(33, 8, "TTS", 0, 2, 'C')
+            self.set_font('Arial', 'B', 6)
+            self.set_text_color(*COLOR_GOLD)
+            self.cell(33, 4, "STATIONARY", 0, 0, 'C')
 
-        self.set_y(10); self.set_x(66)
-        self.set_font('Arial', 'B', 17)
+        # 4. Identitas Perusahaan (Tengah-Kiri)
+        self.set_xy(47, 7.5)
+        self.set_font('Arial', 'B', 14.5)
         self.set_text_color(255, 255, 255)
-        self.cell(0, 8, COMPANY_NAME, ln=1)
+        self.cell(90, 6.5, COMPANY_NAME, ln=1)
 
-        self.set_x(66)
-        self.set_font('Arial', 'B', 8.5)
+        self.set_x(47)
+        self.set_font('Arial', 'B', 7.5)
         self.set_text_color(*COLOR_GOLD)
-        self.cell(0, 5, "  ".join(SLOGAN.upper()), ln=1)
+        self.cell(90, 4.5, "CORPORATE OFFICE & SCHOOL SUPPLIES SOLUTION", ln=1)
 
-        self.set_fill_color(255, 255, 255)
-        self.rect(66, 26, 132, 0.3, 'F')
+        self.set_draw_color(80, 110, 145)
+        self.set_line_width(0.2)
+        self.line(47, 20.5, 136, 20.5)
 
-        self.set_y(29); self.set_x(66)
-        self.set_font('Arial', '', 7.5)
-        self.set_text_color(210, 220, 235)
-        self.cell(0, 4.5, ADDR, ln=1)
-        self.set_x(66)
-        self.cell(0, 4.5, f"Office: {OFFICE_PHONE}  |  WA: {MARKETING_WA}", ln=1)
-        self.set_x(66)
-        self.cell(0, 4.5, f"Email: {MARKETING_EMAIL}", ln=1)
+        self.set_xy(47, 22)
+        self.set_font('Arial', '', 7.2)
+        self.set_text_color(215, 225, 238)
+        self.cell(90, 4, ADDR, ln=1)
+        self.set_x(47)
+        self.cell(90, 4, f"Office: {OFFICE_PHONE}  |  WhatsApp: {MARKETING_WA}", ln=1)
+        self.set_x(47)
+        self.cell(90, 4, f"Email: {MARKETING_EMAIL}", ln=1)
 
-        self.set_fill_color(*COLOR_GOLD)
-        self.rect(0, 52, 210, 2.5, 'F')
+        # 5. Badge "COMMERCIAL QUOTATION" di Kanan Atas
+        self.set_fill_color(*COLOR_NAVY_LIGHT)
+        self.set_draw_color(*COLOR_GOLD)
+        self.set_line_width(0.35)
+        self.rect(142, 6.5, 58, 32, 'DF')
 
-        self.set_y(62)
+        self.set_xy(142, 8.2)
+        self.set_font('Arial', 'B', 6.5)
+        self.set_text_color(*COLOR_GOLD)
+        self.cell(58, 3.8, "COMMERCIAL DOCUMENT", 0, 1, 'C')
+
+        self.set_x(142)
+        self.set_font('Arial', 'B', 13)
+        self.set_text_color(255, 255, 255)
+        self.cell(58, 6, "QUOTATION", 0, 1, 'C')
+
+        self.set_x(142)
+        self.set_font('Arial', '', 6.8)
+        self.set_text_color(200, 215, 235)
+        self.cell(58, 4, "SURAT PENAWARAN HARGA", 0, 1, 'C')
+
+        # Pill nomor referensi di dalam badge
+        self.set_fill_color(0, 22, 48)
+        self.rect(145, 27, 52, 8.5, 'F')
+        self.set_xy(145, 28)
+        self.set_font('Arial', 'B', 6.8)
+        self.set_text_color(*COLOR_GOLD)
+        ref_short = self.no_surat if self.no_surat else "/S-TTS/X/2026"
+        self.cell(52, 6.5, f"NO: {ref_short[:24]}", 0, 0, 'C')
+
+        self.set_y(50)
 
     def footer(self):
         self.set_y(-18)
         self.set_fill_color(*COLOR_GOLD)
-        self.rect(0, self.get_y(), 210, 1.5, 'F')
+        self.rect(0, self.get_y(), 210, 1.2, 'F')
 
         self.set_fill_color(*COLOR_NAVY)
-        self.rect(0, self.get_y() + 1.5, 210, 17, 'F')
+        self.rect(0, self.get_y() + 1.2, 210, 16.8, 'F')
 
-        self.set_y(-14)
-        self.set_font('Arial', 'B', 8)
+        self.set_y(-14.5)
+        self.set_x(10)
+        self.set_font('Arial', 'B', 7.2)
         self.set_text_color(255, 255, 255)
-        self.cell(0, 5, SLOGAN.upper(), 0, 1, 'C')
+        self.cell(120, 4.5, f"{COMPANY_NAME}  -  {SLOGAN.upper()}", 0, 0, 'L')
 
-        self.set_font('Arial', '', 7)
+        self.set_font('Arial', 'B', 7.2)
         self.set_text_color(*COLOR_GOLD)
-        self.cell(0, 4,
-                  f"{COMPANY_NAME}  |  {ADDR}  |  Hal. {self.page_no()} / {self.total_pages}",
-                  0, 0, 'C')
+        self.cell(70, 4.5, f"Page {self.page_no()} of {self.total_pages}", 0, 1, 'R')
+
+        self.set_x(10)
+        self.set_font('Arial', '', 6.5)
+        self.set_text_color(180, 198, 220)
+        self.cell(120, 4, f"Confidential Commercial Quotation  |  Ref: {self.no_surat}", 0, 0, 'L')
+        self.cell(70, 4, f"Office: {OFFICE_PHONE}  |  {MARKETING_EMAIL}", 0, 0, 'R')
 
 
 def draw_table_header(pdf):
     pdf.set_fill_color(*COLOR_NAVY)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font('Arial', 'B', 9)
-    pdf.set_draw_color(*COLOR_GOLD)
-    pdf.set_line_width(0.4)
+    pdf.set_font('Arial', 'B', 7.8)
+    pdf.set_draw_color(*COLOR_NAVY)
+    pdf.set_line_width(0.3)
 
-    pdf.cell(10, 10, 'NO',        border=1, align='C', fill=True)
-    pdf.cell(82, 10, 'DESKRIPSI', border=1, align='C', fill=True)
-    pdf.cell(18, 10, 'QTY',       border=1, align='C', fill=True)
-    pdf.cell(20, 10, 'SATUAN',    border=1, align='C', fill=True)
-    pdf.cell(30, 10, 'HARGA',     border=1, align='C', fill=True)
-    pdf.cell(30, 10, 'TOTAL',     border=1, align='C', fill=True)
+    pdf.cell(10, 9, 'NO',                                      border=1, align='C', fill=True)
+    pdf.cell(80, 9, '  ITEM DESCRIPTION / SPESIFIKASI BARANG', border=1, align='L', fill=True)
+    pdf.cell(16, 9, 'QTY',                                     border=1, align='C', fill=True)
+    pdf.cell(20, 9, 'UOM',                                     border=1, align='C', fill=True)
+    pdf.cell(31, 9, 'UNIT PRICE (IDR) ',                       border=1, align='R', fill=True)
+    pdf.cell(33, 9, 'LINE TOTAL (IDR) ',                       border=1, align='R', fill=True)
     pdf.ln()
 
+    pdf.set_fill_color(*COLOR_GOLD)
+    pdf.rect(10, pdf.get_y(), 190, 0.8, 'F')
+    pdf.set_y(pdf.get_y() + 0.8)
 
-def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total):
+
+def _split_lines(pdf, text, max_width):
+    """Pecah nama barang panjang menjadi beberapa baris agar rapi di dalam sel tabel."""
+    words = _pdf_safe(text).split(' ')
+    lines = []
+    current_line = ""
+    for w in words:
+        test_line = f"{current_line} {w}".strip() if current_line else w
+        if pdf.get_string_width(test_line) <= max_width:
+            current_line = test_line
+        else:
+            if current_line:
+                lines.append(current_line)
+            current_line = w
+    if current_line:
+        lines.append(current_line)
+    return lines if lines else [""]
+
+
+def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total, cust_wa=""):
     def _render(pdf):
-        pdf.set_margins(10, 70, 10)
-        pdf.set_auto_page_break(auto=True, margin=28)
+        pdf.set_margins(10, 50, 10)
+        pdf.set_auto_page_break(auto=True, margin=22)
         pdf.add_page()
-
-        pdf.set_y(62)
-        pdf.set_font('Arial', 'B', 26)
-        pdf.set_text_color(*COLOR_NAVY)
-        pdf.cell(0, 10, "QUOTATION", ln=1, align='R')
-
-        pdf.set_draw_color(*COLOR_GOLD)
-        pdf.set_line_width(0.8)
-        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-        pdf.ln(2)
 
         waktu_skrg  = get_wib_now()
         expiry_date = waktu_skrg + timedelta(days=7)
-        pdf.set_font('Arial', '', 8.5)
-        pdf.set_text_color(100, 100, 100)
-        pdf.cell(0, 5, f"No. Surat   : {no_surat}", ln=1, align='R')
-        pdf.cell(0, 5, f"Tanggal     : {waktu_skrg.strftime('%d %B %Y')}", ln=1, align='R')
-        pdf.cell(0, 5, f"Berlaku s/d : {expiry_date.strftime('%d %B %Y')}", ln=1, align='R')
-        pdf.ln(4)
 
-        pdf.set_x(10)
-        pdf.set_font('Arial', 'B', 7.5)
+        # ── 1. EXECUTIVE METADATA STRIP (4 KOLOM INFORMASI DOKUMEN) ──
+        y_strip = 49.5
+        pdf.set_fill_color(*COLOR_SLATE_BG)
+        pdf.set_draw_color(*COLOR_BORDER)
+        pdf.set_line_width(0.25)
+        pdf.rect(10, y_strip, 190, 11.5, 'DF')
+        pdf.set_fill_color(*COLOR_GOLD)
+        pdf.rect(10, y_strip, 2.5, 11.5, 'F')
+
+        meta_items = [
+            ("TANGGAL / ISSUE DATE", waktu_skrg.strftime('%d %B %Y')),
+            ("BERLAKU S/D / VALID UNTIL", f"{expiry_date.strftime('%d %B %Y')} (7 Days)"),
+            ("MATA UANG / CURRENCY", "IDR - Indonesian Rupiah"),
+            ("PENGIRIMAN / LEAD TIME", "1 Hari Kerja (Setelah PO)"),
+        ]
+        col_w = 187.5 / 4
+        for idx_m, (lbl, val) in enumerate(meta_items):
+            x_m = 12.5 + idx_m * col_w
+            if idx_m > 0:
+                pdf.set_draw_color(*COLOR_BORDER)
+                pdf.line(x_m, y_strip + 2, x_m, y_strip + 9.5)
+            pdf.set_xy(x_m + 2.5, y_strip + 1.6)
+            pdf.set_font('Arial', 'B', 6)
+            pdf.set_text_color(*COLOR_MUTED)
+            pdf.cell(col_w - 4, 3.5, lbl, ln=1)
+            pdf.set_x(x_m + 2.5)
+            pdf.set_font('Arial', 'B', 7.8)
+            pdf.set_text_color(*COLOR_NAVY)
+            pdf.cell(col_w - 4, 4.2, val, ln=0)
+
+        # ── 2. TWO-COLUMN CLIENT & ACCOUNT EXECUTIVE CARDS ──
+        y_cards = y_strip + 14
+        card_h  = 27
+
+        # Card Kiri: Client Info
+        pdf.set_fill_color(255, 255, 255)
+        pdf.set_draw_color(*COLOR_BORDER)
+        pdf.set_line_width(0.3)
+        pdf.rect(10, y_cards, 93, card_h, 'DF')
+        pdf.set_fill_color(*COLOR_NAVY)
+        pdf.rect(10, y_cards, 93, 5.8, 'F')
+
+        pdf.set_xy(13, y_cards + 1)
+        pdf.set_font('Arial', 'B', 6.8)
         pdf.set_text_color(*COLOR_GOLD)
-        pdf.cell(90, 5, "DITUJUKAN KEPADA:", ln=1)
+        pdf.cell(87, 4, "DITUJUKAN KEPADA  /  PREPARED FOR", ln=1)
 
-        pdf.set_x(10)
-        pdf.set_font('Arial', 'B', 13)
+        pdf.set_xy(13, y_cards + 7.5)
+        pdf.set_font('Arial', 'B', 10)
         pdf.set_text_color(*COLOR_NAVY)
-        pdf.cell(90, 7, str(nama_cust).upper(), ln=1)
+        cust_clean = str(nama_cust).upper()[:40]
+        pdf.cell(87, 5, cust_clean, ln=1)
 
-        pdf.set_x(10)
-        pdf.set_font('Arial', '', 9)
+        pdf.set_x(13)
+        pdf.set_font('Arial', 'B', 7.8)
         pdf.set_text_color(*COLOR_TEXT)
-        pdf.cell(90, 5, f"U/P: {pic}", ln=1)
-        pdf.ln(6)
+        pic_display = str(pic).strip() if str(pic).strip() else "Purchasing / Procurement Dept."
+        pdf.cell(22, 4.5, "Attn (U/P)", 0, 0)
+        pdf.set_font('Arial', '', 7.8)
+        pdf.cell(65, 4.5, f": {pic_display[:36]}", 0, 1)
 
+        pdf.set_x(13)
+        pdf.set_font('Arial', 'B', 7.8)
+        pdf.cell(22, 4.5, "Kontak / WA", 0, 0)
+        pdf.set_font('Arial', '', 7.8)
+        wa_display = str(cust_wa).strip() if str(cust_wa).strip() else "Official Corporate Contact"
+        pdf.cell(65, 4.5, f": {wa_display}", 0, 1)
+
+        # Card Kanan: Account Executive / Issued By
+        pdf.set_fill_color(255, 255, 255)
+        pdf.set_draw_color(*COLOR_BORDER)
+        pdf.rect(107, y_cards, 93, card_h, 'DF')
+        pdf.set_fill_color(*COLOR_NAVY)
+        pdf.rect(107, y_cards, 93, 5.8, 'F')
+
+        pdf.set_xy(110, y_cards + 1)
+        pdf.set_font('Arial', 'B', 6.8)
+        pdf.set_text_color(*COLOR_GOLD)
+        pdf.cell(87, 4, "DITERBITKAN OLEH  /  ACCOUNT EXECUTIVE", ln=1)
+
+        pdf.set_xy(110, y_cards + 7.5)
+        pdf.set_font('Arial', 'B', 9.5)
+        pdf.set_text_color(*COLOR_NAVY)
+        pdf.cell(87, 5, f"{MARKETING_NAME.upper()}  -  {MARKETING_TITLE}", ln=1)
+
+        pdf.set_x(110)
+        pdf.set_font('Arial', 'B', 7.8)
+        pdf.set_text_color(*COLOR_TEXT)
+        pdf.cell(22, 4.5, "Direct WA", 0, 0)
+        pdf.set_font('Arial', '', 7.8)
+        pdf.cell(65, 4.5, f": {MARKETING_WA}  |  Office: {OFFICE_PHONE}", 0, 1)
+
+        pdf.set_x(110)
+        pdf.set_font('Arial', 'B', 7.8)
+        pdf.cell(22, 4.5, "Official Email", 0, 0)
+        pdf.set_font('Arial', '', 7.8)
+        pdf.cell(65, 4.5, f": {MARKETING_EMAIL}", 0, 1)
+
+        # ── 3. KALIMAT PENGANTAR KORPORAT ──
+        pdf.set_xy(10, y_cards + card_h + 2.5)
+        pdf.set_font('Arial', '', 7.8)
+        pdf.set_text_color(*COLOR_MUTED)
+        pdf.cell(
+            190, 4.5,
+            "Dengan hormat, bersama dokumen ini kami sampaikan penawaran harga resmi untuk kebutuhan pengadaan Bapak/Ibu dengan rincian berikut:",
+            ln=1
+        )
+        pdf.ln(1)
+
+        # ── 4. TABEL BARANG (MULTI-LINE AUTO WRAP) ──
         draw_table_header(pdf)
-        pdf.set_font('Arial', '', 9)
+        pdf.set_font('Arial', '', 8.5)
         pdf.set_text_color(*COLOR_TEXT)
 
+        total_qty_units = 0
         for i, row in df_order.iterrows():
-            if pdf.get_y() > 170:
+            nama_brg = str(row['Nama Barang']).strip()
+            qty_val  = int(row['Qty'])
+            total_qty_units += qty_val
+            sat_val  = str(row['Satuan']).strip()
+            hrg_val  = float(row['Harga'])
+            tot_val  = float(row['Total_Row'])
+
+            pdf.set_font('Arial', '', 8.5)
+            desc_lines = _split_lines(pdf, nama_brg, max_width=75)
+            line_h = 4.8
+            row_h  = max(7.5, len(desc_lines) * line_h + 2.4)
+
+            if pdf.get_y() + row_h > 252:
                 pdf.add_page()
                 draw_table_header(pdf)
-                pdf.set_font('Arial', '', 9)
+                pdf.set_font('Arial', '', 8.5)
                 pdf.set_text_color(*COLOR_TEXT)
 
+            y_row = pdf.get_y()
             if i % 2 == 0:
-                pdf.set_fill_color(240, 245, 252)
+                pdf.set_fill_color(*COLOR_SLATE_BG)
             else:
                 pdf.set_fill_color(255, 255, 255)
 
-            pdf.set_draw_color(180, 195, 215)
+            pdf.set_draw_color(*COLOR_BORDER)
             pdf.set_line_width(0.2)
 
-            pdf.cell(10, 8, str(i + 1),                    border=1, align='C', fill=True)
-            pdf.cell(82, 8, f" {str(row['Nama Barang'])}", border=1, align='L', fill=True)
-            pdf.cell(18, 8, str(int(row['Qty'])),          border=1, align='C', fill=True)
-            pdf.cell(20, 8, str(row['Satuan']),            border=1, align='C', fill=True)
-            pdf.cell(30, 8, f"Rp {row['Harga']:,.0f}",     border=1, align='R', fill=True)
-            pdf.cell(30, 8, f"Rp {row['Total_Row']:,.0f}", border=1, align='R', fill=True)
-            pdf.ln()
+            x_positions = [10, 20, 100, 116, 136, 167]
+            widths      = [10, 80, 16,  20,  31,  33]
+            for xp, wp in zip(x_positions, widths):
+                pdf.rect(xp, y_row, wp, row_h, 'DF')
 
-        pdf.ln(4)
-        pdf.set_draw_color(*COLOR_GOLD)
-        pdf.set_line_width(0.6)
-        pdf.line(120, pdf.get_y(), 200, pdf.get_y())
-        pdf.ln(3)
+            pdf.set_xy(10, y_row)
+            pdf.set_font('Arial', 'B', 8)
+            pdf.set_text_color(*COLOR_MUTED)
+            pdf.cell(10, row_h, str(i + 1), 0, 0, 'C')
 
-        pdf.set_font('Arial', '', 9)
-        pdf.set_text_color(*COLOR_TEXT)
-        pdf.set_x(120)
-        pdf.cell(50, 7, "Sub Total", align='L')
-        pdf.cell(30, 7, f"Rp {subtotal:,.0f}", align='R', ln=1)
+            pdf.set_font('Arial', '', 8.4)
+            pdf.set_text_color(*COLOR_TEXT)
+            y_text_start = y_row + (row_h - len(desc_lines) * line_h) / 2
+            for l_idx, d_line in enumerate(desc_lines):
+                pdf.set_xy(22, y_text_start + l_idx * line_h)
+                pdf.cell(76, line_h, d_line, 0, 0, 'L')
 
-        if ppn > 0:
-            pdf.set_x(120)
-            pdf.cell(50, 7, "PPN 11%", align='L')
-            pdf.cell(30, 7, f"Rp {ppn:,.0f}", align='R', ln=1)
+            pdf.set_xy(100, y_row)
+            pdf.set_font('Arial', 'B', 8.4)
+            pdf.cell(16, row_h, f"{qty_val:,}", 0, 0, 'C')
 
-        pdf.set_draw_color(*COLOR_NAVY)
-        pdf.set_line_width(0.4)
-        pdf.line(120, pdf.get_y(), 200, pdf.get_y())
-        pdf.ln(1)
+            pdf.set_xy(116, y_row)
+            pdf.set_font('Arial', '', 8)
+            pdf.cell(20, row_h, sat_val, 0, 0, 'C')
 
+            pdf.set_xy(136, y_row)
+            pdf.set_font('Arial', '', 8.4)
+            pdf.cell(29.5, row_h, f"Rp {hrg_val:,.0f}", 0, 0, 'R')
+
+            pdf.set_xy(167, y_row)
+            pdf.set_font('Arial', 'B', 8.4)
+            pdf.set_text_color(*COLOR_NAVY)
+            pdf.cell(31.5, row_h, f"Rp {tot_val:,.0f}", 0, 0, 'R')
+
+            pdf.set_y(y_row + row_h)
+
+        # Garis penutup bawah tabel
         pdf.set_fill_color(*COLOR_NAVY)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font('Arial', 'B', 10)
-        pdf.set_x(120)
-        pdf.cell(50, 10, "  GRAND TOTAL", border=0, align='L', fill=True)
-        pdf.cell(30, 10, f"Rp {grand_total:,.0f}  ", border=0, align='R', fill=True, ln=1)
+        pdf.rect(10, pdf.get_y(), 190, 0.7, 'F')
+        pdf.set_y(pdf.get_y() + 0.7)
+
+        # ── 5. RINGKASAN KUANTITAS, TERBILANG & TABEL TOTAL ──
+        if pdf.get_y() + 34 > 270:
+            pdf.add_page()
+
+        y_sum = pdf.get_y() + 2.5
+
+        # Kiri: Kotak Info Kuantitas & Terbilang
+        pdf.set_fill_color(*COLOR_GOLD_SOFT)
+        pdf.set_draw_color(*COLOR_GOLD)
+        pdf.set_line_width(0.3)
+        pdf.rect(10, y_sum, 108, 27, 'DF')
+
+        pdf.set_xy(13, y_sum + 1.8)
+        pdf.set_font('Arial', 'B', 7)
+        pdf.set_text_color(*COLOR_NAVY)
+        pdf.cell(
+            102, 4.2,
+            f"TOTAL ITEM SPECIFICATION: {len(df_order)} SKU / Jenis Barang  ({total_qty_units:,} Unit)",
+            ln=1
+        )
 
         pdf.set_draw_color(*COLOR_GOLD)
-        pdf.set_line_width(0.8)
-        pdf.line(120, pdf.get_y(), 200, pdf.get_y())
+        pdf.line(13, y_sum + 6.8, 115, y_sum + 6.8)
 
-        TC_HEIGHT = 62
-        BOTTOM_LIMIT = 297 - 28
-        if pdf.get_y() + 10 + TC_HEIGHT > BOTTOM_LIMIT:
+        pdf.set_xy(13, y_sum + 7.8)
+        pdf.set_font('Arial', 'B', 6.5)
+        pdf.set_text_color(*COLOR_GOLD)
+        pdf.cell(102, 3.6, "TERBILANG / AMOUNT IN WORDS (IDR):", ln=1)
+
+        pdf.set_x(13)
+        pdf.set_font('Arial', 'BI', 7.8)
+        pdf.set_text_color(*COLOR_NAVY)
+        terbilang_str = f"# {angka_ke_terbilang(grand_total)} #"
+        pdf.multi_cell(102, 4.1, terbilang_str)
+
+        # Kanan: Kalkulasi Subtotal, PPN, Grand Total
+        pdf.set_fill_color(255, 255, 255)
+        pdf.set_draw_color(*COLOR_BORDER)
+        pdf.rect(121, y_sum, 79, 17, 'DF')
+
+        pdf.set_xy(124, y_sum + 1.8)
+        pdf.set_font('Arial', '', 8.2)
+        pdf.set_text_color(*COLOR_TEXT)
+        pdf.cell(42, 5.8, "Sub Total (IDR)", 0, 0, 'L')
+        pdf.set_font('Arial', 'B', 8.2)
+        pdf.cell(32, 5.8, f"Rp {subtotal:,.0f}", 0, 1, 'R')
+
+        pdf.set_x(124)
+        pdf.set_font('Arial', '', 8.2)
+        ppn_label = "VAT / PPN (11%)" if ppn > 0 else "VAT / PPN (0%)"
+        pdf.cell(42, 5.8, ppn_label, 0, 0, 'L')
+        pdf.set_font('Arial', 'B', 8.2)
+        pdf.cell(32, 5.8, f"Rp {ppn:,.0f}", 0, 1, 'R')
+
+        # Grand Total Bar
+        pdf.set_fill_color(*COLOR_NAVY)
+        pdf.rect(121, y_sum + 17, 79, 10, 'F')
+        pdf.set_fill_color(*COLOR_GOLD)
+        pdf.rect(121, y_sum + 26.2, 79, 0.8, 'F')
+
+        pdf.set_xy(124, y_sum + 18.5)
+        pdf.set_font('Arial', 'B', 8.5)
+        pdf.set_text_color(*COLOR_GOLD)
+        pdf.cell(34, 7, "GRAND TOTAL", 0, 0, 'L')
+        pdf.set_font('Arial', 'B', 9.8)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(40, 7, f"Rp {grand_total:,.0f}", 0, 1, 'R')
+
+        pdf.set_y(y_sum + 30.5)
+
+        # ── 6. SYARAT & KETENTUAN + BANK BCA + PERSETUJUAN KLIEN + TTD RESMI ──
+        BLOCK_HEIGHT = 56
+        BOTTOM_LIMIT = 297 - 21
+        if pdf.get_y() + BLOCK_HEIGHT > BOTTOM_LIMIT:
             pdf.add_page()
-            pdf.set_y(68)
-        else:
-            pdf.ln(10)
+            pdf.set_y(53)
 
         y_tc = pdf.get_y()
 
-        pdf.set_fill_color(248, 250, 253)
-        pdf.set_draw_color(*COLOR_NAVY)
-        pdf.set_line_width(0.4)
-        pdf.rect(10, y_tc, 120, TC_HEIGHT, 'DF')
+        # Kolom 1 (Kiri, Lebar 92mm): Syarat & Ketentuan + Kotak Bank BCA
+        pdf.set_fill_color(*COLOR_SLATE_BG)
+        pdf.set_draw_color(*COLOR_BORDER)
+        pdf.set_line_width(0.3)
+        pdf.rect(10, y_tc, 92, 32, 'DF')
 
-        pdf.set_y(y_tc + 3)
-        pdf.set_x(13)
-        pdf.set_font('Arial', 'B', 9)
+        pdf.set_xy(12.5, y_tc + 1.8)
+        pdf.set_font('Arial', 'B', 7.2)
         pdf.set_text_color(*COLOR_NAVY)
-        pdf.cell(116, 5, "SYARAT & KETENTUAN:", ln=1)
+        pdf.cell(87, 4, "SYARAT & KETENTUAN KOMERSIAL (TERMS & CONDITIONS):", ln=1)
 
         pdf.set_draw_color(*COLOR_GOLD)
-        pdf.set_line_width(0.5)
-        pdf.line(13, pdf.get_y(), 127, pdf.get_y())
-        pdf.ln(2)
+        pdf.set_line_width(0.4)
+        pdf.line(12.5, y_tc + 6.2, 99.5, y_tc + 6.2)
 
-        pdf.set_x(13)
-        pdf.set_font('Arial', '', 8.5)
-        pdf.set_text_color(50, 50, 50)
+        pdf.set_xy(12.5, y_tc + 7.4)
+        pdf.set_font('Arial', '', 7)
+        pdf.set_text_color(45, 55, 65)
         terms = (
             "1. Harga dapat berubah sewaktu-waktu tanpa pemberitahuan.\n"
-            "2. Penawaran berlaku 7 hari dari tanggal surat.\n"
-            "3. Pengiriman 1 hari kerja setelah konfirmasi PO.\n"
-            "4. Pembayaran ditransfer HANYA ke rekening berikut:\n"
-            "   Bank       : Bank BCA\n"
-            "   No. Rek    : 658 033 8818\n"
-            "   Atas Nama  : PT THEA THEO STATIONARY"
+            "2. Masa berlaku penawaran adalah 7 hari kalender sejak tanggal surat.\n"
+            "3. Pengiriman 1 hari kerja setelah konfirmasi Purchase Order (PO).\n"
+            "4. Pembayaran sah hanya ditransfer ke rekening resmi di bawah ini."
         )
-        pdf.set_x(13)
-        pdf.multi_cell(114, 5.5, terms)
+        pdf.multi_cell(87, 4.1, terms)
 
-        pdf.set_y(y_tc + 3)
-        pdf.set_x(138)
-        pdf.set_font('Arial', 'B', 8.5)
+        # Kotak Rekening Pembayaran Resmi (di bawah T&C)
+        y_bank = y_tc + 34
+        pdf.set_fill_color(255, 255, 255)
+        pdf.set_draw_color(*COLOR_NAVY)
+        pdf.set_line_width(0.35)
+        pdf.rect(10, y_bank, 92, 21, 'DF')
+        pdf.set_fill_color(*COLOR_NAVY)
+        pdf.rect(10, y_bank, 2.8, 21, 'F')
+
+        pdf.set_xy(14.5, y_bank + 1.6)
+        pdf.set_font('Arial', 'B', 6.8)
         pdf.set_text_color(*COLOR_GOLD)
-        pdf.cell(60, 5, "Hormat Kami,", ln=1)
+        pdf.cell(85, 3.8, "OFFICIAL BANK SETTLEMENT  /  REKENING PEMBAYARAN", ln=1)
+
+        pdf.set_x(14.5)
+        pdf.set_font('Arial', 'B', 9)
+        pdf.set_text_color(*COLOR_NAVY)
+        pdf.cell(85, 4.8, "BANK BCA  -  No. Rek: 658 033 8818", ln=1)
+
+        pdf.set_x(14.5)
+        pdf.set_font('Arial', 'B', 7.6)
+        pdf.set_text_color(*COLOR_TEXT)
+        pdf.cell(85, 4.2, "A/N : PT THEA THEO STATIONARY", ln=1)
+
+        pdf.set_x(14.5)
+        pdf.set_font('Arial', 'I', 6.3)
+        pdf.set_text_color(*COLOR_MUTED)
+        pdf.cell(85, 3.5, "*Harap mencantumkan No. Surat saat konfirmasi pembayaran.", ln=1)
+
+        # Kolom 2 (Tengah, Lebar 46mm): Client Acceptance / Konfirmasi PO
+        pdf.set_fill_color(255, 255, 255)
+        pdf.set_draw_color(*COLOR_BORDER)
+        pdf.set_line_width(0.3)
+        pdf.rect(105, y_tc, 46, 55, 'DF')
+
+        pdf.set_fill_color(*COLOR_SLATE_BG)
+        pdf.rect(105, y_tc, 46, 5.8, 'F')
+        pdf.set_xy(105, y_tc + 1)
+        pdf.set_font('Arial', 'B', 6.5)
+        pdf.set_text_color(*COLOR_NAVY)
+        pdf.cell(46, 4, "CLIENT ACCEPTANCE", 0, 1, 'C')
+
+        pdf.set_xy(105, y_tc + 7)
+        pdf.set_font('Arial', '', 6.5)
+        pdf.set_text_color(*COLOR_MUTED)
+        pdf.cell(46, 3.5, "Disetujui Oleh (PO Confirmation):", 0, 1, 'C')
+
+        pdf.set_draw_color(*COLOR_BORDER)
+        pdf.set_line_width(0.3)
+        pdf.line(110, y_tc + 41, 146, y_tc + 41)
+
+        pdf.set_xy(105, y_tc + 42)
+        pdf.set_font('Arial', 'B', 7.2)
+        pdf.set_text_color(*COLOR_NAVY)
+        pdf.cell(46, 4, str(pic).strip()[:22] if str(pic).strip() else "Authorized Signature", 0, 1, 'C')
+
+        pdf.set_x(105)
+        pdf.set_font('Arial', '', 6.3)
+        pdf.set_text_color(*COLOR_MUTED)
+        pdf.cell(46, 3.5, "Tanda Tangan & Stempel Perusahaan", 0, 1, 'C')
+
+        # Kolom 3 (Kanan, Lebar 46mm): Authorized Signatory PT THEA THEO STATIONARY
+        pdf.set_fill_color(255, 255, 255)
+        pdf.set_draw_color(*COLOR_BORDER)
+        pdf.set_line_width(0.3)
+        pdf.rect(154, y_tc, 46, 55, 'DF')
+
+        pdf.set_fill_color(*COLOR_NAVY)
+        pdf.rect(154, y_tc, 46, 5.8, 'F')
+        pdf.set_xy(154, y_tc + 1)
+        pdf.set_font('Arial', 'B', 6.5)
+        pdf.set_text_color(*COLOR_GOLD)
+        pdf.cell(46, 4, "AUTHORIZED SIGNATORY", 0, 1, 'C')
+
+        pdf.set_xy(154, y_tc + 7)
+        pdf.set_font('Arial', 'B', 6.5)
+        pdf.set_text_color(*COLOR_NAVY)
+        pdf.cell(46, 3.5, "PT. THEA THEO STATIONARY", 0, 1, 'C')
 
         ttd_path = TTD_PATH
-        TTD_MAX_W, TTD_MAX_H = 50, 45
-        ttd_render_h = 0
+        TTD_MAX_W, TTD_MAX_H = 38, 25
+        y_img_top = y_tc + 11.5
         if os.path.exists(ttd_path):
             try:
                 from PIL import Image as PILImage
@@ -1012,37 +1420,37 @@ def generate_pdf(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_total)
                     render_h = TTD_MAX_H
                     render_w = render_h / aspect_h_per_w
 
-                pdf.image(img_to_draw, x=133, y=pdf.get_y() + 1, w=render_w, h=render_h)
-                ttd_render_h = render_h
+                x_centered = 154 + (46 - render_w) / 2
+                pdf.image(img_to_draw, x=x_centered, y=y_img_top, w=render_w, h=render_h)
             except Exception:
-                pdf.image(ttd_path, x=133, y=pdf.get_y() + 1, w=TTD_MAX_W)
-                ttd_render_h = TTD_MAX_H
-            pdf.set_y(pdf.get_y() + max(ttd_render_h, 10) + 4)
-        else:
-            pdf.ln(10)
+                pdf.image(ttd_path, x=158, y=y_img_top, w=TTD_MAX_W)
 
-        pdf.set_x(138)
-        pdf.set_font('Arial', 'B', 12)
+        pdf.set_draw_color(*COLOR_GOLD)
+        pdf.set_line_width(0.4)
+        pdf.line(159, y_tc + 41, 195, y_tc + 41)
+
+        pdf.set_xy(154, y_tc + 42)
+        pdf.set_font('Arial', 'B', 8.5)
         pdf.set_text_color(*COLOR_NAVY)
-        pdf.cell(60, 7, MARKETING_NAME.upper(), ln=1)
+        pdf.cell(46, 4, MARKETING_NAME.upper(), 0, 1, 'C')
 
-        pdf.set_x(138)
-        pdf.set_font('Arial', 'I', 8.5)
+        pdf.set_x(154)
+        pdf.set_font('Arial', 'I', 6.5)
         pdf.set_text_color(*COLOR_TEXT)
-        pdf.cell(60, 4.5, MARKETING_TITLE, ln=1)
+        pdf.cell(46, 3.5, MARKETING_TITLE, 0, 1, 'C')
 
-        pdf.set_x(138)
-        pdf.set_font('Arial', '', 8.5)
-        pdf.set_text_color(*COLOR_TEXT)
-        pdf.cell(60, 5, f"WA    : {MARKETING_WA}", ln=1)
-        pdf.set_x(138)
-        pdf.cell(60, 5, f"Email : {MARKETING_EMAIL}", ln=1)
+        pdf.set_x(154)
+        pdf.set_font('Arial', '', 6.3)
+        pdf.set_text_color(*COLOR_MUTED)
+        pdf.cell(46, 3.5, f"WA: {MARKETING_WA}", 0, 1, 'C')
 
-    pdf1 = PenawaranPDF(total_pages=99)
+    # Pass 1: Hitung jumlah halaman
+    pdf1 = PenawaranPDF(total_pages=99, no_surat=no_surat)
     _render(pdf1)
     total_pages = pdf1.page
 
-    pdf2 = PenawaranPDF(total_pages=total_pages)
+    # Pass 2: Render final dengan nomor halaman akurat
+    pdf2 = PenawaranPDF(total_pages=total_pages, no_surat=no_surat)
     _render(pdf2)
 
     return pdf2.output(dest='S').encode('latin-1')
@@ -1113,7 +1521,6 @@ def generate_excel(no_surat, nama_cust, pic, df_order, subtotal, ppn, grand_tota
 if menu == "🏠 Home":
     render_header(COMPANY_NAME, SLOGAN, f"📍 {ADDR.split(',')[0]}")
 
-    # Ringkasan Metrik Atas
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("📦 Katalog Database", f"{len(df_barang):,} SKU")
     m2.metric("🛒 Isi Keranjang", f"{len(st.session_state.cart)} Item")
@@ -1173,7 +1580,6 @@ elif menu == "📝 Admin Sales":
     if not require_login():
         st.stop()
 
-    # Split Layout: Kiri (Input Pelanggan & Cari Barang) | Kanan (Keranjang Live)
     left_col, right_col = st.columns([1.3, 1], gap="medium")
 
     with left_col:
@@ -1403,7 +1809,6 @@ elif menu == "👨‍💻 Sales Dashboard":
     if not require_login():
         st.stop()
 
-    # Toolbar Pencarian & Refresh
     tb1, tb2, tb3 = st.columns([3, 1, 1])
     search_cust_q = tb1.text_input("🔎 Filter Nama Pelanggan / UP", placeholder="Ketik nama PT atau nama penerima...", label_visibility="collapsed")
     with tb2:
@@ -1418,7 +1823,6 @@ elif menu == "👨‍💻 Sales Dashboard":
             st.session_state.active_menu = "📝 Admin Sales"
             st.rerun()
 
-    # Khusus Koordinator (Asin): Update CSV Database
     if st.session_state.auth_user == "asin":
         with st.expander("📁 Update Database Barang Master (.csv)", expanded=False):
             st.caption("Upload file CSV baru (`Nama Barang`, `Harga`, `Satuan`) untuk memperbarui katalog produk.")
@@ -1450,7 +1854,6 @@ elif menu == "👨‍💻 Sales Dashboard":
                         df_gs[col] = ""
                     df_gs[col] = df_gs[col].astype(str).str.strip()
 
-                # Filter pencarian jika diisi
                 if search_cust_q.strip():
                     q_low = search_cust_q.strip().lower()
                     mask_q = (
@@ -1660,7 +2063,7 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     ).strip().replace(" ", "_")
 
                                     b1, b2, b3 = st.columns(3)
-                                    pdf_data = generate_pdf(no_s, customer_val, up_val, f_df, subt, tax, gtot)
+                                    pdf_data = generate_pdf(no_s, customer_val, up_val, f_df, subt, tax, gtot, cust_wa=wa_val)
                                     b1.download_button(
                                         label="📩 Download PDF",
                                         data=pdf_data,
@@ -1735,31 +2138,8 @@ elif menu == "👨‍💻 Sales Dashboard":
 
                                     rc1.download_button(
                                         "📩 Unduh Ulang PDF",
-                                        data=generate_pdf(no_s_d, customer_val, up_val, df_done, sub_d, tax_d, gt_d),
+                                        data=generate_pdf(no_s_d, customer_val, up_val, df_done, sub_d, tax_d, gt_d, cust_wa=wa_val),
                                         file_name=f"Quo_{safe_c}_{waktu_f}.pdf",
                                         mime="application/pdf",
                                         key=f"re_pdf_{real_row_idx}",
-                                        use_container_width=True
-                                    )
-                                    rc2.download_button(
-                                        "📊 Unduh Ulang Excel",
-                                        data=generate_excel(no_s_d, customer_val, up_val, df_done, sub_d, tax_d, gt_d),
-                                        file_name=f"Quo_{safe_c}_{waktu_f}.xlsx",
-                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                        key=f"re_xls_{real_row_idx}",
-                                        use_container_width=True
-                                    )
-                                    if rc3.button("↩️ Kembalikan ke Pending", key=f"restore_{real_row_idx}", use_container_width=True):
-                                        sheet.update_cell(real_row_idx, 6, "Pending")
-                                        st.session_state.pop("gs_all_vals", None)
-                                        st.toast(f"Dikembalikan ke antrean Pending: {customer_val}")
-                                        st.rerun()
-                    else:
-                        st.info("Belum ada riwayat penawaran yang ditandai selesai.")
-            else:
-                st.info("Belum ada data penawaran di Google Sheets Anda. Silakan buat penawaran baru melalui menu **Admin Sales**.")
-
-        except Exception as e:
-            st.error(f"❌ Error Sistem: {e}")
-            import traceback
-            st.code(traceback.format_exc(), language="python")
+                                        use
