@@ -1864,8 +1864,7 @@ elif menu == "👨‍💻 Sales Dashboard":
                 else:
                     df_gs_filtered = df_gs
 
-                pending   = df_gs_filtered[df_gs_filtered['Status'].str.lower() == 'pending']
-                processed = df_gs_filtered[df_gs_filtered['Status'].str.lower() != 'pending']
+                pending = df_gs_filtered[df_gs_filtered['Status'].str.lower() == 'pending']
 
                 total_all     = len(df_gs)
                 total_pending = len(df_gs[df_gs['Status'].str.lower() == 'pending'])
@@ -1878,13 +1877,9 @@ elif menu == "👨‍💻 Sales Dashboard":
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                tab_pending, tab_done = st.tabs([
-                    f"⏳ Antrean Pending ({len(pending)})",
-                    f"✅ Riwayat Selesai ({len(processed)})"
-                ])
-
-                # ── TAB 1: ANTREAN PENDING ──
-                with tab_pending:
+                # ── ANTREAN PENDING ──
+                render_section_title(f"⏳ Antrean Pending ({len(pending)})")
+                with st.container():
                     if not pending.empty:
                         for idx, row in pending.iterrows():
                             real_row_idx = idx + 2
@@ -2107,58 +2102,6 @@ elif menu == "👨‍💻 Sales Dashboard":
                             <div style="font-size:0.85rem; margin-top:6px;">Semua penawaran sudah diproses, {MARKETING_NAME}.</div>
                         </div>
                         """, unsafe_allow_html=True)
-
-                # ── TAB 2: RIWAYAT SELESAI (PROCESSED) ──
-                with tab_done:
-                    if not processed.empty:
-                        for idx, row in processed.iloc[::-1].iterrows():
-                            real_row_idx = idx + 2
-                            waktu_val    = row.get('Waktu', '')
-                            customer_val = row.get('Customer', '')
-                            up_val       = row.get('UP', '')
-                            wa_val       = row.get('WA', '')
-                            try:
-                                done_items = ast.literal_eval(str(row['Pesanan']))
-                            except Exception:
-                                done_items = []
-
-                            with st.expander(f"✅ {customer_val}  ·  {len(done_items)} Item  ·  {waktu_val}", expanded=False):
-                                st.caption(f"👤 UP: **{up_val or '-'}** &nbsp;|&nbsp; 📞 WA: **{wa_val or '-'}**")
-                                if done_items:
-                                    df_done = pd.DataFrame(done_items)
-                                    st.dataframe(df_done, use_container_width=True, hide_index=True)
-                                    sub_d = df_done['Total_Row'].sum()
-                                    tax_d = sub_d * 0.11
-                                    gt_d  = sub_d + tax_d
-
-                                    rc1, rc2, rc3 = st.columns(3)
-                                    waktu_f = get_wib_now().strftime("%d%m%y_%H%M")
-                                    safe_c  = "".join(c for c in str(customer_val) if c.isalnum() or c in (" ", "-", "_")).strip().replace(" ", "_")
-                                    no_s_d  = default_nomor_surat(real_row_idx - 1)
-
-                                    rc1.download_button(
-                                        "📩 Unduh Ulang PDF",
-                                        data=generate_pdf(no_s_d, customer_val, up_val, df_done, sub_d, tax_d, gt_d, cust_wa=wa_val),
-                                        file_name=f"Quo_{safe_c}_{waktu_f}.pdf",
-                                        mime="application/pdf",
-                                        key=f"re_pdf_{real_row_idx}",
-                                        use_container_width=True
-                                    )
-                                    rc2.download_button(
-                                        "📊 Unduh Ulang Excel",
-                                        data=generate_excel(no_s_d, customer_val, up_val, df_done, sub_d, tax_d, gt_d),
-                                        file_name=f"Quo_{safe_c}_{waktu_f}.xlsx",
-                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                        key=f"re_xls_{real_row_idx}",
-                                        use_container_width=True
-                                    )
-                                    if rc3.button("↩️ Kembalikan ke Pending", key=f"restore_{real_row_idx}", use_container_width=True):
-                                        sheet.update_cell(real_row_idx, 6, "Pending")
-                                        st.session_state.pop("gs_all_vals", None)
-                                        st.toast(f"Dikembalikan ke antrean Pending: {customer_val}")
-                                        st.rerun()
-                    else:
-                        st.info("Belum ada riwayat penawaran yang ditandai selesai.")
             else:
                 st.info("Belum ada data penawaran di Google Sheets Anda. Silakan buat penawaran baru melalui menu **Admin Sales**.")
 
