@@ -2142,4 +2142,27 @@ elif menu == "👨‍💻 Sales Dashboard":
                                         file_name=f"Quo_{safe_c}_{waktu_f}.pdf",
                                         mime="application/pdf",
                                         key=f"re_pdf_{real_row_idx}",
-                                        use
+                                        use_container_width=True
+                                    )
+                                    rc2.download_button(
+                                        "📊 Unduh Ulang Excel",
+                                        data=generate_excel(no_s_d, customer_val, up_val, df_done, sub_d, tax_d, gt_d),
+                                        file_name=f"Quo_{safe_c}_{waktu_f}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        key=f"re_xls_{real_row_idx}",
+                                        use_container_width=True
+                                    )
+                                    if rc3.button("↩️ Kembalikan ke Pending", key=f"restore_{real_row_idx}", use_container_width=True):
+                                        sheet.update_cell(real_row_idx, 6, "Pending")
+                                        st.session_state.pop("gs_all_vals", None)
+                                        st.toast(f"Dikembalikan ke antrean Pending: {customer_val}")
+                                        st.rerun()
+                    else:
+                        st.info("Belum ada riwayat penawaran yang ditandai selesai.")
+            else:
+                st.info("Belum ada data penawaran di Google Sheets Anda. Silakan buat penawaran baru melalui menu **Admin Sales**.")
+
+        except Exception as e:
+            st.error(f"❌ Error Sistem: {e}")
+            import traceback
+            st.code(traceback.format_exc(), language="python")
