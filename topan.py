@@ -381,6 +381,47 @@ def render_header(title, subtitle="", right_badge=""):
 def render_section_title(text):
     st.markdown(f'<div class="section-title">{text}</div>', unsafe_allow_html=True)
 
+def _norm_name(s):
+    """Normalisasi nama barang untuk cek duplikat (abaikan kapital & spasi pinggir/ganda)."""
+    return " ".join(str(s).lower().split())
+
+def dedupe_items(items):
+    """Gabungkan item kembar (nama sama): Qty dijumlahkan, field lain ikut item pertama.
+    Return (list_baru, daftar_nama_yang_digabung)."""
+    merged = {}
+    order = []
+    dup_names = []
+    for it in items:
+        k = _norm_name(it.get('Nama Barang', ''))
+        if k in merged:
+            merged[k]['Qty'] = int(merged[k].get('Qty', 0)) + int(it.get('Qty', 0))
+            if it.get('Nama Barang') not in dup_names:
+                dup_names.append(it.get('Nama Barang'))
+        else:
+            merged[k] = dict(it)
+            order.append(k)
+    result = []
+    for k in order:
+        it = merged[k]
+        try:
+            it['Total_Row'] = float(it.get('Qty', 0)) * float(it.get('Harga', 0))
+        except Exception:
+            pass
+        result.append(it)
+    return result, dup_names
+
+def add_to_cart(item):
+    """Masukkan item ke keranjang (item lama dengan nama sama dibuang dulu)."""
+    st.session_state.cart = [
+        x for x in st.session_state.cart
+        if _norm_name(x['Nama Barang']) != _norm_name(item['Nama Barang'])
+    ]
+    st.session_state.cart.append(item)
+    st.session_state.widget_id += 1
+    st.toast(f"✅ Ditambahkan: {item['Nama Barang']}")
+    time.sleep(0.2)
+    st.rerun()
+
 def get_creds():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     return Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
@@ -1097,15 +1138,31 @@ elif menu == "📝 Admin Sales":
             """, unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
 
-            if st.button("➕ Masukkan ke Keranjang", use_container_width=True, type="primary"):
-                st.session_state.cart = [x for x in st.session_state.cart if x['Nama Barang'] != pilihan_barang]
-                st.session_state.cart.append({
-                    "Nama Barang": pilihan_barang, "Qty": int(qty_c),
-                    "Harga": float(h_jual_c), "Satuan": sat_final,
-                    "Total_Row": float(qty_c * h_jual_c)
-                })
-                st.session_state.widget_id += 1
-                st.toast(f"✅ Ditambahkan: {pilihan_barang}"); time.sleep(0.2); st.rerun()
+            item_baru = {
+                "Nama Barang": pilihan_barang, "Qty": int(qty_c),
+                "Harga": float(h_jual_c), "Satuan": sat_final,
+                "Total_Row": float(qty_c * h_jual_c)
+            }
+            item_lama = next(
+                (x for x in st.session_state.cart
+                 if _norm_name(x['Nama Barang']) == _norm_name(pilihan_barang)), None
+            )
+
+            if item_lama:
+                st.warning(
+                    f"⚠️ **{pilihan_barang}** sudah ada di keranjang "
+                    f"({item_lama['Qty']} {item_lama['Satuan']} @ Rp {item_lama['Harga']:,.0f}). "
+                    f"Mau ditimpa dengan input baru ({int(qty_c)} {sat_final} @ Rp {h_jual_c:,.0f})?"
+                )
+                cy, cn = st.columns(2)
+                if cy.button("🔄 Ya, Timpa", key="btn_timpa_dup", type="primary", use_container_width=True):
+                    add_to_cart(item_baru)
+                if cn.button("❌ Batal", key="btn_batal_dup", use_container_width=True):
+                    st.session_state.widget_id += 1
+                    st.rerun()
+            else:
+                if st.button("➕ Masukkan ke Keranjang", use_container_width=True, type="primary"):
+                    add_to_cart(item_baru)
         else:
             st.markdown("""<div style="text-align:center; padding:20px 0; color:#7a9ab8;">
                 <div style="font-size:2rem; margin-bottom:8px;">🔍</div>
@@ -1250,6 +1307,17 @@ elif menu == "👨‍💻 Sales Dashboard":
                                 if real_row_idx in st.session_state.saved_items_cache:
                                     items_list = st.session_state.saved_items_cache[real_row_idx]
 
+                                # Data lama yang kebetulan sudah kembar di Sheets: gabungkan
+                                # (Qty dijumlah) supaya tidak bentrok widget key. Tersimpan
+                                # permanen setelah klik "SIMPAN PERUBAHAN DATA".
+                                items_list, kembar_lama = dedupe_items(items_list)
+                                if kembar_lama:
+                                    st.warning(
+                                        "⚠️ Ada barang dobel di penawaran ini dan sudah digabung otomatis "
+                                        "(Qty dijumlahkan): " + ", ".join(f"**{k}**" for k in kembar_lama)
+                                        + ". Cek Qty-nya lalu klik **Simpan Perubahan Data**."
+                                    )
+
                                 render_section_title("📝 Edit Daftar Barang")
                                 st.caption("💡 Ubah **Pos** untuk urutan. Centang 🗑️ untuk hapus.")
 
@@ -1325,11 +1393,32 @@ elif menu == "👨‍💻 Sales Dashboard":
                                     placeholder="Pilih barang untuk ditambahkan..."
                                 )
 
+                                # Barang yang dipilih tapi sudah ada di penawaran ini akan
+                                # OTOMATIS dilewati saat simpan (item yang dicentang 🗑️ Hapus
+                                # tidak dihitung, jadi boleh ditambahkan lagi).
+                                nama_aktif = {_norm_name(x['Nama']) for x in temp_up if not x['del']}
+                                akan_dilewati = [p for p in add_b if _norm_name(p) in nama_aktif]
+                                if akan_dilewati:
+                                    st.info(
+                                        "ℹ️ Sudah ada di penawaran, **tidak akan ditambahkan lagi**: "
+                                        + ", ".join(f"**{d}**" for d in akan_dilewati)
+                                        + ". Ubah Qty di item yang sudah ada kalau perlu."
+                                    )
+
                                 if st.button("💾 SIMPAN PERUBAHAN DATA", key=f"btn_save_{real_row_idx}", use_container_width=True):
                                     final = sorted([x for x in temp_up if not x['del']], key=lambda x: x['pos'])
+
+                                    # Tambah barang baru — lewati yang sudah ada / dobel pilih
+                                    nama_final = {_norm_name(x['Nama']) for x in final}
+                                    dilewati = []
                                     for p in add_b:
+                                        if _norm_name(p) in nama_final:
+                                            dilewati.append(p)
+                                            continue
                                         rb = df_barang[df_barang['Nama Barang'] == p].iloc[0]
                                         final.append({"Nama": p, "Qty": 1, "Harga": float(rb['Harga']), "Sat": str(rb['Satuan'])})
+                                        nama_final.add(_norm_name(p))
+
                                     save_data = [
                                         {
                                             "Nama Barang": x['Nama'],
@@ -1348,8 +1437,16 @@ elif menu == "👨‍💻 Sales Dashboard":
                                         st.session_state.saved_items_cache[real_row_idx] = save_data
                                         st.session_state.pop("gs_all_vals", None)
                                         clear_row_state(real_row_idx)
+                                        st.session_state.pop(f"add_new_{real_row_idx}", None)  # kosongkan pilihan tambah barang
                                         st.success(f"✅ Tersimpan & terverifikasi! {len(save_data)} barang.")
-                                        time.sleep(1)
+                                        if dilewati:
+                                            st.warning(
+                                                "⚠️ Tidak ditambahkan karena sudah ada: "
+                                                + ", ".join(f"**{d}**" for d in dilewati)
+                                            )
+                                            time.sleep(2.5)
+                                        else:
+                                            time.sleep(1)
                                         st.rerun()
                                     else:
                                         st.error(f"⚠️ Simpan gagal: {msg}. Coba lagi.")
